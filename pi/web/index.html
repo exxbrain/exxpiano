@@ -122,6 +122,7 @@
 const T = {
   en: {
     bank_title: "Piano bank", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
+    bank_profile: "Touch, volume and mechanics settings are remembered for each instrument.",
     bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", preset: "Preset",
     sw_switching: "Loading {bank}… about a minute of silence.", sw_done: "Now playing {bank}.", sw_rolled_back: "{bank} did not load; the previous bank is playing again.",
     sw_failed: "{bank} did not load and the previous bank could not be restored either: check the device.", sw_same: "This bank is already in use.",
@@ -145,6 +146,7 @@ const T = {
   },
   ru: {
     bank_title: "Банк рояля", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
+    bank_profile: "Чувствительность, громкость и механика запоминаются для каждого инструмента.",
     bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", preset: "Пресет",
     sw_switching: "Загружается {bank}… около минуты тишины.", sw_done: "Теперь играет {bank}.", sw_rolled_back: "{bank} не загрузился; снова играет прежний банк.",
     sw_failed: "{bank} не загрузился, и прежний банк восстановить тоже не удалось: проверьте устройство.", sw_same: "Этот банк уже используется.",
@@ -183,6 +185,7 @@ const LIVE = {
 const SYNTH_KEYS = ["alsa_device", "usb_period_size", "usb_periods", "reverb", "polyphony"];
 let state = null, token = sessionStorage.getItem("pianoToken") || "";
 const timers = {};
+const showers = {};          // name -> function that refreshes the number next to a slider
 
 function api(path, body) {
   const opt = { headers: { "X-Token": token } };
@@ -214,7 +217,7 @@ function buildSliders() {
       const out = document.createElement("output"); out.id = "o_" + name;
       const small = document.createElement("span"); small.className = "small"; small.textContent = hint;
       const show = () => { out.textContent = (+inp.value).toFixed(2).replace(/\.?0+$/, "") + unit; };
-      show();
+      show(); showers[name] = show;
       inp.addEventListener("input", () => {
         show(); if (name === "velocity_curve") drawCurve(+inp.value);
         clearTimeout(timers[name]);
@@ -223,6 +226,12 @@ function buildSliders() {
       row.append(lab, inp, out, small); $(box).append(row);
     }
   }
+}
+
+// bring the sliders to the values in state.settings (after a bank switch the new bank's remembered settings are in force)
+function syncSliders() {
+  for (const name of Object.keys(showers)) { const el = $("r_" + name); if (el) { el.value = state.settings[name]; showers[name](); } }
+  drawCurve(state.settings.velocity_curve);
 }
 
 function drawCurve(g) {
@@ -266,7 +275,7 @@ function renderBanks(force) {
   const sig = JSON.stringify([b.current, b.external, b.banks, b.switch, b.preset, b.presets, L]);
   if (sig === lastBanks && !force) return;
   lastBanks = sig;
-  $("bankHint").textContent = fmt(tr("bank_hint"), { dir: b.dir });
+  $("bankHint").textContent = fmt(tr("bank_hint"), { dir: b.dir }) + " " + tr("bank_profile");
   const list = $("bankList"); list.textContent = "";
   const busy = b.switch.state === "switching";
   const add = (title, small, playing, why, id, canUse) => {
@@ -356,7 +365,11 @@ async function applyRestart() {
 
 async function refresh() {
   try {
-    const s = await api("/api/state"); state.status = s.status; state.banks = s.banks; renderStatus(); renderBanks(false);
+    const s = await api("/api/state");
+    const prev = state.banks, dragging = document.activeElement && document.activeElement.type === "range";
+    const bankChanged = prev && (s.banks.current !== prev.current || (prev.switch.state === "switching" && s.banks.switch.state !== "switching"));
+    state.status = s.status; state.banks = s.banks; renderStatus(); renderBanks(false);
+    if (bankChanged && !dragging) { state.settings = s.settings; syncSliders(); }
     if (s.banks.switch.state === "switching") setTimeout(refresh, 1500);
   } catch (e) { /* the page keeps working */ }
 }

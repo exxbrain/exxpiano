@@ -127,11 +127,11 @@ cd /root/pi
 Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
 
 ```bash
-python3 scripts/build-deb.py --version 1.2.0                                # -> dist/piano-synth_1.2.0_all.deb
-python3 scripts/build-deb.py --version 1.2.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.2.0_all.deb
+python3 scripts/build-deb.py --version 1.3.0                                # -> dist/piano-synth_1.3.0_all.deb
+python3 scripts/build-deb.py --version 1.3.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.3.0_all.deb
 scp -O dist/*.deb root@<IP-Pi>:/root/
-ssh root@<IP-Pi> "apt install -y ./piano-synth_1.2.0_all.deb ./piano-synth-soundfonts_1.2.0_all.deb"
+ssh root@<IP-Pi> "apt install -y ./piano-synth_1.3.0_all.deb ./piano-synth-soundfonts_1.3.0_all.deb"
 ```
 
 - `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
@@ -143,7 +143,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.2.0_all.deb ./piano-synth-sound
 
 Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
 (`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
-На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.2.0_all.deb && dpkg-deb --contents piano-synth_1.2.0_all.deb`.
+На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.3.0_all.deb && dpkg-deb --contents piano-synth_1.3.0_all.deb`.
 
 ## Установщик для DietPi (собирается при каждом коммите)
 
@@ -158,7 +158,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.2.0_all.deb ./piano-synth-sound
 
 **Откуда берётся установщик.** Локально `scripts/install-hooks.sh` (один раз) включает git-хук: каждый `git commit` прогоняет тесты и собирает `dist/`
 (`.deb` и установщик для DietPi). На GitHub то же самое делает `.github/workflows/build.yml` для каждого пуша и pull request и сохраняет файлы как
-скачиваемый артефакт; тег вида `v1.2.0` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
+скачиваемый артефакт; тег вида `v1.3.0` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
 пакет, установщик и веб-страница берут её оттуда.
 
 Что проверено, а что нет: скрипт установщика проверен запуском с подставными `apt-get` и прочим, структура архива проверена тестами. Хук первой загрузки
@@ -246,6 +246,12 @@ vcgencmd get_throttled     # должно быть 0x0
 
 Если выбранный банк потом пропадёт или повредится (удалённый файл), модуль запустится с `PIANO_SF2_LAST_GOOD`, то есть с последним рабочим банком,
 а не останется без звука. Выбрать можно только имена файлов, которые видит папка библиотеки: страница никогда не присылает путь.
+
+**Настройки идут за инструментом.** Кривая чувствительности, общая громкость, уровни механики, случайность и пресет запоминаются **для каждого банка**
+(в `/var/lib/piano-synth/profiles.json`, ключ — имя файла банка, поэтому переименованный файл начинает с нуля). Подвинули ползунок: значение сохранено
+для играющего банка; выбрали другой банк: вернулись его собственные настройки, а при возврате снова прежние. Банк, на котором ещё не играли, стартует с настроек,
+действовавших в тот момент. Звуковой выход, буферы, полифония и переключатель реверберации принадлежат устройству и одинаковы для всех банков.
+Если переключение не удалось, возвращаются прежний банк и его настройки.
 
 Чтобы добавить банк сейчас, скопируйте `.sf2` в `BANK_DIR` (например `scp -O my.sf2 root@<Pi>:/opt/piano-synth/soundfonts/`); импорт с USB-флешки
 запланирован (`docs/plans/usb-banks.md`).

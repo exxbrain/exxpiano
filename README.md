@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.2.0                                # -> dist/piano-synth_1.2.0_all.deb
-python3 scripts/build-deb.py --version 1.2.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.2.0_all.deb
+python3 scripts/build-deb.py --version 1.3.0                                # -> dist/piano-synth_1.3.0_all.deb
+python3 scripts/build-deb.py --version 1.3.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.3.0_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.2.0_all.deb ./piano-synth-soundfonts_1.2.0_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.3.0_all.deb ./piano-synth-soundfonts_1.3.0_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.2.0_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.2.0_all.deb && dpkg-deb --contents piano-synth_1.2.0_all.deb`.
+`dpkg-deb --info piano-synth_1.3.0_all.deb && dpkg-deb --contents piano-synth_1.3.0_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -163,7 +163,7 @@ On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bas
 
 **Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
 builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
-and keeps the files as a downloadable artifact; a tag such as `v1.2.0` (it must equal the `VERSION` file) publishes them as a release.
+and keeps the files as a downloadable artifact; a tag such as `v1.3.0` (it must equal the `VERSION` file) publishes them as a release.
 Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
 
 What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
@@ -251,6 +251,12 @@ bank 0 programs 1-6 are not offered because the mechanics bank answers there.
 
 If the chosen bank is later missing or damaged (a deleted file), the module starts with `PIANO_SF2_LAST_GOOD`, the last bank that worked,
 instead of staying silent. Only file names that the library folder lists can be chosen: the page never sends a path.
+
+**Settings follow the instrument.** The touch curve, master volume, mechanics levels, randomness and the preset are remembered **per bank** (in
+`/var/lib/piano-synth/profiles.json`, keyed by the bank's file name, so renaming a file starts it afresh). Change a slider and it is stored for the bank
+that is playing; choose another bank and that bank's own settings come back, then back again when you return. A bank that was never played
+starts from the settings in force at that moment. The audio output, buffers, polyphony and reverb switch belong to the device and are the same
+for every bank. If a switch fails, the old bank and its settings are restored.
 
 To add a bank for now, copy a `.sf2` into `BANK_DIR` (for example `scp -O my.sf2 root@<Pi>:/opt/piano-synth/soundfonts/`); importing from a USB
 flash drive is planned (`docs/plans/usb-banks.md`).

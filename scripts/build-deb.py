@@ -161,6 +161,7 @@ def main():
         ('opt/piano-synth/pianoconf.py', src('pi', 'pianoconf.py'), 0o644),
         ('opt/piano-synth/sf2info.py', src('pi', 'sf2info.py'), 0o755),
         ('opt/piano-synth/banklib.py', src('pi', 'banklib.py'), 0o644),
+        ('opt/piano-synth/profiles.py', src('pi', 'profiles.py'), 0o644),
         ('opt/piano-synth/piano-web.py', src('pi', 'piano-web.py'), 0o755),
         ('opt/piano-synth/web/index.html', src('pi', 'web', 'index.html'), 0o644),
         ('lib/systemd/system/piano-web.service', src('pi', 'piano-web.service'), 0o644),
@@ -184,7 +185,7 @@ def main():
 
     with tempfile.TemporaryDirectory() as tmp:
         built = [build_package(args.out, 'piano-synth', args.version, DEPENDS, description, main_files,
-                               ['opt/piano-synth/soundfonts'], scripts, ['/etc/piano-synth.conf'], mtime, tmp)]
+                               ['opt/piano-synth/soundfonts', 'var/lib/piano-synth'], scripts, ['/etc/piano-synth.conf'], mtime, tmp)]
         if args.banks:
             piano, mech = args.banks
             for p in (piano, mech):

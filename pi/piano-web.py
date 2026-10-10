@@ -22,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import banklib
 import pianoconf
+import profiles
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 MAX_BODY = 4096
@@ -184,20 +185,35 @@ class Switcher:
     def _set(self, state, message):
         self.status = dict(state=state, message=message, bank=self.status.get('bank'))
 
+    def _per_bank(self, settings):
+        return {n: settings[n] for n in pianoconf.PER_BANK_NAMES}
+
     def _run(self, path, bank_id, preset):
-        conf, actions = self.app.conf_path, self.app.actions
+        app, conf, actions = self.app, self.app.conf_path, self.app.actions
         raw = pianoconf.parse_conf(conf)
         old_path = raw.get('PIANO_SF2')
-        old = pianoconf.get_settings(conf)
+        old = self._per_bank(pianoconf.get_settings(conf))
+        old_key = os.path.basename(old_path) if old_path else None
+        # 1. what the old bank was last played with is remembered now (also covers edits made by hand in the file)
+        app.remember(old_key, old)
+        # 2. the new bank brings its own settings back; a bank never played before starts from the current ones
+        mine = dict(old)
+        saved = profiles.get(app.profile_path, bank_id)
+        if saved:
+            mine.update(saved)
+        usable = {(p['bank'], p['program']) for p in banklib.presets_of(path) if p['usable']}
+        if not saved or (mine['piano_bank'], mine['piano_prog']) not in usable:
+            mine['piano_bank'], mine['piano_prog'] = preset
         ready = False
         try:
-            pianoconf.apply_updates({'piano_bank': preset[0], 'piano_prog': preset[1]}, conf, raw={'PIANO_SF2': path})
+            pianoconf.apply_updates(mine, conf, raw={'PIANO_SF2': path})
             old_pid = actions.synth_pid()
             actions.restart_synth()
             ready = actions.wait_synth_ready(old_pid)
         except Exception as exc:                                # whatever went wrong, the old bank must come back
             print('bank switch failed: %s' % exc, file=sys.stderr)
         if ready:
+            app.remember(bank_id, mine)
             try:
                 pianoconf.apply_updates(None, conf, raw={'PIANO_SF2_LAST_GOOD': path})
             except (OSError, ValueError) as exc:
@@ -207,9 +223,8 @@ class Switcher:
         if not old_path:
             self._set('failed', 'The new bank did not load and there is no previous bank to go back to')
             return
-        try:
-            pianoconf.apply_updates({'piano_bank': old['piano_bank'], 'piano_prog': old['piano_prog']}, conf,
-                                    raw={'PIANO_SF2': old_path})
+        try:                                                    # the old bank AND its settings come back
+            pianoconf.apply_updates(old, conf, raw={'PIANO_SF2': old_path})
             old_pid = actions.synth_pid()
             actions.restart_synth()
             back = actions.wait_synth_ready(old_pid)
@@ -227,6 +242,7 @@ class App:
         self.actions = actions or Actions()
         conf = pianoconf.parse_conf(self.conf_path)
         self.token = conf.get('WEB_TOKEN', '')
+        self.profile_path = conf.get('PROFILE_FILE') or profiles.DEFAULT_PATH
         self.switcher = Switcher(self)
 
     def spec(self):
@@ -244,6 +260,20 @@ class App:
             status=dict(synth=a.service_state('piano-synth'), bridge=a.service_state('piano-fx'),
                         output=a.audio_output(), cards=a.cards()),
         )
+
+    # ---- settings remembered per instrument
+    def current_key(self):
+        cur = pianoconf.parse_conf(self.conf_path).get('PIANO_SF2')
+        return os.path.basename(cur) if cur else None
+
+    def remember(self, key, settings):
+        """Store the per-instrument settings under the bank's file name (a failure is logged, never fatal)."""
+        if not key:
+            return
+        try:
+            profiles.save(self.profile_path, key, settings)
+        except OSError as exc:
+            print('could not remember the settings of %s: %s' % (key, exc), file=sys.stderr)
 
     # ---- the piano banks
     def _bank_context(self):
@@ -268,7 +298,9 @@ class App:
             info, _ = banklib.inspect(current)
             external = dict(path=current, name=(info or {}).get('name') or os.path.basename(current))
         s = pianoconf.get_settings(self.conf_path)
+        key = os.path.basename(current) if current else None
         return dict(dir=bank_dir, current=current_id, external=external, banks=banks,
+                    profile=dict(key=key, saved=bool(key and profiles.get(self.profile_path, key))),
                     presets=banklib.presets_of(current) if current else [],
                     preset=dict(bank=s['piano_bank'], program=s['piano_prog']), switch=self.switcher.status)
 
@@ -305,9 +337,14 @@ class App:
             raise ValueError('no such preset in the current bank, or the mechanics bank shadows it')
 
     def update(self, body):
+        per_bank = isinstance(body, dict) and any(k in pianoconf.PER_BANK_NAMES for k in body)
+        if per_bank and self.switcher.busy():
+            raise Busy()                                   # the switch is writing these very values
         if isinstance(body, dict):
             self._check_preset(body)
         settings, scopes = pianoconf.apply_updates(body, self.conf_path)     # ValueError -> 400
+        if per_bank:
+            self.remember(self.current_key(), {n: settings[n] for n in pianoconf.PER_BANK_NAMES})
         done = dict(fx='fx' in scopes, gain=None)         # gain: True live, False failed, None unchanged
         if 'gain' in scopes:
             done['gain'] = bool(self.actions.set_gain(settings['gain']))

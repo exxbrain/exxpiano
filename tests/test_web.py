@@ -15,6 +15,7 @@ PI = os.path.join(HERE, '..', 'pi')
 sys.path.insert(0, PI)
 sys.path.insert(0, HERE)
 from sf2fixture import make_sf2  # noqa: E402
+import profiles  # noqa: E402
 spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'piano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
@@ -83,8 +84,9 @@ class ServerCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.conf = os.path.join(self.tmp.name, 'piano-synth.conf')
+        self.profile_file = os.path.join(self.tmp.name, 'state', 'profiles.json')    # never the real /var/lib
         with open(self.conf, 'w') as f:
-            f.write(conf)
+            f.write(conf + 'PROFILE_FILE=%s\n' % self.profile_file)
         self.actions = FakeActions()
         self.app = web.App(self.conf, self.actions)
         self.server = ThreadingHTTPServer(('127.0.0.1', 0), web.make_handler(self.app))
@@ -341,6 +343,113 @@ class BankWebTests(ServerCase):
         self.start(self.conf_text_base + 'WEB_TOKEN=s3cret\n')
         self.assertEqual(self.call('/api/bank', {'id': 'new.sf2'})[0], 401)
         self.assertEqual(self.actions.restarts, 0)
+
+
+class InstrumentProfileTests(ServerCase):
+    """Every bank remembers its own touch, volume, mechanics and preset; switching brings them back."""
+
+    def setUp(self):
+        self.bank_tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.bank_tmp.cleanup)
+        d = self.bank_dir = self.bank_tmp.name
+        self.mech = make_sf2(os.path.join(d, 'mech.sf2'), presets=[('Hammer', 0, 1)])
+        self.a = make_sf2(os.path.join(d, 'a.sf2'), presets=[('A piano', 0, 0)], name='A')
+        self.b = make_sf2(os.path.join(d, 'b.sf2'), presets=[('B piano', 0, 0), ('B pad', 0, 90)], name='B')
+        self.base = ('BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nGAIN=1.0\nFX_ARGS="--hammer-boost 0"\n' % (d, self.a, self.mech))
+        self.start(self.base)
+
+    def settings(self):
+        return self.jcall('/api/state')[1]['settings']
+
+    def switch(self, bank_id):
+        self.assertEqual(self.jcall('/api/bank', {'id': bank_id})[0], 200)
+        self.app.switcher.join(10)
+
+    def test_a_change_is_remembered_for_the_bank_that_is_playing(self):
+        self.jcall('/api/settings', {'velocity_curve': 1.5, 'hammer_boost': 4})
+        p = profiles.get(self.profile_file, 'a.sf2')
+        self.assertEqual((p['velocity_curve'], p['hammer_boost']), (1.5, 4.0))
+        self.assertIsNone(profiles.get(self.profile_file, 'b.sf2'))
+
+    def test_device_settings_are_not_remembered_per_bank(self):
+        self.jcall('/api/settings', {'polyphony': 64, 'alsa_device': 'plughw:U24'})
+        self.assertIsNone(profiles.get(self.profile_file, 'a.sf2'))
+
+    def test_a_bank_never_played_inherits_the_current_settings(self):
+        self.jcall('/api/settings', {'velocity_curve': 1.5, 'gain': 1.7})
+        self.switch('b.sf2')
+        s = self.settings()
+        self.assertEqual((s['velocity_curve'], s['gain']), (1.5, 1.7))
+        self.assertEqual(profiles.get(self.profile_file, 'b.sf2')['velocity_curve'], 1.5)       # now it has a profile of its own
+
+    def test_each_bank_gets_its_own_settings_back(self):
+        self.jcall('/api/settings', {'velocity_curve': 1.5, 'gain': 1.2})                        # A
+        self.switch('b.sf2')
+        self.jcall('/api/settings', {'velocity_curve': 0.7, 'gain': 2.0, 'hammer_boost': 6})     # B
+        self.switch('a.sf2')
+        s = self.settings()
+        self.assertEqual((s['velocity_curve'], s['gain'], s['hammer_boost']), (1.5, 1.2, 0.0))
+        self.switch('b.sf2')
+        s = self.settings()
+        self.assertEqual((s['velocity_curve'], s['gain'], s['hammer_boost']), (0.7, 2.0, 6.0))
+        self.assertIn('GAIN=2', self.conf_text())                                                # the synthesizer starts with it
+
+    def test_the_preset_is_remembered_per_bank_too(self):
+        self.switch('b.sf2')
+        self.assertEqual(self.jcall('/api/settings', {'piano_bank': 0, 'piano_prog': 90})[0], 200)
+        self.switch('a.sf2')
+        self.assertEqual(self.settings()['piano_prog'], 0)
+        self.switch('b.sf2')
+        s = self.settings()
+        self.assertEqual((s['piano_bank'], s['piano_prog']), (0, 90))
+
+    def test_a_remembered_preset_that_no_longer_exists_falls_back_to_the_default(self):
+        profiles.save(self.profile_file, 'b.sf2', {'piano_bank': 5, 'piano_prog': 77, 'velocity_curve': 0.9})
+        self.switch('b.sf2')
+        s = self.settings()
+        self.assertEqual((s['piano_bank'], s['piano_prog']), (0, 0))
+        self.assertEqual(s['velocity_curve'], 0.9)                                                # the rest is still brought back
+
+    def test_values_edited_by_hand_in_the_file_are_not_lost_when_switching_away(self):
+        with open(self.conf) as f:
+            text = f.read()
+        with open(self.conf, 'w') as f:
+            f.write(text.replace('--hammer-boost 0', '--hammer-boost 0 --velocity-curve 1.9'))   # not through the page
+        self.switch('b.sf2')
+        self.assertEqual(profiles.get(self.profile_file, 'a.sf2')['velocity_curve'], 1.9)
+
+    def test_a_failed_switch_puts_the_old_settings_back_too(self):
+        self.jcall('/api/settings', {'velocity_curve': 1.5, 'gain': 1.2})
+        profiles.save(self.profile_file, 'b.sf2', {'velocity_curve': 0.5, 'gain': 3.0})
+        self.actions.ready = [False, True]
+        self.switch('b.sf2')
+        s = self.settings()
+        self.assertEqual((s['velocity_curve'], s['gain']), (1.5, 1.2))
+        self.assertIn('PIANO_SF2="%s"' % self.a, self.conf_text())
+        self.assertEqual(profiles.get(self.profile_file, 'b.sf2')['velocity_curve'], 0.5)       # B's own profile is untouched
+
+    def test_per_bank_changes_are_refused_while_a_switch_runs_but_device_settings_are_not(self):
+        self.actions.gate = threading.Event()
+        self.jcall('/api/bank', {'id': 'b.sf2'})
+        try:
+            self.assertEqual(self.jcall('/api/settings', {'velocity_curve': 1.1})[0], 409)
+            self.assertEqual(self.jcall('/api/settings', {'gain': 1.1})[0], 409)
+            self.assertEqual(self.jcall('/api/settings', {'polyphony': 64})[0], 200)
+        finally:
+            self.actions.gate.set()
+            self.app.switcher.join(10)
+
+    def test_the_state_says_whether_the_bank_has_remembered_settings(self):
+        b = self.jcall('/api/state')[1]['banks']
+        self.assertEqual(b['profile'], dict(key='a.sf2', saved=False))
+        self.jcall('/api/settings', {'velocity_curve': 1.3})
+        self.assertEqual(self.jcall('/api/state')[1]['banks']['profile'], dict(key='a.sf2', saved=True))
+
+    def test_the_profiles_survive_a_restart_of_the_web_service(self):
+        self.jcall('/api/settings', {'velocity_curve': 1.3})
+        again = web.App(self.conf, self.actions)                 # a new process, same files
+        self.assertTrue(again.banks_state()['profile']['saved'])
+        self.assertEqual(profiles.get(again.profile_path, 'a.sf2')['velocity_curve'], 1.3)
 
 
 class GainPipeTests(unittest.TestCase):

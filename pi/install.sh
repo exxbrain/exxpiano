@@ -44,6 +44,8 @@ install -m 755 "$HERE/piano-synth-run" "$PREFIX/piano-synth-run"
 install -m 644 "$HERE/pianoconf.py" "$PREFIX/pianoconf.py"
 install -m 755 "$HERE/sf2info.py" "$PREFIX/sf2info.py"
 install -m 644 "$HERE/banklib.py" "$PREFIX/banklib.py"
+install -m 644 "$HERE/profiles.py" "$PREFIX/profiles.py"
+install -d /var/lib/piano-synth
 install -m 755 "$HERE/piano-web.py" "$PREFIX/piano-web.py"
 install -d "$PREFIX/web"
 install -m 644 "$HERE/web/index.html" "$PREFIX/web/index.html"
