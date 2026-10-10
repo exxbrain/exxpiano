@@ -89,6 +89,13 @@ a bad bank, clicks while copying, reboot persistence.
 
 What this changes in the plan: phase 5 shrinks (no SFZ, no auto-import); phase 4 stays but is not a blocker; phase 3 has no hardware-button path.
 
+## Progress
+
+- **Done (2026-10-10), before any USB work:** choosing among the banks already on the device. `pi/sf2info.py` (bounded SF2 reader), `pi/banklib.py`
+  (the library: listing, memory check, safe name resolution), the **Piano bank** card in the web page, background switching with automatic rollback,
+  preset selection, and the fall-back to the last good bank at start. 117 tests. Not yet tried on the real Pi.
+- **Left:** phase 0 (the spike on the Pi), mounting and detecting the drive (phase 2), importing into the library from the drive (phase 3), hardening (phase 4).
+
 ## Next step
 
 Phase 0 on the real Pi (read-only checks and one measurement, see above), in parallel with phase 1 (bank library and SF2 reader),

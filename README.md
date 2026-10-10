@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.1.0                                # -> dist/piano-synth_1.1.0_all.deb
-python3 scripts/build-deb.py --version 1.1.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.1.0_all.deb
+python3 scripts/build-deb.py --version 1.2.0                                # -> dist/piano-synth_1.2.0_all.deb
+python3 scripts/build-deb.py --version 1.2.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.2.0_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.1.0_all.deb ./piano-synth-soundfonts_1.1.0_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.2.0_all.deb ./piano-synth-soundfonts_1.2.0_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.1.0_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.1.0_all.deb && dpkg-deb --contents piano-synth_1.1.0_all.deb`.
+`dpkg-deb --info piano-synth_1.2.0_all.deb && dpkg-deb --contents piano-synth_1.2.0_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -240,6 +240,20 @@ Everything is in `/etc/piano-synth.conf`. After editing: `sudo systemctl restart
 | `--res-boost DB` | 0 | string-resonance level |
 | `--pedal-boost DB` | 0 | pedal-noise level |
 | `--velocity-curve G` | 1.0 | touch curve for the whole piano: out = 127 * (in/127)^G. 1 = unchanged, below 1 soft touches sound louder, above 1 you must play harder |
+
+## Choosing the piano bank
+
+The page has a **Piano bank** card that lists the sound banks (`*.sf2`, `*.sf3`) found in `BANK_DIR` (default `/opt/piano-synth/soundfonts`; the
+mechanics bank is never offered). **Use** switches the piano: the synthesizer reloads (about a minute of silence). If the new bank does not come
+up, the previous one is put back automatically and the page says so. A bank is refused, with the reason shown, when it is damaged or too large
+for the device's memory (on a Pi 3: about 500 MB). If the bank has several presets the card also offers a **Preset** drop-down (applied at once);
+bank 0 programs 1-6 are not offered because the mechanics bank answers there.
+
+If the chosen bank is later missing or damaged (a deleted file), the module starts with `PIANO_SF2_LAST_GOOD`, the last bank that worked,
+instead of staying silent. Only file names that the library folder lists can be chosen: the page never sends a path.
+
+To add a bank for now, copy a `.sf2` into `BANK_DIR` (for example `scp -O my.sf2 root@<Pi>:/opt/piano-synth/soundfonts/`); importing from a USB
+flash drive is planned (`docs/plans/usb-banks.md`).
 
 ## Web interface
 

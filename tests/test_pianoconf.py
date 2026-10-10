@@ -24,7 +24,7 @@ FX_ARGS="--hammer-boost 0 --hammer-exp 0.8 --random 1"
 """
 
 
-class ConfTests(unittest.TestCase):
+class ConfBase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.tmp.name, 'piano-synth.conf')
@@ -38,6 +38,8 @@ class ConfTests(unittest.TestCase):
         with open(self.path) as f:
             return f.read()
 
+
+class ConfTests(ConfBase):
     def test_reads_values_and_fills_defaults(self):
         s = pc.get_settings(self.path)
         self.assertEqual(s['hammer_exp'], 0.8)
@@ -102,6 +104,39 @@ class ConfTests(unittest.TestCase):
         pc.apply_updates({'gain': 2}, self.path)
         self.assertEqual(oct(os.stat(self.path).st_mode & 0o777), oct(0o644))
         self.assertEqual(os.listdir(self.tmp.name), ['piano-synth.conf'])
+
+
+class RawPathTests(ConfBase):
+    """Paths of banks are written by the server itself, never taken from a request as they are."""
+
+    def test_a_path_is_written_quoted_and_read_back_in_the_same_atomic_step_as_settings(self):
+        path = '/var/lib/piano-synth/banks/My Bank (v2).sf2'
+        pc.apply_updates({'piano_bank': 2, 'piano_prog': 5}, self.path, raw={'PIANO_SF2': path})
+        text = self.read()
+        self.assertIn('PIANO_SF2="%s"' % path, text)
+        self.assertEqual(pc.parse_conf(self.path)['PIANO_SF2'], path)
+        s = pc.get_settings(self.path)
+        self.assertEqual((s['piano_bank'], s['piano_prog']), (2, 5))
+        self.assertIn('--piano-bank 2', text)
+        self.assertEqual(text.count('PIANO_SF2='), 1)               # replaced, not duplicated
+
+    def test_raw_only_write(self):
+        pc.apply_updates(None, self.path, raw={'PIANO_SF2_LAST_GOOD': '/b/x.sf2'})
+        self.assertIn('PIANO_SF2_LAST_GOOD="/b/x.sf2"', self.read())
+
+    def test_unsafe_raw_values_are_refused_and_nothing_is_written(self):
+        for key, value in (('PIANO_SF2', 'relative/x.sf2'), ('PIANO_SF2', '/a/b"; rm -rf /; "'), ('PIANO_SF2', '/a/$HOME/x'),
+                           ('PIANO_SF2', '/a/b\nGAIN=9'), ('PIANO_SF2', '/a/`id`'), ('PIANO_SF2', 5), ('GAIN', '/a/b'),
+                           ('FX_ARGS', '/a/b'), ('PIANO_SF2', '/' + 'x' * 400)):
+            with self.subTest((key, value)), self.assertRaises(ValueError):
+                pc.apply_updates(None, self.path, raw={key: value})
+        self.assertEqual(self.read(), SAMPLE)
+
+    def test_preset_settings_are_validated(self):
+        for bad in ({'piano_bank': -1}, {'piano_bank': 128}, {'piano_prog': 'x'}, {'piano_prog': 1e9}):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                pc.validate(bad)
+        self.assertEqual(pc.validate({'piano_bank': 3, 'piano_prog': 4}), {'piano_bank': 3, 'piano_prog': 4})
 
 
 if __name__ == '__main__':

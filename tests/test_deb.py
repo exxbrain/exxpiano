@@ -128,7 +128,8 @@ class DebTests(unittest.TestCase):
         names = [m.name for m in data.getmembers()]
         self.assertEqual(data.extractfile('./opt/piano-synth/VERSION').read().decode().strip(), '9.9.9')
         self.assertIn('./lib/udev/rules.d/90-piano-synth.rules', names)
-        for web_file in ('./opt/piano-synth/pianoconf.py', './opt/piano-synth/piano-web.py',
+        for web_file in ('./opt/piano-synth/pianoconf.py', './opt/piano-synth/piano-web.py', './opt/piano-synth/sf2info.py',
+                         './opt/piano-synth/banklib.py',
                          './opt/piano-synth/web/index.html', './lib/systemd/system/piano-web.service'):
             self.assertIn(web_file, names)
 

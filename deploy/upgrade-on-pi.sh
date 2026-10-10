@@ -35,6 +35,12 @@ dpkg -s piano-synth 2>/dev/null | grep '^Version' | tee "$BACKUP/version.txt" ||
 echo "== 3/6 Installing (keeping your configuration)"
 dpkg -i --force-confold "$DEB" || rollback "dpkg failed"
 
+# An older configuration has no BANK_DIR: use the folder of the bank that is playing now, so the web page lists your banks.
+if ! grep -q '^BANK_DIR=' /etc/piano-synth.conf; then
+  cur="$(sed -n 's/^PIANO_SF2="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/piano-synth.conf | head -1)"
+  [ -n "$cur" ] && echo "BANK_DIR=$(dirname "$cur")" >> /etc/piano-synth.conf && echo "BANK_DIR set to $(dirname "$cur")"
+fi
+
 echo "== 4/6 Starting (the banks load for ~40 s)"
 systemctl daemon-reload
 systemctl enable piano-synth piano-fx piano-web >/dev/null 2>&1

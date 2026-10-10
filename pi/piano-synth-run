@@ -30,6 +30,18 @@ has_playback() {
   compgen -G "$ASOUND/card$1/pcm*p" >/dev/null
 }
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SF2INFO="${SF2INFO:-$HERE/sf2info.py}"
+
+# A bank that is missing or damaged (a deleted file, a half-copied one) must not leave the module silent: fall back to the
+# last bank that is known to have worked (the web interface records it after every successful switch).
+if [ -f "$SF2INFO" ] && command -v python3 >/dev/null && ! python3 "$SF2INFO" --check "${PIANO_SF2:-}" 2>/dev/null; then
+  if [ -n "${PIANO_SF2_LAST_GOOD:-}" ] && python3 "$SF2INFO" --check "$PIANO_SF2_LAST_GOOD" 2>/dev/null; then
+    echo "piano-synth: ${PIANO_SF2:-<none>} is missing or damaged, using the last good bank $PIANO_SF2_LAST_GOOD" >&2
+    PIANO_SF2="$PIANO_SF2_LAST_GOOD"
+  fi
+fi
+
 # prints "<card id> <usb|onboard|other>" for the best card, or nothing
 pick_card() {
   local usb="" onboard="" other="" num id

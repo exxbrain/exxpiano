@@ -111,6 +111,50 @@ class AudioSelectTests(unittest.TestCase):
         self.assertIn('plughw:CARD=First', r.stdout)
 
 
+class LastGoodBankTests(unittest.TestCase):
+    """A missing or damaged piano bank must fall back to the last good one instead of leaving the module silent."""
+
+    def setUp(self):
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from sf2fixture import make_sf2
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.good = make_sf2(os.path.join(self.tmp.name, 'good.sf2'))
+        self.other = make_sf2(os.path.join(self.tmp.name, 'other.sf2'))
+        self.broken = os.path.join(self.tmp.name, 'broken.sf2')
+        with open(self.broken, 'wb') as f:
+            f.write(b'half a copy')
+        self.asound = os.path.join(self.tmp.name, 'asound')
+        os.makedirs(os.path.join(self.asound, 'card0', 'pcm0p'))
+        with open(os.path.join(self.asound, 'cards'), 'w') as f:
+            f.write(' 0 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n')
+
+    def run_script(self, piano, last_good=''):
+        env = dict(os.environ, ASOUND_DIR=self.asound, DRY_RUN='1', USB_WAIT='0', PIANO_SF2=piano, MECH_SF2='/m.sf2',
+                   PIANO_SF2_LAST_GOOD=last_good, FLUIDSYNTH='/usr/bin/fluidsynth')
+        return subprocess.run(['bash', RUN], env=env, capture_output=True, text=True)
+
+    def test_a_good_bank_is_used_as_it_is(self):
+        r = self.run_script(self.other, self.good)
+        self.assertTrue(r.stdout.strip().endswith('%s /m.sf2' % self.other), r.stdout + r.stderr)
+
+    def test_a_damaged_bank_falls_back_to_the_last_good_one(self):
+        r = self.run_script(self.broken, self.good)
+        self.assertTrue(r.stdout.strip().endswith('%s /m.sf2' % self.good), r.stdout + r.stderr)
+        self.assertIn('using the last good bank', r.stderr)
+
+    def test_a_missing_bank_falls_back_too(self):
+        r = self.run_script(os.path.join(self.tmp.name, 'gone.sf2'), self.good)
+        self.assertTrue(r.stdout.strip().endswith('%s /m.sf2' % self.good), r.stdout + r.stderr)
+
+    def test_without_a_good_fallback_the_configured_bank_is_kept(self):
+        r = self.run_script(self.broken, '')
+        self.assertTrue(r.stdout.strip().endswith('%s /m.sf2' % self.broken))
+        r = self.run_script(self.broken, self.broken)                  # the "last good" one is damaged as well
+        self.assertTrue(r.stdout.strip().endswith('%s /m.sf2' % self.broken))
+
+
 class PipePlumbingTests(unittest.TestCase):
     """FluidSynth must keep running on a root-only pipe, and commands written into the pipe must reach it."""
 

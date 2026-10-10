@@ -50,6 +50,15 @@
   .check { display: flex; gap: 10px; align-items: center; padding: 8px 0; }
   .check input { width: 20px; height: 20px; }
   #login { display: none; }
+  .bank { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .bank:first-child { border-top: 0; }
+  .bank .meta { flex: 1; min-width: 0; }
+  .bank .meta b { display: block; overflow-wrap: anywhere; }
+  .bank .meta small { color: var(--muted); display: block; overflow-wrap: anywhere; }
+  .bank .why { color: var(--warn); font-size: .82rem; }
+  .badge { background: var(--ok); color: #fff; padding: 2px 10px; border-radius: 999px; font-size: .78rem; white-space: nowrap; }
+  #bankStatus { min-height: 2.9em; font-size: .9rem; margin: 6px 0 0; }
+  #bankStatus.warn { color: var(--warn); } #bankStatus.err { color: var(--bad); } #bankStatus.ok { color: var(--ok); }
 </style>
 </head>
 <body>
@@ -65,6 +74,14 @@
 
   <div class="card">
     <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-t="bank_title">Piano bank</h2>
+    <p class="hint" id="bankHint"></p>
+    <div id="bankList"></div>
+    <div class="row" id="presetRow" style="display:none"><label for="preset" data-t="preset">Preset</label><select id="preset" style="grid-column:1/3"></select></div>
+    <p id="bankStatus" role="status"></p>
   </div>
 
   <div class="card">
@@ -104,6 +121,10 @@
 "use strict";
 const T = {
   en: {
+    bank_title: "Piano bank", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
+    bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", preset: "Preset",
+    sw_switching: "Loading {bank}… about a minute of silence.", sw_done: "Now playing {bank}.", sw_rolled_back: "{bank} did not load; the previous bank is playing again.",
+    sw_failed: "{bank} did not load and the previous bank could not be restored either: check the device.", sw_same: "This bank is already in use.",
     title: "Piano module", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
     volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
     audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).",
@@ -123,6 +144,10 @@ const T = {
     s_pedal_boost: ["Pedal noise level", "dB relative to the original.", " dB"],
   },
   ru: {
+    bank_title: "Банк рояля", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
+    bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", preset: "Пресет",
+    sw_switching: "Загружается {bank}… около минуты тишины.", sw_done: "Теперь играет {bank}.", sw_rolled_back: "{bank} не загрузился; снова играет прежний банк.",
+    sw_failed: "{bank} не загрузился, и прежний банк восстановить тоже не удалось: проверьте устройство.", sw_same: "Этот банк уже используется.",
     title: "Модуль пианино", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
     volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
     audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки).",
@@ -232,6 +257,63 @@ function fillAudio() {
 }
 
 let lastStatus = "";
+let lastBanks = "";
+const fmt = (text, vars) => text.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
+const mb = n => (n / 1048576 >= 10 ? Math.round(n / 1048576) : (n / 1048576).toFixed(1)) + " MB";
+
+function renderBanks(force) {
+  const b = state.banks; if (!b) return;
+  const sig = JSON.stringify([b.current, b.external, b.banks, b.switch, b.preset, b.presets, L]);
+  if (sig === lastBanks && !force) return;
+  lastBanks = sig;
+  $("bankHint").textContent = fmt(tr("bank_hint"), { dir: b.dir });
+  const list = $("bankList"); list.textContent = "";
+  const busy = b.switch.state === "switching";
+  const add = (title, small, playing, why, id, canUse) => {
+    const row = document.createElement("div"); row.className = "bank";
+    const meta = document.createElement("div"); meta.className = "meta";
+    const t = document.createElement("b"); t.textContent = title;
+    const s = document.createElement("small"); s.textContent = small; meta.append(t, s);
+    if (why) { const w = document.createElement("span"); w.className = "why"; w.textContent = why; meta.append(w); }
+    row.append(meta);
+    if (playing) { const g = document.createElement("span"); g.className = "badge"; g.textContent = tr("playing"); row.append(g); }
+    else if (id) {
+      const btn = document.createElement("button"); btn.textContent = tr("use"); btn.disabled = !canUse || busy;
+      btn.addEventListener("click", () => useBank(id)); row.append(btn);
+    }
+    list.append(row);
+  };
+  if (b.external) add(b.external.name, b.external.path + " (" + tr("outside") + ")", true, null, null, false);
+  for (const x of b.banks) {
+    add(x.name, x.id + " · " + mb(x.size) + " · " + fmt(tr("presets_n"), { n: x.presets }), x.id === b.current,
+        x.ok && x.fits ? null : x.reason, x.id, x.ok && x.fits);
+  }
+  if (!b.banks.length && !b.external) { const p = document.createElement("p"); p.className = "hint"; p.textContent = fmt(tr("bank_empty"), { dir: b.dir }); list.append(p); }
+  // the preset of the current bank (only when there is a choice)
+  const usable = (b.presets || []).filter(p => p.usable);
+  const sel = $("preset"); sel.textContent = "";
+  for (const p of usable) {
+    const o = document.createElement("option"); o.value = p.bank + ":" + p.program;
+    o.textContent = p.name + " (" + p.bank + "/" + p.program + ")"; sel.append(o);
+  }
+  sel.value = b.preset.bank + ":" + b.preset.program; sel.disabled = busy;
+  $("presetRow").style.display = usable.length > 1 ? "grid" : "none";
+  // what the switch is doing or has just done
+  const st = $("bankStatus"), sw = b.switch;
+  const cls = { switching: "warn", done: "ok", rolled_back: "err", failed: "err" }[sw.state] || "";
+  st.className = cls;
+  st.textContent = sw.state === "idle" ? "" : fmt(tr("sw_" + sw.state), { bank: sw.bank || "" });
+}
+
+async function useBank(id) {
+  try {
+    const r = await api("/api/bank", { id });
+    if (!r.started) { $("bankStatus").className = ""; $("bankStatus").textContent = tr("sw_same"); return; }
+    state.banks.switch = { state: "switching", message: "", bank: id };
+    renderBanks(true); setTimeout(refresh, 1500);
+  } catch (e) { $("bankStatus").className = "err"; $("bankStatus").textContent = tr("err") + ": " + e.message; }
+}
+
 function renderStatus() {
   const st = state.status, box = $("status");
   const sig = JSON.stringify(st.synth) + JSON.stringify(st.bridge) + JSON.stringify(st.output);
@@ -273,7 +355,10 @@ async function applyRestart() {
 }
 
 async function refresh() {
-  try { const s = await api("/api/state"); state.status = s.status; renderStatus(); } catch (e) { /* the page keeps working */ }
+  try {
+    const s = await api("/api/state"); state.status = s.status; state.banks = s.banks; renderStatus(); renderBanks(false);
+    if (s.banks.switch.state === "switching") setTimeout(refresh, 1500);
+  } catch (e) { /* the page keeps working */ }
 }
 
 async function start() {
@@ -283,7 +368,8 @@ async function start() {
   $("login").style.display = "none";
   $("ver").textContent = [state.version ? "piano-synth " + state.version : "", state.fluidsynth ? "FluidSynth " + state.fluidsynth : ""].filter(Boolean).join(" · ");
   ["touchRows", "volumeRows", "mechRows"].forEach(id => { $(id).textContent = ""; });
-  buildSliders(); drawCurve(state.settings.velocity_curve); fillAudio(); renderStatus();
+  buildSliders(); drawCurve(state.settings.velocity_curve); fillAudio(); renderStatus(); renderBanks(true);
+  $("preset").addEventListener("change", () => { const [bank, program] = $("preset").value.split(":").map(Number); save({ piano_bank: bank, piano_prog: program }); });
   for (const id of ["device", "usb_period_size", "usb_periods", "reverb", "polyphony"]) {
     $(id).addEventListener("input", () => { $("applyRestart").disabled = !dirty(); });
   }

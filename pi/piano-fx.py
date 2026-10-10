@@ -43,18 +43,20 @@ class FXCore:
     """Pure logic: feed it note/pedal events, it returns FX note-ons as (channel, note, velocity)."""
 
     def __init__(self, hammer_boost=10.0, res_boost=0.0, pedal_boost=0.0, rng=None, hammer_exp=2.0,
-                 randomness=1.0, velocity_curve=1.0):
+                 randomness=1.0, velocity_curve=1.0, piano_bank=0, piano_prog=0):
         self.boost = {'hammer': hammer_boost, 'res': res_boost, 'pedal': pedal_boost}
         self.hammer_exp = hammer_exp
         self.randomness = randomness
         self.velocity_curve = velocity_curve
+        self.piano_bank = piano_bank          # the preset that plays the piano on channel 0
+        self.piano_prog = piano_prog
         self.rng = rng or random.Random()
         self.held = {}        # note -> (t_on, vel)
         self.sustained = {}   # note -> (t_on, vel) released while the pedal was down
         self.pedal = False
 
     def configure(self, hammer_boost=None, res_boost=None, pedal_boost=None, hammer_exp=None, randomness=None,
-                  velocity_curve=None):
+                  velocity_curve=None, piano_bank=None, piano_prog=None):
         """Change settings while running (None = keep)."""
         if hammer_boost is not None:
             self.boost['hammer'] = hammer_boost
@@ -68,6 +70,10 @@ class FXCore:
             self.randomness = randomness
         if velocity_curve is not None:
             self.velocity_curve = velocity_curve
+        if piano_bank is not None:
+            self.piano_bank = piano_bank
+        if piano_prog is not None:
+            self.piano_prog = piano_prog
 
     def map_velocity(self, vel):
         """Touch curve: out = 127 * (in/127) ** curve. 1.0 = unchanged, < 1 = more sensitive (soft touches get louder),
@@ -200,7 +206,15 @@ class Bridge:
             self.out = None
             self.out_name = None
 
+    def select_piano(self):
+        """Bank select + program change for the piano on channel 0 (the caller holds the lock or runs before playing)."""
+        bank, prog = self.core.piano_bank, self.core.piano_prog
+        self.send(self.mido.Message('control_change', channel=0, control=0, value=bank))
+        self.send(self.mido.Message('control_change', channel=0, control=32, value=0))
+        self.send(self.mido.Message('program_change', channel=0, program=prog))
+
     def setup_programs(self):
+        self.select_piano()
         for ch, prog in PROGRAMS.items():
             self.send(self.mido.Message('control_change', channel=ch, control=0, value=0))
             self.send(self.mido.Message('control_change', channel=ch, control=32, value=0))
@@ -285,9 +299,13 @@ class Bridge:
         self.conf_mtime = mtime
         s = self.pianoconf.get_settings(self.conf_path)
         with self.lock:
+            preset_changed = (self.core.piano_bank, self.core.piano_prog) != (s['piano_bank'], s['piano_prog'])
             self.core.configure(hammer_boost=s['hammer_boost'], res_boost=s['res_boost'],
                                 pedal_boost=s['pedal_boost'], hammer_exp=s['hammer_exp'],
-                                randomness=s['random'], velocity_curve=s['velocity_curve'])
+                                randomness=s['random'], velocity_curve=s['velocity_curve'],
+                                piano_bank=s['piano_bank'], piano_prog=s['piano_prog'])
+            if preset_changed and not first:
+                self.select_piano()
         if not first:
             print('settings reloaded: curve %.2f, hammer %+.1f dB, exp %.2f, random %.1f, res %+.1f, pedal %+.1f' % (
                 s['velocity_curve'], s['hammer_boost'], s['hammer_exp'], s['random'], s['res_boost'], s['pedal_boost']),
@@ -312,11 +330,14 @@ def main():
                     help='hammer noise amplitude ~ (velocity/127)**EXP; larger = stronger dependence (default 2)')
     ap.add_argument('--random', type=float, default=1.0,
                     help='variation of knock/pedal level and sample choice: 0 = none, 1 = default, 2 = strong')
+    ap.add_argument('--piano-bank', type=int, default=0, help='bank of the piano preset on channel 0 (default 0)')
+    ap.add_argument('--piano-prog', type=int, default=0, help='program of the piano preset on channel 0 (default 0)')
     ap.add_argument('--velocity-curve', type=float, default=1.0,
                     help='touch curve: out = 127*(in/127)**CURVE; 1 = unchanged, <1 more sensitive, >1 harder')
     args = ap.parse_args()
     core = FXCore(args.hammer_boost, args.res_boost, args.pedal_boost, hammer_exp=args.hammer_exp,
-                  randomness=args.random, velocity_curve=args.velocity_curve)
+                  randomness=args.random, velocity_curve=args.velocity_curve,
+                  piano_bank=args.piano_bank, piano_prog=args.piano_prog)
     Bridge(core).run()
 
 

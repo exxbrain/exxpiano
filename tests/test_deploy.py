@@ -55,6 +55,17 @@ class DeployTests(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('usage', r.stderr)
 
+    def test_the_bank_folder_is_derived_from_the_current_bank_when_missing(self):
+        # run the very sed expression of the upgrade script on sample configuration lines
+        with open(os.path.join(ROOT, 'deploy', 'upgrade-on-pi.sh')) as f:
+            text = f.read()
+        self.assertIn("grep -q '^BANK_DIR=' /etc/piano-synth.conf", text)
+        expr = text.split("sed -n '")[1].split("' /etc/piano-synth.conf")[0]
+        for line, expected in (('PIANO_SF2=/root/soundfonts/v5.sf2', '/root/soundfonts/v5.sf2'),
+                               ('PIANO_SF2="/root/sound fonts/v 5.sf2"', '/root/sound fonts/v 5.sf2')):
+            r = subprocess.run(['sed', '-n', expr], input=line + '\n', capture_output=True, text=True)
+            self.assertEqual(r.stdout.strip(), expected)
+
     def test_the_scripts_on_the_pi_do_not_hardcode_a_version(self):
         for name in ('upgrade-on-pi.sh', 'rollback-on-pi.sh'):
             with open(os.path.join(ROOT, 'deploy', name)) as f:

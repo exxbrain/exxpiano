@@ -20,6 +20,8 @@ DEVICE_RE = re.compile(r'^(auto|plughw:[A-Za-z0-9_.,:=-]{1,40})$')
 # name -> dict(kind, lo, hi, default, scope, key)   key = variable in the conf file ('FX_ARGS' = part of the options line)
 SETTINGS = {
     'velocity_curve': dict(kind='float', lo=0.4, hi=2.5, default=1.0, scope='fx', key='FX_ARGS', flag='--velocity-curve'),
+    'piano_bank': dict(kind='int', lo=0, hi=127, default=0, scope='fx', key='FX_ARGS', flag='--piano-bank'),
+    'piano_prog': dict(kind='int', lo=0, hi=127, default=0, scope='fx', key='FX_ARGS', flag='--piano-prog'),
     'hammer_boost': dict(kind='float', lo=-30.0, hi=30.0, default=0.0, scope='fx', key='FX_ARGS', flag='--hammer-boost'),
     'hammer_exp': dict(kind='float', lo=0.0, hi=4.0, default=0.8, scope='fx', key='FX_ARGS', flag='--hammer-exp'),
     'random': dict(kind='float', lo=0.0, hi=3.0, default=1.0, scope='fx', key='FX_ARGS', flag='--random'),
@@ -35,6 +37,9 @@ SETTINGS = {
     'periods': dict(kind='int', lo=2, hi=8, default=3, scope='synth', key='PERIODS'),
 }
 FX_NAMES = [n for n, s in SETTINGS.items() if s['key'] == 'FX_ARGS']
+# Raw keys the server may write itself (never taken from a request as they are): paths of banks it has checked.
+RAW_KEYS = ('PIANO_SF2', 'PIANO_SF2_LAST_GOOD')
+PATH_RE = re.compile(r'^/[^\x00-\x1f"\\$`]{1,300}$')
 LINE_RE = re.compile(r'^([A-Z][A-Z0-9_]*)=(.*)$')
 
 
@@ -131,13 +136,24 @@ def _fx_line(settings):
     return 'FX_ARGS="%s"' % ' '.join(parts)
 
 
-def apply_updates(updates, path=None):
+def _raw_line(key, value):
+    if key not in RAW_KEYS:
+        raise ValueError('not a writable key: %s' % key)
+    if not isinstance(value, str) or not PATH_RE.match(value):
+        raise ValueError('%s: not a plain absolute path' % key)
+    return '%s="%s"' % (key, value)
+
+
+def apply_updates(updates, path=None, raw=None):
     """Validate and store `updates` in the conf file (atomic replace, comments and other lines are kept).
 
-    Returns (new_settings, scopes) where scopes is the set of scopes that changed.
+    `raw` (optional) is a dict of RAW_KEYS paths written in the same atomic step. Returns (new_settings, scopes) where scopes is the
+    set of scopes that changed.
     """
     path = path or CONF_PATH
-    clean = validate(updates)
+    clean = validate(updates) if updates else {}
+    if not clean and not raw:
+        raise ValueError('expected a non-empty object of settings')
     current = get_settings(path)
     merged = dict(current, **clean)
     changed = {n for n in clean if clean[n] != current[n]}
@@ -151,6 +167,8 @@ def apply_updates(updates, path=None):
             wanted['FX_ARGS'] = _fx_line(merged)
         else:
             wanted[spec['key']] = '%s=%s' % (spec['key'], _fmt(merged[name]))
+    for key, value in (raw or {}).items():
+        wanted[key] = _raw_line(key, value)
     done = set()
     for i, line in enumerate(lines):
         m = LINE_RE.match(line)

@@ -13,6 +13,8 @@ from http.server import ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 PI = os.path.join(HERE, '..', 'pi')
 sys.path.insert(0, PI)
+sys.path.insert(0, HERE)
+from sf2fixture import make_sf2  # noqa: E402
 spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'piano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
@@ -34,6 +36,24 @@ class FakeActions:
         self.restarts = 0
         self.gains = []
         self.gain_ok = True
+        self.mem = 954 << 20
+        self.ready = [True, True, True]     # answers of wait_synth_ready, one per switch attempt
+        self.waits = 0
+        self.gate = None                     # an Event: wait_synth_ready blocks until it is set
+        self.pid = 100
+
+    def mem_total(self):
+        return self.mem
+
+    def synth_pid(self):
+        return self.pid
+
+    def wait_synth_ready(self, old_pid, timeout=150):
+        if self.gate is not None:
+            self.gate.wait(5)
+        answer = self.ready[min(self.waits, len(self.ready) - 1)]
+        self.waits += 1
+        return answer
 
     def service_state(self, unit):
         return 'active'
@@ -58,7 +78,7 @@ class FakeActions:
         return dict(device='plughw:CARD=U24', kind='usb', period=64, periods=3)
 
 
-class WebTests(unittest.TestCase):
+class ServerCase(unittest.TestCase):
     def start(self, conf=CONF):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -92,6 +112,7 @@ class WebTests(unittest.TestCase):
         with open(self.conf) as f:
             return f.read()
 
+class WebTests(ServerCase):
     def test_index_page_is_served(self):
         self.start()
         code, body = self.call('/')
@@ -184,6 +205,141 @@ class WebTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(s['auth_required'])
         self.assertEqual(self.call('/api/settings', {'gain': 1.1}, headers={'X-Token': 's3cret'})[0], 200)
+        self.assertEqual(self.actions.restarts, 0)
+
+
+class BankWebTests(ServerCase):
+    """The piano bank library through the API: listing, switching, rolling back and every refusal."""
+
+    def setUp(self):
+        self.bank_tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.bank_tmp.cleanup)
+        self.bank_dir = self.bank_tmp.name
+        self.mech = make_sf2(os.path.join(self.bank_dir, 'mech.sf2'), presets=[('Hammer', 0, 1)], name='Mechanics')
+        self.old = make_sf2(os.path.join(self.bank_dir, 'old.sf2'), presets=[('Old piano', 0, 0)], name='Old piano')
+        self.new = make_sf2(os.path.join(self.bank_dir, 'new.sf2'), presets=[('New piano', 0, 0), ('Pad', 0, 90)], name='New piano')
+        self.gm = make_sf2(os.path.join(self.bank_dir, 'odd.sf2'), presets=[('Odd', 2, 5)], name='Odd bank')
+        self.conf_text_base = ('BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nALSA_DEVICE=auto\nGAIN=1.0\nREVERB=0\n'
+                               'FX_ARGS="--hammer-boost 0"\n' % (self.bank_dir, self.old, self.mech))
+        self.start(self.conf_text_base)
+
+    def finish_switch(self):
+        self.app.switcher.join(10)
+
+    def test_state_lists_the_banks_without_the_mechanics_and_marks_the_current_one(self):
+        code, s = self.jcall('/api/state')
+        b = s['banks']
+        self.assertEqual(code, 200)
+        self.assertEqual(sorted(x['id'] for x in b['banks']), ['new.sf2', 'odd.sf2', 'old.sf2'])
+        self.assertEqual(b['current'], 'old.sf2')
+        self.assertIsNone(b['external'])
+        self.assertEqual([p['name'] for p in b['presets']], ['Old piano'])
+        self.assertEqual(b['preset'], dict(bank=0, program=0))
+        self.assertEqual(b['switch']['state'], 'idle')
+
+    def test_a_current_bank_outside_the_library_is_reported_as_external(self):
+        with tempfile.TemporaryDirectory() as elsewhere:
+            path = make_sf2(os.path.join(elsewhere, 'far.sf2'), name='Far away')
+            self.start(self.conf_text_base.replace(self.old, path))
+            b = self.jcall('/api/state')[1]['banks']
+            self.assertIsNone(b['current'])
+            self.assertEqual((b['external']['path'], b['external']['name']), (path, 'Far away'))
+
+    def test_switching_stores_the_new_bank_restarts_once_and_remembers_it_as_good(self):
+        code, r = self.jcall('/api/bank', {'id': 'new.sf2'})
+        self.assertEqual((code, r['started']), (200, True))
+        self.finish_switch()
+        text = self.conf_text()
+        self.assertIn('PIANO_SF2="%s"' % self.new, text)
+        self.assertIn('PIANO_SF2_LAST_GOOD="%s"' % self.new, text)
+        self.assertEqual(self.actions.restarts, 1)
+        b = self.jcall('/api/state')[1]['banks']
+        self.assertEqual((b['current'], b['switch']['state']), ('new.sf2', 'done'))
+        self.assertEqual(sorted(p['name'] for p in b['presets']), ['New piano', 'Pad'])
+
+    def test_a_bank_without_preset_zero_gets_its_first_usable_preset(self):
+        self.jcall('/api/bank', {'id': 'odd.sf2'})
+        self.finish_switch()
+        self.assertEqual(self.jcall('/api/state')[1]['banks']['preset'], dict(bank=2, program=5))
+
+    def test_a_bank_that_does_not_come_up_is_rolled_back(self):
+        self.actions.ready = [False, True]          # the new bank fails, the old one comes back
+        self.jcall('/api/bank', {'id': 'new.sf2'})
+        self.finish_switch()
+        text = self.conf_text()
+        self.assertIn('PIANO_SF2="%s"' % self.old, text)
+        self.assertNotIn('LAST_GOOD', text)
+        self.assertEqual(self.actions.restarts, 2)
+        sw = self.jcall('/api/state')[1]['banks']['switch']
+        self.assertEqual(sw['state'], 'rolled_back')
+        self.assertIn('previous bank is playing again', sw['message'])
+
+    def test_when_even_the_old_bank_does_not_come_back_the_state_says_failed(self):
+        self.actions.ready = [False, False]
+        self.jcall('/api/bank', {'id': 'new.sf2'})
+        self.finish_switch()
+        self.assertEqual(self.jcall('/api/state')[1]['banks']['switch']['state'], 'failed')
+
+    def test_a_crash_inside_the_switch_still_rolls_back(self):
+        def boom(old_pid, timeout=150):
+            raise RuntimeError('systemctl exploded')
+        self.actions.wait_synth_ready = boom
+        self.jcall('/api/bank', {'id': 'new.sf2'})
+        self.finish_switch()
+        self.assertIn('PIANO_SF2="%s"' % self.old, self.conf_text())
+
+    def test_refusals_change_nothing(self):
+        junk = os.path.join(self.bank_dir, 'junk.sf2')
+        with open(junk, 'wb') as f:
+            f.write(b'this is not a soundfont')
+        before = self.conf_text()
+        for bad in ('../old.sf2', '/etc/passwd', 'missing.sf2', 'junk.sf2', '', 'notes.txt', None, 7):
+            with self.subTest(bad):
+                code, r = self.jcall('/api/bank', {'id': bad})
+                self.assertEqual(code, 400, r)
+        self.assertEqual(self.call('/api/bank', raw=b'[1]')[0], 400)
+        self.assertEqual(self.conf_text(), before)
+        self.assertEqual(self.actions.restarts, 0)
+
+    def test_a_bank_too_big_for_the_memory_is_refused(self):
+        self.actions.mem = (400 << 20) + (1 << 10)        # the 400 MB reserve leaves almost nothing
+        code, r = self.jcall('/api/bank', {'id': 'new.sf2'})
+        self.assertEqual(code, 400)
+        self.assertIn('too large', r['error'])
+        self.assertEqual(self.actions.restarts, 0)
+        banks = {x['id']: x for x in self.jcall('/api/state')[1]['banks']['banks']}
+        self.assertFalse(banks['new.sf2']['fits'])
+
+    def test_choosing_the_bank_already_in_use_does_nothing(self):
+        code, r = self.jcall('/api/bank', {'id': 'old.sf2'})
+        self.assertEqual((code, r['started']), (200, False))
+        self.assertEqual(self.actions.restarts, 0)
+
+    def test_a_second_switch_or_a_preset_change_while_one_runs_is_refused(self):
+        self.actions.gate = threading.Event()
+        self.jcall('/api/bank', {'id': 'new.sf2'})
+        try:
+            self.assertEqual(self.jcall('/api/bank', {'id': 'odd.sf2'})[0], 409)
+            self.assertEqual(self.jcall('/api/settings', {'piano_prog': 0, 'piano_bank': 0})[0], 409)
+            self.assertEqual(self.jcall('/api/state')[1]['banks']['switch']['state'], 'switching')
+        finally:
+            self.actions.gate.set()
+            self.finish_switch()
+        self.assertEqual(self.jcall('/api/state')[1]['banks']['switch']['state'], 'done')
+
+    def test_a_preset_change_is_checked_against_the_current_bank(self):
+        self.jcall('/api/bank', {'id': 'new.sf2'})
+        self.finish_switch()
+        code, r = self.jcall('/api/settings', {'piano_bank': 0, 'piano_prog': 90})
+        self.assertEqual((code, r['applied']['fx']), (200, True))
+        self.assertIn('--piano-prog 90', self.conf_text())
+        for bad in ({'piano_prog': 91}, {'piano_bank': 5}, {'piano_prog': 1}, {'piano_prog': 200}):
+            with self.subTest(bad):
+                self.assertEqual(self.jcall('/api/settings', bad)[0], 400)
+
+    def test_the_token_protects_the_bank_switch_too(self):
+        self.start(self.conf_text_base + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/bank', {'id': 'new.sf2'})[0], 401)
         self.assertEqual(self.actions.restarts, 0)
 
 

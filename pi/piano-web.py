@@ -5,6 +5,7 @@
   GET  /api/state          settings, their ranges, service status, sound cards
   POST /api/settings       {"velocity_curve": 0.8, ...}  - validated, stored in /etc/piano-synth.conf, applied
   POST /api/restart        restart piano-synth (needed after changing audio output / buffer / reverb / polyphony)
+  POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
 
 Settings that can be changed are whitelisted with ranges in pianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
 come from /etc/piano-synth.conf. Without WEB_TOKEN anybody on your network can change the settings (nothing else).
@@ -15,8 +16,11 @@ import os
 import re
 import subprocess
 import sys
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import banklib
 import pianoconf
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
@@ -50,6 +54,43 @@ class Actions:
             return None
         m = re.search(r'version (\S+)', r.stdout)
         return m.group(1) if m else None
+
+    def mem_total(self):
+        return banklib.mem_total_bytes()
+
+    def synth_pid(self):
+        try:
+            r = subprocess.run(['systemctl', 'show', '-p', 'MainPID', '--value', 'piano-synth'], capture_output=True, text=True,
+                               timeout=3)
+            return int(r.stdout.strip() or 0)
+        except (OSError, subprocess.SubprocessError, ValueError):
+            return 0
+
+    def _seq_has_synth(self):
+        try:
+            with open(os.path.join(self.asound, 'seq', 'clients'), encoding='utf-8', errors='replace') as f:
+                return 'FLUID Synth' in f.read()
+        except OSError:
+            return False
+
+    def wait_synth_ready(self, old_pid, timeout=150):
+        """True when a NEW synthesizer process runs and has finished loading its banks (its ALSA sequencer client exists) and
+        stays that way for two polls. False on timeout or when it keeps being restarted (a bank it cannot load)."""
+        t0, stable, seen = time.time(), 0, set()
+        while time.time() - t0 < timeout:
+            time.sleep(2)
+            pid = self.synth_pid()
+            if pid and pid != old_pid:
+                seen.add(pid)
+            if len(seen) >= 3:
+                return False                                   # flapping: crashing and being restarted
+            if pid and pid != old_pid and self.service_state('piano-synth') == 'active' and self._seq_has_synth():
+                stable += 1
+                if stable >= 2:
+                    return True
+            else:
+                stable = 0
+        return False
 
     def service_state(self, unit):
         try:
@@ -112,12 +153,81 @@ class Actions:
         return dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)))
 
 
+class Busy(Exception):
+    """A bank switch is already running."""
+
+
+class Switcher:
+    """Switches the piano bank in the background and puts the old one back if the synthesizer does not come up with the new one."""
+
+    def __init__(self, app):
+        self.app = app
+        self.lock = threading.Lock()
+        self.thread = None
+        self.status = dict(state='idle', message='', bank=None)
+
+    def busy(self):
+        return self.status['state'] == 'switching'
+
+    def start(self, path, bank_id, preset):
+        with self.lock:
+            if self.busy():
+                raise Busy()
+            self.status = dict(state='switching', message='Loading the bank, this takes about a minute', bank=bank_id)
+        self.thread = threading.Thread(target=self._run, args=(path, bank_id, preset), daemon=True)
+        self.thread.start()
+
+    def join(self, timeout=None):
+        if self.thread:
+            self.thread.join(timeout)
+
+    def _set(self, state, message):
+        self.status = dict(state=state, message=message, bank=self.status.get('bank'))
+
+    def _run(self, path, bank_id, preset):
+        conf, actions = self.app.conf_path, self.app.actions
+        raw = pianoconf.parse_conf(conf)
+        old_path = raw.get('PIANO_SF2')
+        old = pianoconf.get_settings(conf)
+        ready = False
+        try:
+            pianoconf.apply_updates({'piano_bank': preset[0], 'piano_prog': preset[1]}, conf, raw={'PIANO_SF2': path})
+            old_pid = actions.synth_pid()
+            actions.restart_synth()
+            ready = actions.wait_synth_ready(old_pid)
+        except Exception as exc:                                # whatever went wrong, the old bank must come back
+            print('bank switch failed: %s' % exc, file=sys.stderr)
+        if ready:
+            try:
+                pianoconf.apply_updates(None, conf, raw={'PIANO_SF2_LAST_GOOD': path})
+            except (OSError, ValueError) as exc:
+                print('could not store the last good bank: %s' % exc, file=sys.stderr)
+            self._set('done', 'Now playing %s' % bank_id)
+            return
+        if not old_path:
+            self._set('failed', 'The new bank did not load and there is no previous bank to go back to')
+            return
+        try:
+            pianoconf.apply_updates({'piano_bank': old['piano_bank'], 'piano_prog': old['piano_prog']}, conf,
+                                    raw={'PIANO_SF2': old_path})
+            old_pid = actions.synth_pid()
+            actions.restart_synth()
+            back = actions.wait_synth_ready(old_pid)
+        except Exception as exc:
+            print('rollback failed: %s' % exc, file=sys.stderr)
+            back = False
+        self._set('rolled_back' if back else 'failed',
+                  '%s did not load; %s' % (bank_id, 'the previous bank is playing again' if back
+                                           else 'the previous bank could not be restored either, check the device'))
+
+
 class App:
     def __init__(self, conf_path=None, actions=None):
         self.conf_path = conf_path or pianoconf.CONF_PATH
         self.actions = actions or Actions()
         conf = pianoconf.parse_conf(self.conf_path)
         self.token = conf.get('WEB_TOKEN', '')
+        self.switcher = Switcher(self)
 
     def spec(self):
         return {n: {k: v for k, v in s.items() if k in ('kind', 'lo', 'hi', 'default', 'scope')}
@@ -126,6 +236,7 @@ class App:
     def state(self):
         a = self.actions
         return dict(
+            banks=self.banks_state(),
             version=a.version(),
             fluidsynth=a.fluidsynth_version(),
             settings=pianoconf.get_settings(self.conf_path),
@@ -134,7 +245,68 @@ class App:
                         output=a.audio_output(), cards=a.cards()),
         )
 
+    # ---- the piano banks
+    def _bank_context(self):
+        conf = pianoconf.parse_conf(self.conf_path)
+        bank_dir = conf.get('BANK_DIR') or banklib.DEFAULT_DIR
+        current, mech = conf.get('PIANO_SF2'), conf.get('MECH_SF2')
+        try:
+            mech_bytes = os.path.getsize(mech) if mech else 0
+        except OSError:
+            mech_bytes = 0
+        return bank_dir, current, mech, mech_bytes
+
+    def banks_state(self):
+        bank_dir, current, mech, mech_bytes = self._bank_context()
+        banks = banklib.list_banks(bank_dir, exclude=[mech], mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
+        current_id = None
+        for b in banks:
+            if current and banklib._same(os.path.join(bank_dir, b['id']), current):
+                current_id = b['id']
+        external = None
+        if current and current_id is None:
+            info, _ = banklib.inspect(current)
+            external = dict(path=current, name=(info or {}).get('name') or os.path.basename(current))
+        s = pianoconf.get_settings(self.conf_path)
+        return dict(dir=bank_dir, current=current_id, external=external, banks=banks,
+                    presets=banklib.presets_of(current) if current else [],
+                    preset=dict(bank=s['piano_bank'], program=s['piano_prog']), switch=self.switcher.status)
+
+    def switch_bank(self, bank_id):
+        bank_dir, current, mech, mech_bytes = self._bank_context()
+        path = banklib.resolve(bank_dir, bank_id)                          # ValueError -> 400
+        if current and banklib._same(path, current):
+            return dict(started=False, message='This bank is already in use')
+        info, error = banklib.inspect(path)
+        if error:
+            raise ValueError(error)
+        limit = banklib.size_limit(self.actions.mem_total(), mech_bytes)
+        if limit is not None and os.path.getsize(path) > limit:
+            raise ValueError('too large for this device: %d MB, at most %d MB fit in memory' % (os.path.getsize(path) >> 20, limit >> 20))
+        preset = banklib.default_preset(banklib.presets_of(path))
+        if preset is None:
+            raise ValueError('the bank has no preset that can be used for the piano')
+        self.switcher.start(path, bank_id, preset)                        # Busy -> 409
+        return dict(started=True)
+
+    def _check_preset(self, body):
+        """A new piano preset must exist in the current bank and must not be one the mechanics bank shadows."""
+        keys = [k for k in ('piano_bank', 'piano_prog') if k in body]
+        if not keys:
+            return
+        if self.switcher.busy():
+            raise Busy()
+        clean = pianoconf.validate({k: body[k] for k in keys})
+        cur = pianoconf.get_settings(self.conf_path)
+        pair = (clean.get('piano_bank', cur['piano_bank']), clean.get('piano_prog', cur['piano_prog']))
+        _, current, _, _ = self._bank_context()
+        usable = {(p['bank'], p['program']) for p in (banklib.presets_of(current) if current else []) if p['usable']}
+        if pair not in usable:
+            raise ValueError('no such preset in the current bank, or the mechanics bank shadows it')
+
     def update(self, body):
+        if isinstance(body, dict):
+            self._check_preset(body)
         settings, scopes = pianoconf.apply_updates(body, self.conf_path)     # ValueError -> 400
         done = dict(fx='fx' in scopes, gain=None)         # gain: True live, False failed, None unchanged
         if 'gain' in scopes:
@@ -199,6 +371,13 @@ def make_handler(app):
                 if self.path == '/api/restart':
                     app.actions.restart_synth()
                     return self._send(200, dict(ok=True))
+                if self.path == '/api/bank':
+                    body = self._body()
+                    if not isinstance(body, dict):
+                        raise ValueError('expected an object')
+                    return self._send(200, app.switch_bank(body.get('id')))
+            except Busy:
+                return self._send(409, dict(error='a bank switch is in progress, wait until it finishes'))
             except (ValueError, json.JSONDecodeError) as exc:
                 return self._send(400, dict(error=str(exc)))
             except OSError as exc:

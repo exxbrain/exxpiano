@@ -159,6 +159,8 @@ def main():
         ('opt/piano-synth/VERSION', (args.version + '\n').encode(), 0o644),
         ('opt/piano-synth/piano-synth-run', src('pi', 'piano-synth-run'), 0o755),
         ('opt/piano-synth/pianoconf.py', src('pi', 'pianoconf.py'), 0o644),
+        ('opt/piano-synth/sf2info.py', src('pi', 'sf2info.py'), 0o755),
+        ('opt/piano-synth/banklib.py', src('pi', 'banklib.py'), 0o644),
         ('opt/piano-synth/piano-web.py', src('pi', 'piano-web.py'), 0o755),
         ('opt/piano-synth/web/index.html', src('pi', 'web', 'index.html'), 0o644),
         ('lib/systemd/system/piano-web.service', src('pi', 'piano-web.service'), 0o644),

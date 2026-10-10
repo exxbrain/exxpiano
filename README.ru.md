@@ -127,11 +127,11 @@ cd /root/pi
 Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
 
 ```bash
-python3 scripts/build-deb.py --version 1.1.0                                # -> dist/piano-synth_1.1.0_all.deb
-python3 scripts/build-deb.py --version 1.1.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.1.0_all.deb
+python3 scripts/build-deb.py --version 1.2.0                                # -> dist/piano-synth_1.2.0_all.deb
+python3 scripts/build-deb.py --version 1.2.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.2.0_all.deb
 scp -O dist/*.deb root@<IP-Pi>:/root/
-ssh root@<IP-Pi> "apt install -y ./piano-synth_1.1.0_all.deb ./piano-synth-soundfonts_1.1.0_all.deb"
+ssh root@<IP-Pi> "apt install -y ./piano-synth_1.2.0_all.deb ./piano-synth-soundfonts_1.2.0_all.deb"
 ```
 
 - `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
@@ -143,7 +143,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.1.0_all.deb ./piano-synth-sound
 
 Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
 (`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
-На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.1.0_all.deb && dpkg-deb --contents piano-synth_1.1.0_all.deb`.
+На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.2.0_all.deb && dpkg-deb --contents piano-synth_1.2.0_all.deb`.
 
 ## Установщик для DietPi (собирается при каждом коммите)
 
@@ -235,6 +235,20 @@ vcgencmd get_throttled     # должно быть 0x0
 | `--res-boost ДБ` | 0 | громкость резонанса струн |
 | `--pedal-boost ДБ` | 0 | громкость стука педали |
 | `--velocity-curve G` | 1.0 | кривая чувствительности всего рояля: выход = 127 * (вход/127)^G. 1 = без изменений, меньше 1 тихие нажатия звучат громче, больше 1 надо играть сильнее |
+
+## Выбор банка рояля
+
+На странице есть карточка **«Банк рояля»**: она показывает звуковые банки (`*.sf2`, `*.sf3`) из папки `BANK_DIR` (по умолчанию
+`/opt/piano-synth/soundfonts`; банк механики не предлагается). **«Использовать»** переключает рояль: синтезатор перезагружается (около минуты
+тишины). Если новый банк не загрузится, прежний возвращается сам, и страница об этом скажет. Банк отклоняется с показом причины, если он повреждён
+или слишком велик для памяти устройства (на Pi 3 около 500 МБ). Если в банке несколько пресетов, карточка предложит ещё и список **«Пресет»**
+(применяется сразу); программы 1-6 банка 0 не предлагаются, потому что там отвечает банк механики.
+
+Если выбранный банк потом пропадёт или повредится (удалённый файл), модуль запустится с `PIANO_SF2_LAST_GOOD`, то есть с последним рабочим банком,
+а не останется без звука. Выбрать можно только имена файлов, которые видит папка библиотеки: страница никогда не присылает путь.
+
+Чтобы добавить банк сейчас, скопируйте `.sf2` в `BANK_DIR` (например `scp -O my.sf2 root@<Pi>:/opt/piano-synth/soundfonts/`); импорт с USB-флешки
+запланирован (`docs/plans/usb-banks.md`).
 
 ## Веб-интерфейс
 

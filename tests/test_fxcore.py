@@ -153,6 +153,14 @@ class VelocityCurveTests(unittest.TestCase):
         self.assertEqual(c.velocity_curve, 0.5)
 
 
+class PianoPresetTests(unittest.TestCase):
+    def test_configure_sets_the_piano_preset(self):
+        c = core()
+        self.assertEqual((c.piano_bank, c.piano_prog), (0, 0))
+        c.configure(piano_bank=3, piano_prog=7)
+        self.assertEqual((c.piano_bank, c.piano_prog), (3, 7))
+
+
 class FakeMsg:
     def __init__(self, type, **kw):
         self.type = type
@@ -190,6 +198,30 @@ class BridgeMappingTests(unittest.TestCase):
         self.assertEqual(len(piano), 1)
         self.assertEqual(piano[0].velocity, 64)          # 127 * (32/127) ** 0.5 = 63.7
         self.assertEqual(b.core.held[60][1], 64)         # the mechanics use the mapped value too
+
+    def test_the_piano_preset_is_selected_when_the_synthesizer_appears(self):
+        b = self.make_bridge(1.0)
+        b.core.configure(piano_bank=2, piano_prog=9)
+        b.setup_programs()
+        ch0 = [(m.type, getattr(m, 'control', None), getattr(m, 'value', getattr(m, 'program', None))) for m in b.sent if m.channel == 0]
+        self.assertEqual(ch0, [('control_change', 0, 2), ('control_change', 32, 0), ('program_change', None, 9)])
+        self.assertEqual({m.program for m in b.sent if m.type == 'program_change' and m.channel > 0}, {1, 2, 3, 4, 5, 6})
+
+    def test_changing_the_preset_in_the_config_selects_it_live(self):
+        import tempfile
+        b = self.make_bridge(1.0)
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = os.path.join(tmp, 'piano-synth.conf')
+            with open(conf, 'w') as f:
+                f.write('FX_ARGS="--piano-bank 0 --piano-prog 0"\n')
+            b.conf_path = conf
+            b.reload_settings()                                  # first read: only loads, plays nothing
+            self.assertEqual(b.sent, [])
+            with open(conf, 'w') as f:
+                f.write('FX_ARGS="--piano-bank 1 --piano-prog 7"\n')
+            os.utime(conf, (1, 1))                               # a different mtime, however fast the test runs
+            b.reload_settings()
+        self.assertEqual([(m.type, getattr(m, 'program', None)) for m in b.sent][-1], ('program_change', 7))
 
     def test_other_messages_are_not_touched(self):
         b = self.make_bridge(0.5)
