@@ -108,6 +108,8 @@
     <h2 data-t="audio">Audio output</h2>
     <p class="hint" data-t="audio_hint">These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).</p>
     <div class="row"><label data-t="device">Output</label><select id="device" style="grid-column:1/3"></select></div>
+    <div class="row"><label data-t="onb_period">Built-in output buffer (frames)</label><input type="number" id="period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="onb_period_hint">Default 256. Lower means less delay; raise it if you hear clicks.</span></div>
+    <div class="row"><label data-t="onb_periods">Built-in output buffers</label><input type="number" id="periods" min="2" max="8" style="grid-column:1/3"></div>
     <div class="row"><label data-t="usb_period">USB buffer (frames)</label><input type="number" id="usb_period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="usb_period_hint">64 is the lowest FluidSynth accepts. Raise it if you hear clicks.</span></div>
     <div class="row"><label data-t="usb_periods">USB buffers</label><input type="number" id="usb_periods" min="2" max="8" style="grid-column:1/3"></div>
     <div class="check"><input type="checkbox" id="reverb"><label for="reverb" data-t="reverb">Reverb (more CPU load)</label></div>
@@ -129,7 +131,7 @@ const T = {
     title: "Piano module", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
     volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
     audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).",
-    device: "Output", usb_period: "USB buffer (frames)", usb_period_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks.",
+    device: "Output", onb_period: "Built-in output buffer (frames)", onb_period_hint: "Default 256. Lower means less delay; raise it if you hear clicks.", onb_periods: "Built-in output buffers", usb_period: "USB buffer (frames)", usb_period_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks.",
     usb_periods: "USB buffers", reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)",
     apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).", token_btn: "Sign in",
     auto: "Automatic (USB card if present, otherwise the jack)", usb: "USB", onboard: "onboard",
@@ -153,7 +155,7 @@ const T = {
     title: "Модуль пианино", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
     volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
     audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки).",
-    device: "Выход", usb_period: "Буфер USB (кадры)", usb_period_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.",
+    device: "Выход", onb_period: "Буфер встроенного выхода (кадры)", onb_period_hint: "По умолчанию 256. Меньше — меньше задержка; увеличьте, если слышны щелчки.", onb_periods: "Число буферов встроенного выхода", usb_period: "Буфер USB (кадры)", usb_period_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.",
     usb_periods: "Число буферов USB", reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)",
     apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/piano-synth.conf).", token_btn: "Войти",
     auto: "Автоматически (USB-карта, если есть, иначе штатный выход)", usb: "USB", onboard: "штатный",
@@ -182,7 +184,9 @@ const LIVE = {
   volumeRows: [["gain", 0.05]],
   mechRows: [["hammer_boost", 0.5], ["hammer_exp", 0.1], ["random", 0.1], ["res_boost", 0.5], ["pedal_boost", 0.5]],
 };
-const SYNTH_KEYS = ["alsa_device", "usb_period_size", "usb_periods", "reverb", "polyphony"];
+// settings that need a restart of the synthesizer: the id of the field and of the setting are the same except the output ("device")
+const SYNTH_KEYS = ["alsa_device", "period_size", "periods", "usb_period_size", "usb_periods", "reverb", "polyphony"];
+const SYNTH_FIELDS = ["device", "period_size", "periods", "usb_period_size", "usb_periods", "reverb", "polyphony"];
 let state = null, token = sessionStorage.getItem("pianoToken") || "";
 const timers = {};
 const showers = {};          // name -> function that refreshes the number next to a slider
@@ -259,8 +263,7 @@ function fillAudio() {
   if (!opts.some(o => o[0] === cur)) opts.push([cur, cur]);
   for (const [v, t] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.append(o); }
   sel.value = cur;
-  $("usb_period_size").value = state.settings.usb_period_size;
-  $("usb_periods").value = state.settings.usb_periods;
+  for (const k of ["period_size", "periods", "usb_period_size", "usb_periods"]) $(k).value = state.settings[k];
   $("reverb").checked = !!state.settings.reverb;
   $("polyphony").value = state.settings.polyphony;
 }
@@ -339,8 +342,8 @@ function renderStatus() {
 
 function dirty() {
   const s = state.settings;
-  return $("device").value !== s.alsa_device || +$("usb_period_size").value !== s.usb_period_size ||
-    +$("usb_periods").value !== s.usb_periods || +$("reverb").checked !== s.reverb || +$("polyphony").value !== s.polyphony;
+  return $("device").value !== s.alsa_device || +$("reverb").checked !== s.reverb || +$("polyphony").value !== s.polyphony ||
+    ["period_size", "periods", "usb_period_size", "usb_periods"].some(k => +$(k).value !== s[k]);
 }
 
 async function save(updates) {
@@ -355,7 +358,8 @@ async function save(updates) {
 
 async function applyRestart() {
   try {
-    const u = { alsa_device: $("device").value, usb_period_size: +$("usb_period_size").value, usb_periods: +$("usb_periods").value,
+    const u = { alsa_device: $("device").value, period_size: +$("period_size").value, periods: +$("periods").value,
+                usb_period_size: +$("usb_period_size").value, usb_periods: +$("usb_periods").value,
                 reverb: $("reverb").checked ? 1 : 0, polyphony: +$("polyphony").value };
     const r = await api("/api/settings", u); Object.assign(state.settings, r.settings);
     await api("/api/restart", {});
@@ -383,7 +387,7 @@ async function start() {
   ["touchRows", "volumeRows", "mechRows"].forEach(id => { $(id).textContent = ""; });
   buildSliders(); drawCurve(state.settings.velocity_curve); fillAudio(); renderStatus(); renderBanks(true);
   $("preset").addEventListener("change", () => { const [bank, program] = $("preset").value.split(":").map(Number); save({ piano_bank: bank, piano_prog: program }); });
-  for (const id of ["device", "usb_period_size", "usb_periods", "reverb", "polyphony"]) {
+  for (const id of SYNTH_FIELDS) {
     $(id).addEventListener("input", () => { $("applyRestart").disabled = !dirty(); });
   }
   $("applyRestart").addEventListener("click", applyRestart);
