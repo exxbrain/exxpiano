@@ -127,11 +127,11 @@ cd /root/pi
 Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
 
 ```bash
-python3 scripts/build-deb.py --version 1.5.1                                # -> dist/piano-synth_1.5.1_all.deb
-python3 scripts/build-deb.py --version 1.5.1 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.5.1_all.deb
+python3 scripts/build-deb.py --version 1.5.2                                # -> dist/piano-synth_1.5.2_all.deb
+python3 scripts/build-deb.py --version 1.5.2 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.5.2_all.deb
 scp -O dist/*.deb root@<IP-Pi>:/root/
-ssh root@<IP-Pi> "apt install -y ./piano-synth_1.5.1_all.deb ./piano-synth-soundfonts_1.5.1_all.deb"
+ssh root@<IP-Pi> "apt install -y ./piano-synth_1.5.2_all.deb ./piano-synth-soundfonts_1.5.2_all.deb"
 ```
 
 - `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
@@ -143,7 +143,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.5.1_all.deb ./piano-synth-sound
 
 Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
 (`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
-На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.5.1_all.deb && dpkg-deb --contents piano-synth_1.5.1_all.deb`.
+На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.5.2_all.deb && dpkg-deb --contents piano-synth_1.5.2_all.deb`.
 
 ## Установщик для DietPi (собирается при каждом коммите)
 
@@ -158,7 +158,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.5.1_all.deb ./piano-synth-sound
 
 **Откуда берётся установщик.** Локально `scripts/install-hooks.sh` (один раз) включает git-хук: каждый `git commit` прогоняет тесты и собирает `dist/`
 (`.deb` и установщик для DietPi). На GitHub то же самое делает `.github/workflows/build.yml` для каждого пуша и pull request и сохраняет файлы как
-скачиваемый артефакт; тег вида `v1.5.1` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
+скачиваемый артефакт; тег вида `v1.5.2` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
 пакет, установщик и веб-страница берут её оттуда.
 
 Что проверено, а что нет: скрипт установщика проверен запуском с подставными `apt-get` и прочим, структура архива проверена тестами. Хук первой загрузки

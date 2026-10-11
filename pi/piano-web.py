@@ -37,6 +37,25 @@ class Actions:
     def __init__(self, asound=None):
         self.asound = asound or os.environ.get('ASOUND_DIR', '/proc/asound')
         self._monitor = sysmon.Monitor(asound=self.asound)
+        self._cache = {}                       # key -> (when, value): the page asks every few seconds, programs are started at most this often
+        self._cache_lock = threading.Lock()
+
+    def _cached(self, key, ttl, produce):
+        now = time.monotonic()
+        with self._cache_lock:
+            hit = self._cache.get(key)
+            if hit and now - hit[0] < ttl:
+                return hit[1]
+        value = produce()                      # outside the lock: a slow program must not block the others
+        with self._cache_lock:
+            self._cache[key] = (time.monotonic(), value)
+        return value
+
+    def _forget(self, *keys):
+        with self._cache_lock:
+            for k in list(self._cache):
+                if k in keys or (isinstance(k, tuple) and k[0] in keys):
+                    del self._cache[k]
 
     def version(self):
         """Installed package version: VERSION next to the program (installed) or in the repository root."""
@@ -52,6 +71,9 @@ class Actions:
         return None
 
     def fluidsynth_version(self):
+        return self._cached('fluidsynth', 600, self._fluidsynth_version)
+
+    def _fluidsynth_version(self):
         try:
             r = subprocess.run(['fluidsynth', '--version'], capture_output=True, text=True, timeout=3)
         except (OSError, subprocess.SubprocessError):
@@ -88,7 +110,7 @@ class Actions:
                 seen.add(pid)
             if len(seen) >= 3:
                 return False                                   # flapping: crashing and being restarted
-            if pid and pid != old_pid and self.service_state('piano-synth') == 'active' and self._seq_has_synth():
+            if pid and pid != old_pid and self._service_state('piano-synth') == 'active' and self._seq_has_synth():     # never the cached answer
                 stable += 1
                 if stable >= 2:
                     return True
@@ -97,6 +119,9 @@ class Actions:
         return False
 
     def service_state(self, unit):
+        return self._cached(('service', unit), 2, lambda: self._service_state(unit))
+
+    def _service_state(self, unit):
         try:
             r = subprocess.run(['systemctl', 'is-active', unit], capture_output=True, text=True, timeout=3)
             return r.stdout.strip() or 'unknown'
@@ -107,6 +132,7 @@ class Actions:
         return self._monitor.get(since)
 
     def restart_synth(self):
+        self._forget('service', 'output')                # the answers are about to change
         subprocess.Popen(['systemctl', '--no-block', 'restart', 'piano-synth.service'])
 
     def set_gain(self, value):
@@ -147,6 +173,9 @@ class Actions:
         return result
 
     def audio_output(self):
+        return self._cached('output', 10, self._audio_output)
+
+    def _audio_output(self):
         try:
             r = subprocess.run(['journalctl', '-u', 'piano-synth', '-n', '300', '--no-pager', '-o', 'cat'],
                                capture_output=True, text=True, timeout=5)

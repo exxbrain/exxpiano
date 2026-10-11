@@ -363,6 +363,66 @@ class BankWebTests(ServerCase):
         self.assertEqual(self.actions.restarts, 0)
 
 
+class ActionsCacheTests(unittest.TestCase):
+    """The page asks for the state every few seconds; the programs behind it are started at most once per cache time."""
+
+    def setUp(self):
+        self.calls = []
+        self.real_run = web.subprocess.run
+
+        def fake_run(cmd, *a, **kw):
+            self.calls.append(cmd[0])
+
+            class R:
+                stdout = {'fluidsynth': 'FluidSynth runtime version 2.4.4\n', 'systemctl': 'active\n',
+                          'journalctl': 'piano-synth: audio output plughw:CARD=U24 (usb), period 64 x 3\n'}.get(cmd[0], '')
+                returncode = 0
+            return R()
+        web.subprocess.run = fake_run
+        self.addCleanup(setattr, web.subprocess, 'run', self.real_run)
+        self.actions = web.Actions(asound=tempfile.mkdtemp())
+
+    def test_repeated_questions_start_each_program_once(self):
+        a = self.actions
+        for _ in range(5):
+            self.assertEqual(a.fluidsynth_version(), '2.4.4')
+            self.assertEqual(a.service_state('piano-synth'), 'active')
+            self.assertEqual(a.service_state('piano-fx'), 'active')
+            self.assertEqual(a.audio_output()['period'], 64)
+        self.assertEqual(sorted(self.calls), ['fluidsynth', 'journalctl', 'systemctl', 'systemctl'])      # one per unit
+
+    def test_entries_expire(self):
+        a = self.actions
+        a.service_state('piano-synth')
+        with a._cache_lock:
+            key = ('service', 'piano-synth')
+            a._cache[key] = (a._cache[key][0] - 3, a._cache[key][1])        # older than its 2 s
+        a.service_state('piano-synth')
+        self.assertEqual(self.calls, ['systemctl', 'systemctl'])
+
+    def test_a_restart_forgets_the_service_state_and_the_output(self):
+        a = self.actions
+        a.service_state('piano-synth'); a.audio_output(); a.fluidsynth_version()
+        popen = web.subprocess.Popen
+        web.subprocess.Popen = lambda *x, **kw: None
+        self.addCleanup(setattr, web.subprocess, 'Popen', popen)
+        a.restart_synth()
+        self.calls.clear()
+        a.service_state('piano-synth'); a.audio_output(); a.fluidsynth_version()
+        self.assertEqual(sorted(self.calls), ['journalctl', 'systemctl'])    # the version of the program does not change with a restart
+
+    def test_readiness_never_uses_the_cached_state(self):
+        a = self.actions
+        a.service_state('piano-synth')
+        self.calls.clear()
+        a.synth_pid = lambda: 7
+        a._seq_has_synth = lambda: True
+        web.time.sleep, orig = (lambda s: None), web.time.sleep
+        self.addCleanup(setattr, web.time, 'sleep', orig)
+        self.assertTrue(a.wait_synth_ready(1, timeout=30))
+        self.assertGreaterEqual(self.calls.count('systemctl'), 2)
+
+
 class MonitorEndpointTests(ServerCase):
     def test_the_monitor_endpoint_returns_the_sample_and_the_points(self):
         self.start()
