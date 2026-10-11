@@ -173,15 +173,15 @@ class WebTests(ServerCase):
 
     def test_buffer_of_the_built_in_output_is_stored_and_needs_a_restart(self):
         self.start()
-        code, r = self.jcall('/api/settings', {'period_size': 64, 'periods': 3})
+        code, r = self.jcall('/api/settings', {'period_size': 128, 'periods': 4})
         self.assertEqual(code, 200)
         self.assertTrue(r['restart_required'])
-        self.assertEqual((r['settings']['period_size'], r['settings']['periods']), (64, 3))
-        self.assertIn('PERIOD_SIZE=64', self.conf_text())
-        self.assertEqual(self.jcall('/api/state')[1]['settings']['period_size'], 64)
+        self.assertEqual((r['settings']['period_size'], r['settings']['periods']), (128, 4))
+        self.assertIn('PERIOD_SIZE=128', self.conf_text())
+        self.assertEqual(self.jcall('/api/state')[1]['settings']['period_size'], 128)
         for bad in ({'period_size': 32}, {'period_size': 9000}, {'periods': 1}):      # outside what FluidSynth accepts
             self.assertEqual(self.jcall('/api/settings', bad)[0], 400)
-        self.assertIn('PERIOD_SIZE=64', self.conf_text())
+        self.assertIn('PERIOD_SIZE=128', self.conf_text())
 
     def test_bad_requests_are_rejected_and_change_nothing(self):
         self.start()

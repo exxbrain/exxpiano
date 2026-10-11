@@ -33,7 +33,7 @@ SETTINGS = {
     'alsa_device': dict(kind='device', default='auto', scope='synth', key='ALSA_DEVICE'),
     'usb_period_size': dict(kind='int', lo=64, hi=8192, default=64, scope='synth', key='USB_PERIOD_SIZE'),
     'usb_periods': dict(kind='int', lo=2, hi=8, default=3, scope='synth', key='USB_PERIODS'),
-    'period_size': dict(kind='int', lo=64, hi=8192, default=256, scope='synth', key='PERIOD_SIZE'),
+    'period_size': dict(kind='int', lo=64, hi=8192, default=64, scope='synth', key='PERIOD_SIZE'),
     'periods': dict(kind='int', lo=2, hi=8, default=3, scope='synth', key='PERIODS'),
 }
 FX_NAMES = [n for n, s in SETTINGS.items() if s['key'] == 'FX_ARGS']

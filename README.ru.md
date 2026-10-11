@@ -127,11 +127,11 @@ cd /root/pi
 Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
 
 ```bash
-python3 scripts/build-deb.py --version 1.3.2                                # -> dist/piano-synth_1.3.2_all.deb
-python3 scripts/build-deb.py --version 1.3.2 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.3.2_all.deb
+python3 scripts/build-deb.py --version 1.3.3                                # -> dist/piano-synth_1.3.3_all.deb
+python3 scripts/build-deb.py --version 1.3.3 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.3.3_all.deb
 scp -O dist/*.deb root@<IP-Pi>:/root/
-ssh root@<IP-Pi> "apt install -y ./piano-synth_1.3.2_all.deb ./piano-synth-soundfonts_1.3.2_all.deb"
+ssh root@<IP-Pi> "apt install -y ./piano-synth_1.3.3_all.deb ./piano-synth-soundfonts_1.3.3_all.deb"
 ```
 
 - `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
@@ -143,7 +143,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.3.2_all.deb ./piano-synth-sound
 
 Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
 (`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
-На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.3.2_all.deb && dpkg-deb --contents piano-synth_1.3.2_all.deb`.
+На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.3.3_all.deb && dpkg-deb --contents piano-synth_1.3.3_all.deb`.
 
 ## Установщик для DietPi (собирается при каждом коммите)
 
@@ -158,7 +158,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.3.2_all.deb ./piano-synth-sound
 
 **Откуда берётся установщик.** Локально `scripts/install-hooks.sh` (один раз) включает git-хук: каждый `git commit` прогоняет тесты и собирает `dist/`
 (`.deb` и установщик для DietPi). На GitHub то же самое делает `.github/workflows/build.yml` для каждого пуша и pull request и сохраняет файлы как
-скачиваемый артефакт; тег вида `v1.3.2` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
+скачиваемый артефакт; тег вида `v1.3.3` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
 пакет, установщик и веб-страница берут её оттуда.
 
 Что проверено, а что нет: скрипт установщика проверен запуском с подставными `apt-get` и прочим, структура архива проверена тестами. Хук первой загрузки
@@ -202,7 +202,7 @@ vcgencmd get_throttled     # должно быть 0x0
 
 - **Штатный 3.5 мм:** включить `dtparam=audio=on` в `/boot/config.txt` (DietPi: `dietpi-config` → Audio Options),
   устройство `plughw:Headphones`. Драйвер bcm2835 сам увеличивает период буфера до 444 сэмплов, поэтому задержка
-  около 30 мс (при `PERIODS=3`); `PERIODS=2` даёт ~20 мс, но возможны щелчки. Выход шумноват.
+  около 30 мс (при `PERIODS=3`); `PERIODS=2` даёт ~20 мс, но возможны щелчки. Значение по умолчанию `PERIOD_SIZE=64` x `PERIODS=3` (минимум, который принимает FluidSynth; драйвер округляет его вверх) на Pi 3 играло без щелчков; если они появятся, увеличьте `PERIOD_SIZE` на веб-странице. Выход шумноват.
 - **USB-звуковая карта / аудиоинтерфейс:** лучшее решение. Просто подключите: `ALSA_DEVICE=auto` (по умолчанию) предпочитает USB-карту и
   использует меньший буфер `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (64 кадра = 1.45 мс на период, около 4.4 мс буфера; сверх этого добавляется собственная задержка USB и преобразователей интерфейса). Устройство открывается через слой ALSA `plughw`, и это
   важно: многие интерфейсы принимают только 24/32 бита или 4 канала, и прямое открытие (`hw:`) падает с ошибкой

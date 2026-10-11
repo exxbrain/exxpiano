@@ -44,11 +44,11 @@ class AudioSelectTests(unittest.TestCase):
             r = subprocess.run(['bash', RUN], env=e, capture_output=True, text=True)
             return r
 
-    def test_only_onboard_uses_big_buffer(self):
+    def test_only_onboard_uses_its_own_buffer_settings(self):
         r = self.run_script([HEADPHONES])
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('audio.alsa.device=plughw:CARD=Headphones', r.stdout)
-        self.assertIn('-z 256 -c 3', r.stdout)
+        self.assertIn('-z 64 -c 3', r.stdout)
 
     def test_usb_card_is_preferred_and_uses_small_buffer(self):
         r = self.run_script([HEADPHONES, usb(1, 'U24')])
@@ -89,7 +89,7 @@ class AudioSelectTests(unittest.TestCase):
         r = self.run_script([HEADPHONES, keyboard(1)])
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('plughw:CARD=Headphones', r.stdout)
-        self.assertIn('-z 256 -c 3', r.stdout)
+        self.assertIn('-z 64 -c 3', r.stdout)
 
     def test_interface_wins_over_keyboard_audio(self):
         r = self.run_script([HEADPHONES, keyboard(1), usb(2, 'U24')])

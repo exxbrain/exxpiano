@@ -108,7 +108,7 @@
     <h2 data-t="audio">Audio output</h2>
     <p class="hint" data-t="audio_hint">These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).</p>
     <div class="row"><label data-t="device">Output</label><select id="device" style="grid-column:1/3"></select></div>
-    <div class="row"><label data-t="onb_period">Built-in output buffer (frames)</label><input type="number" id="period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="onb_period_hint">Default 256. Lower means less delay; raise it if you hear clicks.</span></div>
+    <div class="row"><label data-t="onb_period">Built-in output buffer (frames)</label><input type="number" id="period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="onb_period_hint">Default 64, the lowest FluidSynth accepts. Raise it if you hear clicks.</span></div>
     <div class="row"><label data-t="onb_periods">Built-in output buffers</label><input type="number" id="periods" min="2" max="8" style="grid-column:1/3"></div>
     <div class="row"><label data-t="usb_period">USB buffer (frames)</label><input type="number" id="usb_period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="usb_period_hint">64 is the lowest FluidSynth accepts. Raise it if you hear clicks.</span></div>
     <div class="row"><label data-t="usb_periods">USB buffers</label><input type="number" id="usb_periods" min="2" max="8" style="grid-column:1/3"></div>
@@ -131,7 +131,7 @@ const T = {
     title: "Piano module", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
     volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
     audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load). Buffers are remembered for each audio interface.",
-    device: "Output", onb_period: "Built-in output buffer (frames)", onb_period_hint: "Default 256. Lower means less delay; raise it if you hear clicks.", onb_periods: "Built-in output buffers", usb_period: "USB buffer (frames)", usb_period_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks.",
+    device: "Output", onb_period: "Built-in output buffer (frames)", onb_period_hint: "Default 64, the lowest FluidSynth accepts. Raise it if you hear clicks.", onb_periods: "Built-in output buffers", usb_period: "USB buffer (frames)", usb_period_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks.",
     usb_periods: "USB buffers", reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)",
     apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).", token_btn: "Sign in",
     auto: "Automatic (USB card if present, otherwise the jack)", usb: "USB", onboard: "onboard",
@@ -155,7 +155,7 @@ const T = {
     title: "Модуль пианино", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
     volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
     audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки). Буферы запоминаются для каждого звукового интерфейса.",
-    device: "Выход", onb_period: "Буфер встроенного выхода (кадры)", onb_period_hint: "По умолчанию 256. Меньше — меньше задержка; увеличьте, если слышны щелчки.", onb_periods: "Число буферов встроенного выхода", usb_period: "Буфер USB (кадры)", usb_period_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.",
+    device: "Выход", onb_period: "Буфер встроенного выхода (кадры)", onb_period_hint: "По умолчанию 64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.", onb_periods: "Число буферов встроенного выхода", usb_period: "Буфер USB (кадры)", usb_period_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.",
     usb_periods: "Число буферов USB", reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)",
     apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/piano-synth.conf).", token_btn: "Войти",
     auto: "Автоматически (USB-карта, если есть, иначе штатный выход)", usb: "USB", onboard: "штатный",
