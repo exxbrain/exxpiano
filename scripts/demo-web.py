@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The web page of the piano module on your computer, without a Raspberry Pi: a simulated device (services, CPU, temperature, Wi-Fi, banks, audio).
+"""The exxpiano web page on your computer, without a Raspberry Pi: a simulated device (services, CPU, temperature, Wi-Fi, banks, audio).
 
   python3 scripts/demo-web.py                    # http://127.0.0.1:8080/
   python3 scripts/demo-web.py --mode ap          # the device in setup mode (its own Wi-Fi), the page opens on the Wi-Fi tab
@@ -7,7 +7,7 @@
 
 Everything works as on the device: move the sliders, change the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" in it does not connect;
 "Cafe" is open), start the setup network, scan the QR codes. Nothing is written outside a temporary folder and nothing is sent anywhere.
-It runs the real code of piano-web.py and the real page; only what touches the machine (systemctl, ALSA, /proc, Wi-Fi) is simulated.
+It runs the real code of exxpiano-web.py and the real page; only what touches the machine (systemctl, ALSA, /proc, Wi-Fi) is simulated.
 """
 import argparse
 import importlib.util
@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PI = os.path.join(ROOT, 'pi')
 sys.path.insert(0, PI)
 sys.path.insert(0, os.path.join(ROOT, 'tests'))
-spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'piano-web.py'))
+spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'exxpiano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
 from sf2fixture import make_sf2  # noqa: E402
@@ -127,7 +127,7 @@ class DemoActions(web.Actions):
 
     def wifi_status(self):
         self._tick()
-        ap = dict(ssid='Piano-Setup-%s' % self.args.number)
+        ap = dict(ssid='exxpiano-Setup-%s' % self.args.number)
         return dict(mode=self.mode, busy=self.busy, link=self.link, cable=self.cable, hostname=self.host, ap=ap if self.mode == 'ap' else None,
                     scan=self.scan, scanned_at=int(time.time()), last_result=self.last_result, updated=int(time.time()))
 
@@ -168,7 +168,7 @@ def main():
     ap.add_argument('--port', type=int, default=8080)
     ap.add_argument('--bind', default='127.0.0.1', help='127.0.0.1 (this computer only); 0.0.0.0 to look at it from a phone on the same network')
     ap.add_argument('--mode', choices=('client', 'ap'), default='client', help='ap: the device has no network and runs its own (setup mode)')
-    ap.add_argument('--hostname', default='pi-synth')
+    ap.add_argument('--hostname', default='exxpiano')
     ap.add_argument('--number', default='81DE', help='the device number (DEVICE_NUMBER)')
     ap.add_argument('--other-board', action='store_true', help='simulate a card that was made for another Raspberry Pi (the red warning)')
     ap.add_argument('--locked', action='store_true', help='with --other-board: the lock is on')
@@ -183,7 +183,7 @@ def main():
     make_sf2(os.path.join(banks, 'mech.sf2'), presets=[('Hammer', 0, 1)], name='Mechanics', sample_bytes=2000)
     make_sf2(os.path.join(banks, 'Salamander Grand.sf2'), presets=[('Grand Piano', 0, 0), ('Bright', 0, 5), ('Felt', 3, 0)], name='Salamander Grand Piano', sample_bytes=900000)
     make_sf2(os.path.join(banks, 'Upright.sf2'), presets=[('Upright', 0, 0)], name='Upright piano', sample_bytes=300000)
-    conf = os.path.join(tmp, 'piano-synth.conf')
+    conf = os.path.join(tmp, 'exxpiano.conf')
     lines = ['PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'), 'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'), 'BANK_DIR=%s' % banks, 'ALSA_DEVICE=auto',
              'GAIN=1.0', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--hammer-boost 0 --hammer-exp 0.8 --random 1"',
              'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'DEVICE_NUMBER=%s' % args.number, 'WEB_PORT=%d' % args.port]
@@ -197,7 +197,7 @@ def main():
     app = web.App(conf, DemoActions(args))
     server = ThreadingHTTPServer((args.bind, args.port), web.make_handler(app))
     url = 'http://%s:%d/%s' % ('127.0.0.1' if args.bind in ('0.0.0.0', '127.0.0.1') else args.bind, args.port, '#/wifi' if args.mode == 'ap' else '')
-    print('Demo of the piano module (a simulated device: nothing is changed on this computer)')
+    print('Demo of exxpiano (a simulated device: nothing is changed on this computer)')
     print('  open', url, ' | stop with Ctrl+C')
     if args.open:
         threading.Timer(0.8, webbrowser.open, [url]).start()

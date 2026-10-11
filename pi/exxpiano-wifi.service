@@ -1,0 +1,17 @@
+[Unit]
+Description=exxpiano Wi-Fi setup (its own access point when there is no network)
+After=network.target networking.service
+Wants=network.target
+
+[Service]
+User=root
+EnvironmentFile=-/etc/exxpiano.conf
+ExecStart=/usr/bin/python3 /opt/exxpiano/exxpiano-wifi.py
+# it ends by itself (exit 0) where NetworkManager owns the network or WIFI_SETUP=0: that is not a failure
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=exxpiano-wifi
+RuntimeDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target

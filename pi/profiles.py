@@ -1,6 +1,6 @@
 """Per-instrument settings: the touch curve, volume, mechanics and preset a piano bank was last played with.
 
-The running values stay in /etc/piano-synth.conf (the bridge and the synthesizer read only that). This file remembers them per bank,
+The running values stay in /etc/exxpiano.conf (the bridge and the synthesizer read only that). This file remembers them per bank,
 keyed by the bank's file name, so choosing a bank again brings its settings back. The file is plain JSON, read defensively: whatever is
 not a known setting, or is out of range, is dropped instead of being trusted.
 """
@@ -8,17 +8,17 @@ import json
 import os
 import tempfile
 
-import pianoconf
+import exxpianoconf
 
-DEFAULT_PATH = '/var/lib/piano-synth/profiles.json'
-DEVICES_DEFAULT_PATH = '/var/lib/piano-synth/devices.json'
+DEFAULT_PATH = '/var/lib/exxpiano/profiles.json'
+DEVICES_DEFAULT_PATH = '/var/lib/exxpiano/devices.json'
 MAX_BYTES = 256 * 1024
 
 
 def load(path, names=None):
     """{key: {setting: value}} with only valid settings from `names` (default: the per-instrument ones).
     A missing, huge or corrupt file gives {}."""
-    names = pianoconf.PER_BANK_NAMES if names is None else names
+    names = exxpianoconf.PER_BANK_NAMES if names is None else names
     try:
         if os.path.getsize(path) > MAX_BYTES:
             return {}
@@ -36,7 +36,7 @@ def load(path, names=None):
         for name, raw in values.items():
             if name in names:
                 try:
-                    clean[name] = pianoconf._coerce(name, raw)
+                    clean[name] = exxpianoconf._coerce(name, raw)
                 except ValueError:
                     pass
         if clean:
@@ -50,7 +50,7 @@ def get(path, key, names=None):
 
 def save(path, key, values, names=None):
     """Remember `values` (a dict of typed settings; only `names` are kept) under `key`: a bank's file name or an audio device."""
-    names = pianoconf.PER_BANK_NAMES if names is None else names
+    names = exxpianoconf.PER_BANK_NAMES if names is None else names
     data = load(path, names)
     data[key] = {n: values[n] for n in names if n in values}
     directory = os.path.dirname(os.path.abspath(path))

@@ -7,7 +7,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'pi'))
-import pianoconf  # noqa: E402
+import exxpianoconf  # noqa: E402
 import profiles  # noqa: E402
 
 
@@ -34,12 +34,12 @@ class ProfilesTests(unittest.TestCase):
 
     def test_device_settings_are_not_per_instrument(self):
         for name in ('alsa_device', 'usb_period_size', 'usb_periods', 'period_size', 'periods', 'polyphony', 'reverb'):
-            self.assertNotIn(name, pianoconf.PER_BANK_NAMES)
+            self.assertNotIn(name, exxpianoconf.PER_BANK_NAMES)
         for name in ('velocity_curve', 'gain', 'hammer_boost', 'piano_prog'):
-            self.assertIn(name, pianoconf.PER_BANK_NAMES)
+            self.assertIn(name, exxpianoconf.PER_BANK_NAMES)
 
     def test_a_second_store_keeps_only_the_names_it_is_given(self):
-        names = pianoconf.PER_DEVICE_NAMES
+        names = exxpianoconf.PER_DEVICE_NAMES
         profiles.save(self.path, 'plughw:CARD=U24', {'usb_period_size': 128, 'gain': 2.0, 'periods': 4}, names)
         self.assertEqual(profiles.get(self.path, 'plughw:CARD=U24', names), {'usb_period_size': 128, 'periods': 4})
         self.assertEqual(profiles.load(self.path), {})                  # read as bank settings nothing of it is valid

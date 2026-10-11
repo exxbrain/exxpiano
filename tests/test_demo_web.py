@@ -55,14 +55,14 @@ class DemoTests(unittest.TestCase):
         self.addCleanup(demo.stop)
         self.assertIn(b'id="drawer"', demo.get('/'))
         state = demo.json('/api/state')
-        self.assertEqual((state['hostname'], state['device']['number']), ('pi-synth', '0007'))
+        self.assertEqual((state['hostname'], state['device']['number']), ('exxpiano', '0007'))
         self.assertEqual([b['id'] for b in state['banks']['banks']], ['Salamander Grand.sf2', 'Upright.sf2'])
         self.assertEqual(state['status']['synth'], 'active')
         mon = demo.json('/api/monitor')
         self.assertGreater(mon['now']['cpu'], 0)
         self.assertEqual(mon['now']['audio'][0]['buffer'], 192)
         self.assertEqual(demo.json('/api/wifi')['mode'], 'client')
-        self.assertEqual(demo.json('/api/qr?kind=join')['text'], 'WIFI:T:WPA;S:Piano-Setup-0007;P:pianosetup;;')
+        self.assertEqual(demo.json('/api/qr?kind=join')['text'], 'WIFI:T:WPA;S:exxpiano-Setup-0007;P:exxpianosetup;;')
 
     def test_settings_the_bank_the_name_and_wifi_work_on_the_simulation(self):
         demo = Demo()
@@ -95,7 +95,7 @@ class DemoTests(unittest.TestCase):
         demo = Demo('--mode', 'ap', '--other-board', '--locked')
         self.addCleanup(demo.stop)
         wifi = demo.json('/api/wifi')
-        self.assertEqual((wifi['mode'], wifi['ap']['ssid']), ('ap', 'Piano-Setup-81DE'))
+        self.assertEqual((wifi['mode'], wifi['ap']['ssid']), ('ap', 'exxpiano-Setup-81DE'))
         device = demo.json('/api/state')['device']
         self.assertEqual((device['serial_ok'], device['locked']), (False, True))
 

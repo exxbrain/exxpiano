@@ -2,9 +2,9 @@
 """The serial number of the Raspberry Pi board, and the binding of a card (an image) to one board.
 
   deviceid.py            print the serial of this board (16 hex digits, as /proc/cpuinfo shows it)
-  deviceid.py check      exit 0 when the card may run here, 78 when it was made for another board and DEVICE_LOCK=1 (piano-synth-run uses it)
+  deviceid.py check      exit 0 when the card may run here, 78 when it was made for another board and DEVICE_LOCK=1 (exxpiano-run uses it)
 
-An image can be built for one board (build-sd-image.py --serial ...). The serial is then in /etc/piano-synth.conf as DEVICE_SERIAL:
+An image can be built for one board (build-sd-image.py --serial ...). The serial is then in /etc/exxpiano.conf as DEVICE_SERIAL:
   * always: the web page warns in red when the card is in another board, the register of the images knows which board each card was made for;
   * with DEVICE_LOCK=1 (build option --lock): the synthesizer does not start on another board.
 This is bookkeeping and a lock against copying a card to a board it was not made for, not copy protection: whoever has root on the device can edit
@@ -28,7 +28,7 @@ def normalize_serial(text):
 
 def read_serial(cpuinfo=None, devicetree='/sys/firmware/devicetree/base/serial-number'):
     """The serial of this board, or None."""
-    cpuinfo = cpuinfo or os.environ.get('PIANO_CPUINFO', '/proc/cpuinfo')           # the variable is for tests
+    cpuinfo = cpuinfo or os.environ.get('EXXPIANO_CPUINFO', '/proc/cpuinfo')           # the variable is for tests
     try:
         with open(cpuinfo, encoding='utf-8', errors='replace') as f:
             for line in f:

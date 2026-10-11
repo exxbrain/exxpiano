@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Make the QR codes of the setup network: one to join it, one to open the setup page. Files: PNG, SVG and a page to print (a sticker for the device).
 
-  python3 scripts/make-qr.py --ssid Piano-Setup-81DE                  # password pianosetup, page http://10.42.0.1:8080/#/wifi
+  python3 scripts/make-qr.py --ssid exxpiano-Setup-81DE                  # password exxpianosetup, page http://10.42.0.1:8080/#/wifi
   python3 scripts/make-qr.py --mac b8:27:eb:d2:81:de --password 'my secret'
 
-The setup network is called Piano-Setup-XXXX, XXXX = the last four digits of the Pi's Wi-Fi address (the Wi-Fi tab and
-`python3 /opt/piano-synth/piano-wifi.py status` show it). Nothing here needs the internet or any package.
+The setup network is called exxpiano-Setup-XXXX, XXXX = the last four digits of the Pi's Wi-Fi address (the Wi-Fi tab and
+`python3 /opt/exxpiano/exxpiano-wifi.py status` show it). Nothing here needs the internet or any package.
 """
 import argparse
 import html
@@ -18,7 +18,7 @@ import qrlib  # noqa: E402
 import wifilib  # noqa: E402
 
 PAGE = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Piano module: setup codes</title>
+<html lang="en"><head><meta charset="utf-8"><title>exxpiano: setup codes</title>
 <style>
   body {{ font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 24px; color: #111; }}
   h1 {{ font-size: 1.3rem; margin: 0 0 4px; }}
@@ -31,7 +31,7 @@ PAGE = """<!doctype html>
   .hint {{ margin-top: 20px; color: #444; font-size: .9rem; max-width: 560px; }}
   @media print {{ body {{ margin: 8mm; }} .noprint {{ display: none; }} }}
 </style></head><body>
-<h1>Piano module: Wi-Fi setup / Настройка Wi-Fi</h1>
+<h1>exxpiano: Wi-Fi setup / Настройка Wi-Fi</h1>
 <p class="sub">Device <b>&#8470; {number}</b> &middot; network <b>{ssid}</b> &middot; password <b>{password}</b></p>
 <div class="codes">
   <div class="code"><img alt="Join the network" src="data:image/png;base64,{join_png}">
@@ -50,11 +50,11 @@ PAGE = """<!doctype html>
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--ssid', help='the setup network name (default: Piano-Setup-<last 4 digits of --mac>)')
+    ap.add_argument('--ssid', help='the setup network name (default: exxpiano-Setup-<last 4 digits of --mac>)')
     ap.add_argument('--mac', default='', help='the Wi-Fi address of the Pi, to build the name')
     ap.add_argument('--number', default='', help='the number given to the device when its image was built (instead of --mac)')
-    ap.add_argument('--password', default='pianosetup', help='WIFI_AP_PASSWORD of the device (default pianosetup)')
-    ap.add_argument('--prefix', default='Piano-Setup')
+    ap.add_argument('--password', default='exxpianosetup', help='WIFI_AP_PASSWORD of the device (default exxpianosetup)')
+    ap.add_argument('--prefix', default='exxpiano-Setup')
     ap.add_argument('--address', default=wifilib.AP_ADDRESS)
     ap.add_argument('--port', type=int, default=8080)
     ap.add_argument('--out', default=os.path.join(ROOT, 'build', 'qr'))

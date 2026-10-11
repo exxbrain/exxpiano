@@ -1,31 +1,31 @@
 #!/bin/bash
-# Runs ON THE PI as root: restores the piano-synth files saved by upgrade-on-pi.sh (the version before the upgrade).
-BACKUP="${PIANO_BACKUP:-/root/piano-synth-backup}"
+# Runs ON THE PI as root: restores the exxpiano files saved by upgrade-on-pi.sh (the version before the upgrade).
+BACKUP="${EXXPIANO_BACKUP:-/root/exxpiano-backup}"
 [ -d "$BACKUP/opt" ] || { echo "No backup in $BACKUP"; exit 1; }
 
-systemctl stop piano-wifi piano-web piano-fx piano-synth 2>/dev/null     # piano-wifi gives the radio back if it was serving its own network
+systemctl stop exxpiano-wifi exxpiano-web exxpiano-fx exxpiano 2>/dev/null     # exxpiano-wifi gives the radio back if it was serving its own network
 # program files and units as they were (the banks were never touched)
-cp -a "$BACKUP/opt/." /opt/piano-synth/
-[ -e "$BACKUP/piano-synth.conf" ] && cp -a "$BACKUP/piano-synth.conf" /etc/piano-synth.conf
-for u in piano-synth piano-fx; do
+cp -a "$BACKUP/opt/." /opt/exxpiano/
+[ -e "$BACKUP/exxpiano.conf" ] && cp -a "$BACKUP/exxpiano.conf" /etc/exxpiano.conf
+for u in exxpiano exxpiano-fx; do
   [ -e "$BACKUP/units/$u.service" ] && cp -a "$BACKUP/units/$u.service" "/lib/systemd/system/$u.service"
 done
 # an older version had no web interface: take its pieces away again
-if [ ! -e "$BACKUP/units/piano-web.service" ]; then
-  systemctl disable piano-web 2>/dev/null
-  rm -f /lib/systemd/system/piano-web.service /opt/piano-synth/piano-web.py /opt/piano-synth/pianoconf.py
-  rm -rf /opt/piano-synth/web
+if [ ! -e "$BACKUP/units/exxpiano-web.service" ]; then
+  systemctl disable exxpiano-web 2>/dev/null
+  rm -f /lib/systemd/system/exxpiano-web.service /opt/exxpiano/exxpiano-web.py /opt/exxpiano/exxpianoconf.py
+  rm -rf /opt/exxpiano/web
 fi
 # an older version had no Wi-Fi setup either
-if [ ! -e "$BACKUP/units/piano-wifi.service" ]; then
-  systemctl disable piano-wifi 2>/dev/null
-  rm -f /lib/systemd/system/piano-wifi.service /opt/piano-synth/piano-wifi.py /opt/piano-synth/wifilib.py
+if [ ! -e "$BACKUP/units/exxpiano-wifi.service" ]; then
+  systemctl disable exxpiano-wifi 2>/dev/null
+  rm -f /lib/systemd/system/exxpiano-wifi.service /opt/exxpiano/exxpiano-wifi.py /opt/exxpiano/wifilib.py
 fi
 systemctl daemon-reload
-systemctl restart piano-synth
+systemctl restart exxpiano
 sleep 45
-systemctl restart piano-fx
+systemctl restart exxpiano-fx
 sleep 3
-systemctl is-active piano-synth piano-fx
+systemctl is-active exxpiano exxpiano-fx
 cat "$BACKUP/version.txt" 2>/dev/null
 echo "Rolled back the files. (dpkg still lists the newer version; reinstall a package later to make them agree.)"

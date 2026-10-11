@@ -7,29 +7,29 @@
 ## Статус служб и журналы
 
 ```bash
-systemctl status piano-synth piano-fx
-journalctl -u piano-synth -n 30 --no-pager
-journalctl -u piano-fx -n 30 --no-pager
+systemctl status exxpiano exxpiano-fx
+journalctl -u exxpiano -n 30 --no-pager
+journalctl -u exxpiano-fx -n 30 --no-pager
 aconnect -l          # клиент «FLUID Synth» должен быть, клавиатура подключена
 vcgencmd get_throttled
 free -m
 ```
 
-В журнале `piano-fx` должны быть строки `synth: FLUID Synth …` и `input: <ваша клавиатура> …`.
+В журнале `exxpiano-fx` должны быть строки `synth: FLUID Synth …` и `input: <ваша клавиатура> …`.
 
 ## Нет звука
 
 | Симптом | Причина и решение |
 |---|---|
 | `aplay -l` пишет «no soundcards found» | Штатный звук выключен: `dtparam=audio=on` в `/boot/config.txt` (DietPi: `dietpi-config` → Audio Options), `reboot` |
-| `piano-synth` постоянно перезапускается, счётчик рестартов растёт | FluidSynth сразу выходит, если его вход закрыт. Запускайте его только через `/opt/piano-synth/piano-synth-run` (служба так и делает): скрипт держит открытым канал только для root как вход FluidSynth. Не используйте `-s` (режим сервера): он открывает управляющий порт на всех сетевых интерфейсах |
+| `exxpiano` постоянно перезапускается, счётчик рестартов растёт | FluidSynth сразу выходит, если его вход закрыт. Запускайте его только через `/opt/exxpiano/exxpiano-run` (служба так и делает): скрипт держит открытым канал только для root как вход FluidSynth. Не используйте `-s` (режим сервера): он открывает управляющий порт на всех сетевых интерфейсах |
 | В журнале `Out of memory`, процесс `Killed` | Банк не помещается в память. Пресет `lite` или `small` |
-| `aconnect -l` не показывает «FLUID Synth» | `piano-synth` не запущен или ещё грузит банки (десятки секунд после старта) |
-| Клавиатура играет, механики нет | Не загружен `mech.sf2` (проверьте `MECH_SF2` в `/etc/piano-synth.conf`) или не запущен `piano-fx` |
+| `aconnect -l` не показывает «FLUID Synth» | `exxpiano` не запущен или ещё грузит банки (десятки секунд после старта) |
+| Клавиатура играет, механики нет | Не загружен `mech.sf2` (проверьте `MECH_SF2` в `/etc/exxpiano.conf`) или не запущен `exxpiano-fx` |
 | Звук есть, но очень тихий | Поднимите `GAIN` (для стерео 1.0, для моно `small` 2.0) и громкость ALSA (`alsamixer`, F6, Headphones ~90%) |
 | При аккордах хрип | `GAIN` слишком большой, уменьшите |
 | В журнале `Failed to find an audio format supported by alsa` | Карта открыта напрямую (`hw:...`) и не принимает 16-битный стерео (USB-интерфейсы часто дают только 32 бита / 4 канала). Используйте форму `plughw:` или оставьте `ALSA_DEVICE=auto` |
-| После подключения или отключения USB-карты звук идёт не с того выхода | `sudo systemctl restart piano-synth` (автоматический перезапуск через udev не проверялся) или задайте `ALSA_DEVICE` явно |
+| После подключения или отключения USB-карты звук идёт не с того выхода | `sudo systemctl restart exxpiano` (автоматический перезапуск через udev не проверялся) или задайте `ALSA_DEVICE` явно |
 
 ## Щелчки, задержка
 

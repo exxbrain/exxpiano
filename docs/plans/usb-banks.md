@@ -10,8 +10,8 @@ also after a reboot and with the drive removed. No SSH, no card reader.
 ## What we already have to build on
 
 - FluidSynth loads a bank completely into RAM when it starts, so a bank does not have to stay on the flash drive afterwards.
-- `PIANO_SF2` / `MECH_SF2` in `/etc/piano-synth.conf` select the banks; `piano-synth-run` passes them to FluidSynth.
-- The web interface and its API (`pi/piano-web.py`, `pi/pianoconf.py`) with strict validation and an atomic config writer.
+- `PIANO_SF2` / `MECH_SF2` in `/etc/exxpiano.conf` select the banks; `exxpiano-run` passes them to FluidSynth.
+- The web interface and its API (`pi/exxpiano-web.py`, `pi/exxpianoconf.py`) with strict validation and an atomic config writer.
 - Upgrades with backup and automatic rollback (`deploy/upgrade-on-pi.sh`): the same idea is needed for switching banks.
 - The SF2 container is simple (RIFF); `tools/build_*_sf2.py` already write it, so reading the list of presets is a small job.
 
@@ -20,7 +20,7 @@ also after a reboot and with the drive removed. No SSH, no card reader.
 | Question | Proposal | Why |
 |---|---|---|
 | Play from the drive or copy? | **Import** (copy to the card, verify), then play from the card | the drive can be removed; a slow or flaky drive cannot cause dropouts; one source of truth |
-| Where do banks live? | `/var/lib/piano-synth/banks/<id>/bank.sf2` + `meta.json` (name, size, SHA-256, presets, source) | survives upgrades (the package never touches it); easy to list and delete |
+| Where do banks live? | `/var/lib/exxpiano/banks/<id>/bank.sf2` + `meta.json` (name, size, SHA-256, presets, source) | survives upgrades (the package never touches it); easy to list and delete |
 | How is the current bank chosen? | `PIANO_SF2` points into the library; one more setting selects the preset (bank:program) | multi-preset banks (General MIDI) need a choice; ours has a single piano |
 | What may be on the drive? | only `*.sf2` / `*.sf3` inside a `piano-banks/` folder at the drive root, optional `bank.json` for name, author, licence | a fixed place and format; nothing else is ever read |
 | Switching | copy, verify, switch the symlink, restart the synthesizer (~45 s), **roll back automatically** if it does not come back | a bad bank must never leave the module silent |
@@ -39,10 +39,10 @@ also after a reboot and with the drive removed. No SSH, no card reader.
 **1. Bank library and SF2 reader** (no hardware needed, fully testable on the Mac)
 - `pi/sf2info.py`: read the header and the preset list with bounded reads; reject truncated files, wrong magic, absurd sizes.
 - `pi/banklib.py`: import (copy to a temporary name, verify size and SHA-256, atomic rename), list, delete, choose the current bank.
-- A small command line `piano-synth-banks list | import FILE | use ID | delete ID`.
+- A small command line `exxpiano-banks list | import FILE | use ID | delete ID`.
 
 **2. Detection and mounting**
-- udev rule: on a USB block device with a filesystem, run a helper that mounts it read-only and writes `/run/piano-synth/usb.json`
+- udev rule: on a USB block device with a filesystem, run a helper that mounts it read-only and writes `/run/exxpiano/usb.json`
   (label, free space, banks found); on removal it clears the file.
 - Import from the mounted drive through the command line, with the checks of phase 1.
 

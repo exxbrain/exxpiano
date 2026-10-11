@@ -3,12 +3,12 @@
 #
 #   sudo ./install.sh --piano /path/piano-standard.sf2 --mech /path/mech.sf2 [--device plughw:Headphones] [--gain 1.0]
 #
-# Safe to run again: /etc/piano-synth.conf is never overwritten,
+# Safe to run again: /etc/exxpiano.conf is never overwritten,
 # only the values you pass as flags are changed.
 set -euo pipefail
 
-PREFIX=/opt/piano-synth
-CONF=/etc/piano-synth.conf
+PREFIX=/opt/exxpiano
+CONF=/etc/exxpiano.conf
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIANO="" MECH="" DEVICE="" GAIN=""
 
@@ -36,14 +36,14 @@ echo "==> Packages"
 apt-get update -qq
 apt-get install -y fluidsynth alsa-utils python3-mido python3-rtmidi hostapd dnsmasq-base iw wpasupplicant
 apt-get install -y avahi-daemon || true      # optional: http://<hostname>.local:8080/
-for dep in hostapd dnsmasq; do systemctl disable --now "$dep" 2>/dev/null || true; done   # piano-wifi starts them itself
+for dep in hostapd dnsmasq; do systemctl disable --now "$dep" 2>/dev/null || true; done   # exxpiano-wifi starts them itself
 
 echo "==> Files in $PREFIX"
 install -d "$PREFIX/soundfonts"
-install -m 755 "$HERE/piano-fx.py" "$PREFIX/piano-fx.py"
+install -m 755 "$HERE/exxpiano-fx.py" "$PREFIX/exxpiano-fx.py"
 [ -f "$HERE/../VERSION" ] && install -m 644 "$HERE/../VERSION" "$PREFIX/VERSION"
-install -m 755 "$HERE/piano-synth-run" "$PREFIX/piano-synth-run"
-install -m 644 "$HERE/pianoconf.py" "$PREFIX/pianoconf.py"
+install -m 755 "$HERE/exxpiano-run" "$PREFIX/exxpiano-run"
+install -m 644 "$HERE/exxpianoconf.py" "$PREFIX/exxpianoconf.py"
 install -m 755 "$HERE/sf2info.py" "$PREFIX/sf2info.py"
 install -m 644 "$HERE/banklib.py" "$PREFIX/banklib.py"
 install -m 644 "$HERE/profiles.py" "$PREFIX/profiles.py"
@@ -51,16 +51,16 @@ install -m 644 "$HERE/sysmon.py" "$PREFIX/sysmon.py"
 install -m 644 "$HERE/wifilib.py" "$PREFIX/wifilib.py"
 install -m 644 "$HERE/qrlib.py" "$PREFIX/qrlib.py"
 install -m 755 "$HERE/deviceid.py" "$PREFIX/deviceid.py"
-install -m 755 "$HERE/piano-wifi.py" "$PREFIX/piano-wifi.py"
-install -d /var/lib/piano-synth
-install -m 755 "$HERE/piano-web.py" "$PREFIX/piano-web.py"
+install -m 755 "$HERE/exxpiano-wifi.py" "$PREFIX/exxpiano-wifi.py"
+install -d /var/lib/exxpiano
+install -m 755 "$HERE/exxpiano-web.py" "$PREFIX/exxpiano-web.py"
 install -d "$PREFIX/web"
 install -m 644 "$HERE/web/index.html" "$PREFIX/web/index.html"
 [ -n "$PIANO" ] && install -m 644 "$PIANO" "$PREFIX/soundfonts/piano.sf2"
 [ -n "$MECH" ]  && install -m 644 "$MECH"  "$PREFIX/soundfonts/mech.sf2"
 
 echo "==> Configuration $CONF"
-[ -f "$CONF" ] || install -m 644 "$HERE/piano-synth.conf" "$CONF"
+[ -f "$CONF" ] || install -m 644 "$HERE/exxpiano.conf" "$CONF"
 set_conf() {  # KEY VALUE
   if grep -q "^$1=" "$CONF"; then sed -i "s|^$1=.*|$1=$2|" "$CONF"; else echo "$1=$2" >> "$CONF"; fi
 }
@@ -77,19 +77,19 @@ for old in fluidsynth-live midi-autoconnect; do
   fi
 done
 pkill -x fluidsynth 2>/dev/null || true
-install -m 644 "$HERE/piano-synth.service" /etc/systemd/system/piano-synth.service
-install -m 644 "$HERE/piano-fx.service"    /etc/systemd/system/piano-fx.service
-install -m 644 "$HERE/piano-web.service"   /etc/systemd/system/piano-web.service
-install -m 644 "$HERE/piano-wifi.service"  /etc/systemd/system/piano-wifi.service
-install -m 644 "$HERE/90-piano-synth.rules" /etc/udev/rules.d/90-piano-synth.rules
+install -m 644 "$HERE/exxpiano.service" /etc/systemd/system/exxpiano.service
+install -m 644 "$HERE/exxpiano-fx.service"    /etc/systemd/system/exxpiano-fx.service
+install -m 644 "$HERE/exxpiano-web.service"   /etc/systemd/system/exxpiano-web.service
+install -m 644 "$HERE/exxpiano-wifi.service"  /etc/systemd/system/exxpiano-wifi.service
+install -m 644 "$HERE/90-exxpiano.rules" /etc/udev/rules.d/90-exxpiano.rules
 udevadm control --reload 2>/dev/null || true
 systemctl daemon-reload
-systemctl enable piano-synth piano-fx piano-web piano-wifi
-systemctl restart piano-synth
+systemctl enable exxpiano exxpiano-fx exxpiano-web exxpiano-wifi
+systemctl restart exxpiano
 sleep 2
-systemctl restart piano-fx
-systemctl restart piano-web
-systemctl restart piano-wifi || true
+systemctl restart exxpiano-fx
+systemctl restart exxpiano-web
+systemctl restart exxpiano-wifi || true
 
 echo "==> Checks"
 if grep -q '^ALSA_DEVICE=.*Headphones' "$CONF" && ! aplay -l 2>/dev/null | grep -qi headphones; then
@@ -102,8 +102,8 @@ if command -v vcgencmd >/dev/null; then
   [ "$thr" = "0x0" ] || echo "WARNING: insufficient power supply (should be 0x0). See the README, section 'Power supply'."
 fi
 echo
-systemctl --no-pager --lines=0 status piano-synth piano-fx || true
+systemctl --no-pager --lines=0 status exxpiano exxpiano-fx || true
 echo
 echo "Done. Loading the sound banks takes tens of seconds, then the keyboard connects by itself."
-echo "Log:  journalctl -u piano-synth -u piano-fx -u piano-web -f"
+echo "Log:  journalctl -u exxpiano -u exxpiano-fx -u exxpiano-web -f"
 echo "Web interface: http://$(hostname -I | awk '{print $1}'):8080/"

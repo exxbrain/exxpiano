@@ -43,7 +43,7 @@ class DeployTests(unittest.TestCase):
         args = self.ssh_args()
         self.assertEqual(args[0], 'root@192.168.1.95')
         self.assertIn('upgrade-on-pi.sh', args[1])
-        self.assertEqual(self.sent_files(), sorted(['piano-synth_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
+        self.assertEqual(self.sent_files(), sorted(['exxpiano_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
 
     def test_an_explicit_user_is_kept(self):
         r = self.run_deploy('denis@piano.local')
@@ -59,8 +59,8 @@ class DeployTests(unittest.TestCase):
         # run the very sed expression of the upgrade script on sample configuration lines
         with open(os.path.join(ROOT, 'deploy', 'upgrade-on-pi.sh')) as f:
             text = f.read()
-        self.assertIn("grep -q '^BANK_DIR=' /etc/piano-synth.conf", text)
-        expr = text.split("sed -n '")[1].split("' /etc/piano-synth.conf")[0]
+        self.assertIn("grep -q '^BANK_DIR=' /etc/exxpiano.conf", text)
+        expr = text.split("sed -n '")[1].split("' /etc/exxpiano.conf")[0]
         for line, expected in (('PIANO_SF2=/root/soundfonts/v5.sf2', '/root/soundfonts/v5.sf2'),
                                ('PIANO_SF2="/root/sound fonts/v 5.sf2"', '/root/sound fonts/v 5.sf2')):
             r = subprocess.run(['sed', '-n', expr], input=line + '\n', capture_output=True, text=True)
@@ -73,7 +73,7 @@ class DeployTests(unittest.TestCase):
             self.assertNotIn('1.0.0', text)
             self.assertNotIn('1.1.0', text)
         with open(os.path.join(ROOT, 'deploy', 'upgrade-on-pi.sh')) as f:
-            self.assertIn('piano-synth_*_all.deb', f.read())
+            self.assertIn('exxpiano_*_all.deb', f.read())
 
 
 if __name__ == '__main__':

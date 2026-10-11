@@ -57,8 +57,8 @@ class DebTests(unittest.TestCase):
                         '--out', os.path.join(cls.out, 'dist'),
                         '--banks', cls.banks['piano.sf2'][0], cls.banks['mech.sf2'][0]],
                        check=True, capture_output=True)
-        cls.main = os.path.join(cls.out, 'dist', 'piano-synth_9.9.9_all.deb')
-        cls.fonts = os.path.join(cls.out, 'dist', 'piano-synth-soundfonts_9.9.9_all.deb')
+        cls.main = os.path.join(cls.out, 'dist', 'exxpiano_9.9.9_all.deb')
+        cls.fonts = os.path.join(cls.out, 'dist', 'exxpiano-soundfonts_9.9.9_all.deb')
 
     @classmethod
     def tearDownClass(cls):
@@ -80,7 +80,7 @@ class DebTests(unittest.TestCase):
     def test_control_fields(self):
         ctl = self.tar(self.members(self.main)[1][1])
         control = parse_control(ctl.extractfile('./control').read().decode())
-        self.assertEqual(control['Package'], 'piano-synth')
+        self.assertEqual(control['Package'], 'exxpiano')
         self.assertEqual(control['Version'], '9.9.9')
         self.assertEqual(control['Architecture'], 'all')
         for dep in ('fluidsynth', 'python3-mido', 'python3-rtmidi', 'alsa-utils', 'hostapd', 'dnsmasq-base', 'iw', 'wpasupplicant'):
@@ -95,21 +95,21 @@ class DebTests(unittest.TestCase):
         names = {m.name: m for m in ctl.getmembers()}
         for script in ('./postinst', './prerm', './postrm'):
             self.assertEqual(names[script].mode & 0o755, 0o755, script)
-        self.assertEqual(ctl.extractfile('./conffiles').read().decode().split(), ['/etc/piano-synth.conf'])
+        self.assertEqual(ctl.extractfile('./conffiles').read().decode().split(), ['/etc/exxpiano.conf'])
 
     def test_data_files_owner_and_modes(self):
         data = self.tar(self.members(self.main)[2][1])
         names = {m.name: m for m in data.getmembers()}
-        for path in ('./etc/piano-synth.conf', './opt/piano-synth/piano-fx.py',
-                     './lib/systemd/system/piano-synth.service', './lib/systemd/system/piano-fx.service',
-                     './usr/bin/piano-synth-install-banks', './usr/share/doc/piano-synth/copyright',
-                     './opt/piano-synth/soundfonts'):
+        for path in ('./etc/exxpiano.conf', './opt/exxpiano/exxpiano-fx.py',
+                     './lib/systemd/system/exxpiano.service', './lib/systemd/system/exxpiano-fx.service',
+                     './usr/bin/exxpiano-install-banks', './usr/share/doc/exxpiano/copyright',
+                     './opt/exxpiano/soundfonts'):
             self.assertIn(path, names)
         for m in names.values():
             self.assertEqual((m.uid, m.gid, m.uname, m.gname), (0, 0, 'root', 'root'), m.name)
-        self.assertEqual(names['./opt/piano-synth/piano-fx.py'].mode, 0o755)
-        self.assertEqual(names['./usr/bin/piano-synth-install-banks'].mode, 0o755)
-        self.assertTrue(names['./opt/piano-synth/soundfonts'].isdir())
+        self.assertEqual(names['./opt/exxpiano/exxpiano-fx.py'].mode, 0o755)
+        self.assertEqual(names['./usr/bin/exxpiano-install-banks'].mode, 0o755)
+        self.assertTrue(names['./opt/exxpiano/soundfonts'].isdir())
 
     def test_md5sums_match_data(self):
         m = self.members(self.main)
@@ -120,29 +120,29 @@ class DebTests(unittest.TestCase):
 
     def test_services_use_conf_and_server_flag(self):
         data = self.tar(self.members(self.main)[2][1])
-        synth = data.extractfile('./lib/systemd/system/piano-synth.service').read().decode()
-        self.assertIn('EnvironmentFile=/etc/piano-synth.conf', synth)
-        self.assertIn('ExecStart=/opt/piano-synth/piano-synth-run', synth)
-        runner = data.extractfile('./opt/piano-synth/piano-synth-run').read().decode()
+        synth = data.extractfile('./lib/systemd/system/exxpiano.service').read().decode()
+        self.assertIn('EnvironmentFile=/etc/exxpiano.conf', synth)
+        self.assertIn('ExecStart=/opt/exxpiano/exxpiano-run', synth)
+        runner = data.extractfile('./opt/exxpiano/exxpiano-run').read().decode()
         self.assertIn('mkfifo', runner)                     # FluidSynth keeps running on a root-only pipe, no network port
         self.assertNotIn('shell.port', runner)
-        self.assertEqual(data.getmember('./opt/piano-synth/piano-synth-run').mode, 0o755)
+        self.assertEqual(data.getmember('./opt/exxpiano/exxpiano-run').mode, 0o755)
         names = [m.name for m in data.getmembers()]
-        self.assertEqual(data.extractfile('./opt/piano-synth/VERSION').read().decode().strip(), '9.9.9')
-        self.assertIn('./lib/udev/rules.d/90-piano-synth.rules', names)
-        for web_file in ('./opt/piano-synth/pianoconf.py', './opt/piano-synth/piano-web.py', './opt/piano-synth/sf2info.py',
-                         './opt/piano-synth/banklib.py', './opt/piano-synth/profiles.py', './opt/piano-synth/sysmon.py', './opt/piano-synth/wifilib.py', './opt/piano-synth/qrlib.py', './opt/piano-synth/deviceid.py', './opt/piano-synth/piano-wifi.py', './lib/systemd/system/piano-wifi.service', './var/lib/piano-synth',
-                         './opt/piano-synth/web/index.html', './lib/systemd/system/piano-web.service'):
+        self.assertEqual(data.extractfile('./opt/exxpiano/VERSION').read().decode().strip(), '9.9.9')
+        self.assertIn('./lib/udev/rules.d/90-exxpiano.rules', names)
+        for web_file in ('./opt/exxpiano/exxpianoconf.py', './opt/exxpiano/exxpiano-web.py', './opt/exxpiano/sf2info.py',
+                         './opt/exxpiano/banklib.py', './opt/exxpiano/profiles.py', './opt/exxpiano/sysmon.py', './opt/exxpiano/wifilib.py', './opt/exxpiano/qrlib.py', './opt/exxpiano/deviceid.py', './opt/exxpiano/exxpiano-wifi.py', './lib/systemd/system/exxpiano-wifi.service', './var/lib/exxpiano',
+                         './opt/exxpiano/web/index.html', './lib/systemd/system/exxpiano-web.service'):
             self.assertIn(web_file, names)
 
     def test_soundfonts_package(self):
         m = self.members(self.fonts)
         control = parse_control(self.tar(m[1][1]).extractfile('./control').read().decode())
-        self.assertEqual(control['Package'], 'piano-synth-soundfonts')
-        self.assertEqual(control['Depends'], 'piano-synth (>= 9.9.9)')
+        self.assertEqual(control['Package'], 'exxpiano-soundfonts')
+        self.assertEqual(control['Depends'], 'exxpiano (>= 9.9.9)')
         data = self.tar(m[2][1])
         for name, (_, payload) in self.banks.items():
-            self.assertEqual(data.extractfile('./opt/piano-synth/soundfonts/' + name).read(), payload)
+            self.assertEqual(data.extractfile('./opt/exxpiano/soundfonts/' + name).read(), payload)
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ debootstrap --variant=minbase --include=ca-certificates,systemd,systemd-sysv,sud
 echo "dietpi" > "$W/root/etc/hostname"; printf '127.0.0.1\tlocalhost\n127.0.1.1\tdietpi\n' > "$W/root/etc/hosts"
 printf 'LABEL=DIETPISETUP /boot vfat defaults 0 2\nLABEL=DietPi-ROOT / ext4 defaults 0 1\n' > "$W/root/etc/fstab"
 mkdir -p "$W/root/boot"; mount "$BOOT" "$W/root/boot"
-mkdir -p "$W/root/boot/dietpi"; printf 'G_DIETPI_VERSION_CORE=10\nG_DIETPI_VERSION_SUB=7\n' > "$W/root/boot/dietpi/.version"
+mkdir -p "$W/root/boot/dietpi"; printf 'G_DIETPI_VERSION_CORE=10\nG_DIETPI_VERSION_SUB=7\nG_DIETPI_VERSION_RC=0\n' > "$W/root/boot/dietpi/.version"
 cat > "$W/root/boot/dietpi.txt" <<'TXT'
 ##### a stand-in for DietPi's dietpi.txt
 AUTO_SETUP_AUTOMATED=0

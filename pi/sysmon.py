@@ -133,9 +133,9 @@ class Monitor:
                 continue
             if comm.startswith('python'):
                 cmd = _read(os.path.join(self.proc, name, 'cmdline')) or ''
-                if 'piano-fx' in cmd:
+                if 'exxpiano-fx' in cmd:
                     found['bridge'].append(int(name))
-                elif 'piano-web' in cmd:
+                elif 'exxpiano-web' in cmd:
                     found['web'].append(int(name))
         return found
 

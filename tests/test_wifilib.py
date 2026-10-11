@@ -167,19 +167,19 @@ class ScanTests(unittest.TestCase):
 class HostnameTests(unittest.TestCase):
     def test_the_number_and_the_suggested_name_come_from_the_wifi_address(self):
         self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de'), '81DE')
-        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de'), 'piano-81de')
+        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de'), 'exxpiano-81de')
         self.assertEqual(wifilib.device_number(''), '0000')
-        self.assertEqual(wifilib.ap_ssid('Piano-Setup', 'b8:27:eb:d2:81:de'), 'Piano-Setup-81DE')   # the same number in the setup network
+        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', 'b8:27:eb:d2:81:de'), 'exxpiano-Setup-81DE')   # the same number in the setup network
         self.assertTrue(wifilib.HOSTNAME_RE.match(wifilib.suggested_hostname('b8:27:eb:d2:81:de')))
 
     def test_a_number_given_at_build_time_wins_over_the_address(self):
         self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', '0007'), '0007')
         self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', 'ab12'), 'AB12')
-        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de', '0007'), 'piano-0007')
-        self.assertEqual(wifilib.ap_ssid('Piano-Setup', '', '0007'), 'Piano-Setup-0007')                 # no address needed
+        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de', '0007'), 'exxpiano-0007')
+        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', '', '0007'), 'exxpiano-Setup-0007')                 # no address needed
         for bad in ('', 'x y', '12345678901', '../1', None):                                          # an unusable value falls back to the address
             self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', bad), '81DE')
-        self.assertEqual(wifilib.setup_credentials({'DEVICE_NUMBER': '0007'}, 'b8:27:eb:d2:81:de'), ('Piano-Setup-0007', 'pianosetup'))
+        self.assertEqual(wifilib.setup_credentials({'DEVICE_NUMBER': '0007'}, 'b8:27:eb:d2:81:de'), ('exxpiano-Setup-0007', 'exxpianosetup'))
 
     def test_apply_hostname_sets_it_fixes_the_hosts_file_and_restarts_avahi(self):
         calls = []
@@ -187,11 +187,11 @@ class HostnameTests(unittest.TestCase):
             hosts = os.path.join(d, 'hosts')
             with open(hosts, 'w') as f:
                 f.write('127.0.0.1\tlocalhost\n127.0.1.1\told-name\n::1 localhost ip6-localhost\n')
-            self.assertEqual(wifilib.apply_hostname('piano-81de', lambda cmd: (calls.append(cmd), (0, ''))[1], hosts), 'piano-81de')
+            self.assertEqual(wifilib.apply_hostname('exxpiano-81de', lambda cmd: (calls.append(cmd), (0, ''))[1], hosts), 'exxpiano-81de')
             with open(hosts) as f:
                 text = f.read()
-        self.assertEqual(text, '127.0.0.1\tlocalhost\n127.0.1.1\tpiano-81de\n::1 localhost ip6-localhost\n')
-        self.assertEqual(calls, [['hostnamectl', 'set-hostname', 'piano-81de'], ['systemctl', 'try-restart', 'avahi-daemon.service']])
+        self.assertEqual(text, '127.0.0.1\tlocalhost\n127.0.1.1\texxpiano-81de\n::1 localhost ip6-localhost\n')
+        self.assertEqual(calls, [['hostnamectl', 'set-hostname', 'exxpiano-81de'], ['systemctl', 'try-restart', 'avahi-daemon.service']])
 
     def test_bad_names_and_failures(self):
         for bad in ('', '-a', 'a-', 'A', 'a b', 'a_b', 'x' * 64, None):
@@ -204,26 +204,26 @@ class HostnameTests(unittest.TestCase):
 
 class AccessPointTests(unittest.TestCase):
     def test_the_name_ends_with_the_adapter_address(self):
-        self.assertEqual(wifilib.ap_ssid('Piano-Setup', 'ba:27:eb:d2:81:de'), 'Piano-Setup-81DE')
-        self.assertEqual(wifilib.ap_ssid('', ''), 'Piano-Setup-0000')
+        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', 'ba:27:eb:d2:81:de'), 'exxpiano-Setup-81DE')
+        self.assertEqual(wifilib.ap_ssid('', ''), 'exxpiano-Setup-0000')
         self.assertLessEqual(len(wifilib.ap_ssid('x' * 60, 'aa:bb')), 32)
 
     def test_hostapd_configuration(self):
-        text = wifilib.hostapd_conf('wlan0', 'Piano-Setup-81DE', 'pianosetup', 6, 'RU', '/run/piano-wifi/hostapd')
-        for line in ('interface=wlan0', 'ssid=Piano-Setup-81DE', 'wpa=2', 'wpa_key_mgmt=WPA-PSK', 'rsn_pairwise=CCMP', 'wpa_passphrase=pianosetup',
-                     'channel=6', 'country_code=RU', 'ctrl_interface=/run/piano-wifi/hostapd'):
+        text = wifilib.hostapd_conf('wlan0', 'exxpiano-Setup-81DE', 'exxpianosetup', 6, 'RU', '/run/exxpiano-wifi/hostapd')
+        for line in ('interface=wlan0', 'ssid=exxpiano-Setup-81DE', 'wpa=2', 'wpa_key_mgmt=WPA-PSK', 'rsn_pairwise=CCMP', 'wpa_passphrase=exxpianosetup',
+                     'channel=6', 'country_code=RU', 'ctrl_interface=/run/exxpiano-wifi/hostapd'):
             self.assertIn(line + '\n', text)
-        self.assertNotIn('country_code', wifilib.hostapd_conf('wlan0', 'x', 'pianosetup', 1, 'xx'))
-        for bad in (dict(passphrase='short'), dict(passphrase=None), dict(passphrase='pianosetup', channel=14), dict(ssid='')):
-            kw = dict(interface='wlan0', ssid='x', passphrase='pianosetup', channel=6)
+        self.assertNotIn('country_code', wifilib.hostapd_conf('wlan0', 'x', 'exxpianosetup', 1, 'xx'))
+        for bad in (dict(passphrase='short'), dict(passphrase=None), dict(passphrase='exxpianosetup', channel=14), dict(ssid='')):
+            kw = dict(interface='wlan0', ssid='x', passphrase='exxpianosetup', channel=6)
             kw.update(bad)
             with self.subTest(bad), self.assertRaises(ValueError):
                 wifilib.hostapd_conf(**kw)
 
     def test_dnsmasq_answers_every_name_with_the_pi_and_stays_on_its_interface(self):
-        text = wifilib.dnsmasq_conf('wlan0', '/run/piano-wifi')
+        text = wifilib.dnsmasq_conf('wlan0', '/run/exxpiano-wifi')
         for line in ('interface=wlan0', 'listen-address=10.42.0.1', 'bind-interfaces', 'address=/#/10.42.0.1', 'dhcp-range=10.42.0.10,10.42.0.60,255.255.255.0,2h',
-                     'dhcp-option=3,10.42.0.1', 'dhcp-option=6,10.42.0.1', 'no-resolv', 'user=nobody', 'group=nogroup', 'pid-file=/run/piano-wifi/dnsmasq.pid'):
+                     'dhcp-option=3,10.42.0.1', 'dhcp-option=6,10.42.0.1', 'no-resolv', 'user=nobody', 'group=nogroup', 'pid-file=/run/exxpiano-wifi/dnsmasq.pid'):
             self.assertIn(line + '\n', text)
 
 

@@ -11,8 +11,8 @@ import tempfile
 SSID_MAX_BYTES = 32
 CHANNELS_2G = (1, 6, 11)
 AP_ADDRESS = '10.42.0.1'
-AP_DEFAULT_PASSWORD = 'pianosetup'
-AP_DEFAULT_PREFIX = 'Piano-Setup'
+AP_DEFAULT_PASSWORD = 'exxpianosetup'
+AP_DEFAULT_PREFIX = 'exxpiano-Setup'
 AP_NETWORK = '10.42.0.0/24'
 
 
@@ -207,12 +207,12 @@ def device_number(mac, configured=None):
 
 
 def suggested_hostname(mac, configured=None):
-    return 'piano-' + device_number(mac, configured).lower()
+    return 'exxpiano-' + device_number(mac, configured).lower()
 
 
 def ap_ssid(prefix, mac, configured=None):
-    """`Piano-Setup-AB12`: the prefix and the number of the device."""
-    return ('%s-%s' % (prefix or 'Piano-Setup', device_number(mac, configured)))[:SSID_MAX_BYTES]
+    """`exxpiano-Setup-AB12`: the prefix and the number of the device."""
+    return ('%s-%s' % (prefix or 'exxpiano-Setup', device_number(mac, configured)))[:SSID_MAX_BYTES]
 
 
 def setup_credentials(conf, mac):
@@ -278,8 +278,8 @@ def apply_hostname(name, run, hosts_path='/etc/hosts'):
     return name
 
 
-# ---- the exchange between the web page and the supervisor (files in /run/piano-wifi, root only)
-RUN_DIR = '/run/piano-wifi'
+# ---- the exchange between the web page and the supervisor (files in /run/exxpiano-wifi, root only)
+RUN_DIR = '/run/exxpiano-wifi'
 MAX_JSON = 64 * 1024
 
 

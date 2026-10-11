@@ -1,11 +1,11 @@
 #!/bin/bash
-# Runs ON THE PI as root (started by scripts/deploy-to-pi.sh): upgrades the piano-synth package from the .deb in this folder.
-# Your /etc/piano-synth.conf is kept. A backup is made first; if the synthesizer or the bridge does not come back, the old
+# Runs ON THE PI as root (started by scripts/deploy-to-pi.sh): upgrades the exxpiano package from the .deb in this folder.
+# Your /etc/exxpiano.conf is kept. A backup is made first; if the synthesizer or the bridge does not come back, the old
 # version is restored automatically (rollback-on-pi.sh does the same by hand).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-DEB="$(ls "$HERE"/piano-synth_*_all.deb 2>/dev/null | sort -V | tail -1 || true)"
-BACKUP="${PIANO_BACKUP:-/root/piano-synth-backup}"
+DEB="$(ls "$HERE"/exxpiano_*_all.deb 2>/dev/null | sort -V | tail -1 || true)"
+BACKUP="${EXXPIANO_BACKUP:-/root/exxpiano-backup}"
 
 rollback() {
   echo; echo "!! $1 -> rolling back"
@@ -13,7 +13,7 @@ rollback() {
   exit 1
 }
 
-[ -n "$DEB" ] || { echo "No piano-synth_*_all.deb next to this script"; exit 1; }
+[ -n "$DEB" ] || { echo "No exxpiano_*_all.deb next to this script"; exit 1; }
 
 echo "== 1/6 Checking the package with dpkg"
 dpkg-deb --info "$DEB" >/dev/null || { echo "dpkg rejects the package"; exit 1; }
@@ -32,46 +32,46 @@ fi
 if ! dpkg -s avahi-daemon >/dev/null 2>&1; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y avahi-daemon >/dev/null 2>&1 && echo "avahi-daemon installed: this device is now reachable as $(hostname).local" || echo "(avahi-daemon could not be installed: the page stays reachable by its address)"
 fi
-# the setup access point is started by piano-wifi: the packages' own services would get in the way
+# the setup access point is started by exxpiano-wifi: the packages' own services would get in the way
 for dep in hostapd dnsmasq; do systemctl disable --now "$dep" >/dev/null 2>&1 || true; done
 
 echo "== 2/6 Backup into $BACKUP"
 rm -rf "$BACKUP"; mkdir -p "$BACKUP/opt" "$BACKUP/units"
-cp -a /opt/piano-synth/. "$BACKUP/opt/" 2>/dev/null || true
+cp -a /opt/exxpiano/. "$BACKUP/opt/" 2>/dev/null || true
 rm -rf "$BACKUP/opt/soundfonts"                 # banks are big and the upgrade does not touch them
-cp -a /etc/piano-synth.conf "$BACKUP/" 2>/dev/null || true
-for u in piano-synth piano-fx piano-web piano-wifi; do
+cp -a /etc/exxpiano.conf "$BACKUP/" 2>/dev/null || true
+for u in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
   [ -e "/lib/systemd/system/$u.service" ] && cp -a "/lib/systemd/system/$u.service" "$BACKUP/units/" || true
 done
-dpkg -s piano-synth 2>/dev/null | grep '^Version' | tee "$BACKUP/version.txt" || echo "(not installed before)" | tee "$BACKUP/version.txt"
+dpkg -s exxpiano 2>/dev/null | grep '^Version' | tee "$BACKUP/version.txt" || echo "(not installed before)" | tee "$BACKUP/version.txt"
 
 echo "== 3/6 Installing (keeping your configuration)"
 dpkg -i --force-confold "$DEB" || rollback "dpkg failed"
 
 # An older configuration has no BANK_DIR: use the folder of the bank that is playing now, so the web page lists your banks.
-if ! grep -q '^BANK_DIR=' /etc/piano-synth.conf; then
-  cur="$(sed -n 's/^PIANO_SF2="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/piano-synth.conf | head -1)"
-  [ -n "$cur" ] && echo "BANK_DIR=$(dirname "$cur")" >> /etc/piano-synth.conf && echo "BANK_DIR set to $(dirname "$cur")"
+if ! grep -q '^BANK_DIR=' /etc/exxpiano.conf; then
+  cur="$(sed -n 's/^PIANO_SF2="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/exxpiano.conf | head -1)"
+  [ -n "$cur" ] && echo "BANK_DIR=$(dirname "$cur")" >> /etc/exxpiano.conf && echo "BANK_DIR set to $(dirname "$cur")"
 fi
 
 echo "== 4/6 Starting (the banks load for ~40 s)"
 systemctl daemon-reload
-systemctl enable piano-synth piano-fx piano-web piano-wifi >/dev/null 2>&1
-systemctl restart piano-synth
+systemctl enable exxpiano exxpiano-fx exxpiano-web exxpiano-wifi >/dev/null 2>&1
+systemctl restart exxpiano
 sleep 45
-systemctl is-active --quiet piano-synth || rollback "the synthesizer is not running"
-systemctl restart piano-fx
-systemctl restart piano-web
-systemctl restart piano-wifi || true           # its failure never takes the piano down: it only matters when there is no network
+systemctl is-active --quiet exxpiano || rollback "the synthesizer is not running"
+systemctl restart exxpiano-fx
+systemctl restart exxpiano-web
+systemctl restart exxpiano-wifi || true           # its failure never takes the piano down: it only matters when there is no network
 sleep 4
-systemctl is-active --quiet piano-fx || rollback "the bridge is not running"
+systemctl is-active --quiet exxpiano-fx || rollback "the bridge is not running"
 
 echo "== 5/6 Checks"
-echo "-- services:"; systemctl is-active piano-synth piano-fx piano-web piano-wifi
-echo "-- audio output:"; journalctl -u piano-synth --no-pager | grep 'audio output' | tail -1
-echo "-- bridge:"; journalctl -u piano-fx -n 3 --no-pager | tail -3
+echo "-- services:"; systemctl is-active exxpiano exxpiano-fx exxpiano-web exxpiano-wifi
+echo "-- audio output:"; journalctl -u exxpiano --no-pager | grep 'audio output' | tail -1
+echo "-- bridge:"; journalctl -u exxpiano-fx -n 3 --no-pager | tail -3
 echo "-- network ports (9800 must be ABSENT, 8080 present):"; ss -ltn | grep -E ':(9800|8080)\b' || echo "(none listed)"
-echo "-- control pipe:"; ls -l /run/piano-synth.cmd
+echo "-- control pipe:"; ls -l /run/exxpiano.cmd
 echo "-- power:"; vcgencmd get_throttled 2>/dev/null || true
 
 echo "== 6/6 Web interface"

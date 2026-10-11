@@ -1,4 +1,4 @@
-"""Tests for the automatic audio output choice in pi/piano-synth-run (a fake /proc/asound, no hardware needed).
+"""Tests for the automatic audio output choice in pi/exxpiano-run (a fake /proc/asound, no hardware needed).
 
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-RUN = os.path.join(ROOT, 'pi', 'piano-synth-run')
+RUN = os.path.join(ROOT, 'pi', 'exxpiano-run')
 
 HEADPHONES = (0, 'Headphones', 'bcm2835_headphon - bcm2835 Headphones', False)
 HDMI = (1, 'vc4hdmi', 'vc4-hdmi - vc4-hdmi', False)
@@ -119,7 +119,7 @@ class DeviceLockTests(unittest.TestCase):
             cpuinfo = os.path.join(d, 'cpuinfo')
             with open(cpuinfo, 'w') as f:
                 f.write('Serial\t\t: 00000000d2f2f1de\n')
-            env = dict(os.environ, PIANO_CPUINFO=cpuinfo, DRY_RUN='1', ASOUND_DIR=d, PIANO_SF2='/x/p.sf2', MECH_SF2='/x/m.sf2', **env_extra)
+            env = dict(os.environ, EXXPIANO_CPUINFO=cpuinfo, DRY_RUN='1', ASOUND_DIR=d, PIANO_SF2='/x/p.sf2', MECH_SF2='/x/m.sf2', **env_extra)
             return subprocess.run(['bash', RUN], capture_output=True, text=True, env=env)
 
     def test_another_board_is_refused_with_78(self):

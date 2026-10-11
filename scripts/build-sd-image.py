@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
-"""Makes the SD card image of one piano module: DietPi + the software + the banks + the number and the name of the device. One zip per device.
+"""Makes the SD card image of one exxpiano device: DietPi + the software + the banks + the number and the name of the device. One zip per device.
 
-  python3 scripts/build-sd-image.py --dietpi DietPi_RPi234-ARMv8-Trixie.img.xz --piano build/archive/Salamander-stereo-6L-9s-v3.sf2 --number auto \\
+  python3 scripts/build-sd-image.py --dietpi DietPi_RPi234-ARMv8-Trixie.img.xz --serial 00000000d2f2f1de --number auto \\
       --password 'root password' --ap-password 'sticker password' --note 'for Ivan'
 
-Result in dist/sd/<number>/:  piano-synth-<number>-sd.zip  (flash it with Raspberry Pi Imager "Use custom" or balenaEtcher: both take the zip as it is),
+Result in dist/sd/<number>/: a versioned, board-bound exxpiano-rpi234-...-sd.zip (flash it with Raspberry Pi Imager "Use custom" or balenaEtcher: both take the zip as it is),
 a sticker (the QR codes of this very device, ready to print) and a README with what the device is called. The device is entered in the register
 (registry/devices.csv, see sd-registry.py): the number is unique, `--number auto` takes the next free one.
 
 Needs Docker (on a Mac the image is made in a Linux container; Docker Desktop must be running) or a Linux machine with root and --no-docker.
 The first start of the card needs the internet ONCE (DietPi's own first-run setup downloads its updates); nothing of ours does.
 HONEST STATUS: the whole build is tested on a stand-in image (same layout) and the finished image is read back and its programs run; it has not been
-started on a Raspberry Pi: do that with the first card and look at /var/log/piano-synth-firstboot.log.
+started on a Raspberry Pi: do that with the first card and look at /var/log/exxpiano-firstboot.log.
 """
 import argparse
 import csv
 import datetime
 import hashlib
 import importlib.util
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -31,7 +33,9 @@ import deviceid  # noqa: E402
 import wifilib  # noqa: E402
 
 DIETPI_URL = 'https://dietpi.com/downloads/images/DietPi_RPi234-ARMv8-Trixie.img.xz'
-BUILDER_IMAGE = 'piano-sd-builder'
+BUILDER_IMAGE = 'exxpiano-sd-builder'
+TARGET_FAMILY = 'rpi234'
+VERSION_RE = re.compile(r'^[0-9A-Za-z][0-9A-Za-z._-]*$')
 
 
 def _load(name):
@@ -58,7 +62,34 @@ def sha256_of(path, block=1 << 20):
 
 def read_version():
     with open(os.path.join(ROOT, 'VERSION')) as f:
-        return f.read().strip()
+        version = f.read().strip()
+    if not VERSION_RE.fullmatch(version):
+        raise BuildError('VERSION is not safe for an artifact name: %r' % version)
+    return version
+
+
+def read_dietpi_version(path):
+    try:
+        with open(path, encoding='ascii') as f:
+            version = f.read().strip()
+    except OSError as exc:
+        raise BuildError('the builder did not report the DietPi version: %s' % exc)
+    if not VERSION_RE.fullmatch(version):
+        raise BuildError('the DietPi version is missing or not safe for an artifact name: %r' % version)
+    return version
+
+
+def artifact_stem(plan, dietpi_version):
+    return 'exxpiano-%s-v%s-dietpi-%s-%s-sn-%s' % (
+        TARGET_FAMILY, plan['version'], dietpi_version, plan['number'], plan['serial'])
+
+
+def write_json(path, data):
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
+        f.write('\n')
+    os.replace(tmp, path)
 
 
 def download(url, dest, fetch=None):
@@ -96,16 +127,12 @@ def resolve_inputs(args):
     if not args.download or args.dietpi:
         if not os.path.isfile(inputs['dietpi']):
             raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
-    if not args.no_banks:
-        if not args.piano:
-            found = sorted(f for f in os.listdir(os.path.join(ROOT, 'build', 'archive')) if f.endswith('.sf2')) if os.path.isdir(os.path.join(ROOT, 'build', 'archive')) else []
-            raise BuildError('give the piano bank: --piano FILE.sf2 (or --no-banks). In build/archive: %s' % (', '.join(found) or 'nothing'))
-        inputs['piano'] = os.path.abspath(args.piano)
-        mech = args.mech or os.path.join(ROOT, 'build', 'archive', 'Salamander-mech.sf2')
-        inputs['mech'] = os.path.abspath(mech)
-        for key in ('piano', 'mech'):
-            if not os.path.isfile(inputs[key]):
-                raise BuildError('no such bank file: %s' % inputs[key])
+    inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-standard.sf2'))
+    inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
+    for key in ('piano', 'mech'):
+        if not os.path.isfile(inputs[key]) or not os.access(inputs[key], os.R_OK):
+            raise BuildError('the required %s bank is missing or unreadable: %s (prepare defaults with scripts/make-soundfonts.sh or pass --%s FILE.sf2)'
+                             % (key, inputs[key], key))
     return inputs
 
 
@@ -122,9 +149,9 @@ def read_serials(path):
             serial = deviceid.normalize_serial(row.get('serial'))
         except ValueError as exc:
             raise BuildError('%s, line %d: %s' % (path, n, exc))
-        if serial[-8:] in seen:
+        if serial in seen:
             raise BuildError('%s, line %d: the serial %s is listed twice' % (path, n, serial))
-        seen.add(serial[-8:])
+        seen.add(serial)
         jobs.append(dict(serial=serial, number=(row.get('number') or '').strip() or None, name=(row.get('name') or '').strip() or None, note=(row.get('note') or '').strip()))
     return jobs
 
@@ -152,7 +179,7 @@ def choose_number(args, job=None, taken=()):
 def build_deb(version, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     subprocess.run([sys.executable, os.path.join(ROOT, 'scripts', 'build-deb.py'), '--version', version, '--out', out_dir], check=True, stdout=subprocess.DEVNULL)
-    return os.path.join(out_dir, 'piano-synth_%s_all.deb' % version)
+    return os.path.join(out_dir, 'exxpiano_%s_all.deb' % version)
 
 
 def docker_ok():
@@ -167,14 +194,10 @@ def docker_ok():
 
 def inner_args(plan, path_of):
     """The arguments of sd-image-inner.sh; `path_of(key)` gives the path of an input as the script sees it."""
-    a = ['--image', path_of('dietpi'), '--out', plan['out_img_in_builder'], '--deb', path_of('deb'), '--number', plan['number'], '--hostname', plan['hostname'],
+    a = ['--image', path_of('dietpi'), '--out', plan['out_img_in_builder'], '--dietpi-version-out', plan['dietpi_version_out_in_builder'],
+         '--deb', path_of('deb'), '--number', plan['number'], '--hostname', plan['hostname'],
          '--country', plan['country'], '--timezone', plan['timezone'], '--locale', plan['locale'], '--keyboard', plan['keyboard'], '--workdir', '/tmp/piano-sd-work']
-    if plan.get('serial'):
-        a += ['--serial', plan['serial']] + (['--lock'] if plan.get('lock') else [])
-    if plan['no_banks']:
-        a.append('--no-banks')
-    else:
-        a += ['--piano', path_of('piano'), '--mech', path_of('mech')]
+    a += ['--serial', plan['serial'], '--lock', '--piano', path_of('piano'), '--mech', path_of('mech')]
     return a                                    # the passwords go through the environment (SD_PASSWORD, SD_AP_PASSWORD), not through the arguments
 
 
@@ -192,49 +215,48 @@ def docker_command(plan, inputs, script_args, smoke=False):
     return cmd + ['bash', '/repo/scripts/sd-image-inner.sh'] + script_args(mapping)
 
 
-def make_zip(img, zip_path):
+def make_zip(img, zip_path, image_name):
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=3, allowZip64=True) as z:
-        z.write(img, os.path.basename(img))
+        z.write(img, image_name)
 
 
 def readme(plan, ssid, zip_name):
-    return '''Piano module № {number}  ({hostname})
+    return '''exxpiano № {number}  ({hostname})
 ==========================================
 Built: version {version}, {when}
 Image: {zip_name}
+DietPi: {dietpi_version} (source SHA-256: {dietpi_sha256})
 Banks: {banks}
-{board}
+Board: Raspberry Pi serial {serial} (the synthesizer refuses another board or an unreadable serial)
 Writing the card
   1. Raspberry Pi Imager: "Choose OS" -> "Use custom" -> pick the zip (it is used as it is). Or balenaEtcher: "Flash from file" -> the zip.
-  2. Put the card in the Raspberry Pi 3 and switch it on. The first start takes several minutes (DietPi sets itself up, then the card grows to its size).
+  2. Put the card in a compatible Raspberry Pi 2/3/4 ARMv8 and switch it on. The first start takes several minutes (DietPi sets itself up, then the card grows to its size).
      DietPi's first run needs the internet ONCE: plug in an Ethernet cable for the first start.
   3. After that the device is called {hostname}: http://{hostname}.local:8080/ (or the address in the router's client list).
 
 Without a network the device starts its own Wi-Fi: {ssid}  (password: {ap_pw}).
 Scan the QR codes of the sticker: the first joins that network, the second opens the settings page (the page warns if the code belongs to another device).
 
-If something is wrong: the log of the first start is /var/log/piano-synth-firstboot.log; DietPi's own log is /var/tmp/dietpi/logs/.
+If something is wrong: the log of the first start is /var/log/exxpiano-firstboot.log; DietPi's own log is /var/tmp/dietpi/logs/.
 '''.format(number=plan['number'], hostname=plan['hostname'], version=plan['version'], when=plan['when'], zip_name=zip_name,
-           banks=plan['banks_text'], ssid=ssid, ap_pw=plan['ap_password'] or wifilib.AP_DEFAULT_PASSWORD,
-           board=('Board: Raspberry Pi serial %s (%s)\n' % (plan['serial'], 'the synthesizer refuses another board' if plan.get('lock') else 'another board gets a warning on the page')) if plan.get('serial') else '')
+           dietpi_version=plan['dietpi_version'], dietpi_sha256=plan['dietpi_sha256'], banks=plan['banks_text'], serial=plan['serial'],
+           ssid=ssid, ap_pw=plan['ap_password'] or wifilib.AP_DEFAULT_PASSWORD)
 
 
 def parse_args(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--dietpi', help='DietPi_RPi234-ARMv8-Trixie.img.xz (or an unpacked .img) from dietpi.com')
     ap.add_argument('--download', action='store_true', help='fetch the official DietPi image into build/cache (only when you ask for it)')
-    ap.add_argument('--piano', help='the piano bank (.sf2)')
-    ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/archive/Salamander-mech.sf2')
-    ap.add_argument('--no-banks', action='store_true', help='leave the banks out (install them later on the device)')
-    ap.add_argument('--serial', help='the serial of the Raspberry Pi this card is for (cat /proc/cpuinfo: Serial). The card warns on any other board')
+    ap.add_argument('--piano', help='the piano bank (.sf2); default build/piano-standard.sf2')
+    ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/mech.sf2')
+    ap.add_argument('--serial', help='required: the serial of the Raspberry Pi this card is locked to (cat /proc/cpuinfo: Serial)')
     ap.add_argument('--serials', metavar='FILE.csv', help='make a card for every board in the list (columns: serial, number, name, note)')
-    ap.add_argument('--lock', action='store_true', help='with --serial/--serials: the synthesizer does not start on another board')
     ap.add_argument('--number', default='auto', help='the number of the device: 7 / 0007 / AB12, auto (the next free one), or serial (the last 4 digits of the serial)')
-    ap.add_argument('--name', help='the host name (default piano-<number>)')
+    ap.add_argument('--name', help='the host name (default exxpiano-<number>)')
     ap.add_argument('--note', default='', help='a note for the register (a customer, a date)')
     ap.add_argument('--force', action='store_true', help='replace a number or a serial that is already in the register')
     ap.add_argument('--password', default='', help="DietPi's global password (root and dietpi users); without it the DietPi default stays: change it")
-    ap.add_argument('--ap-password', default='', help='the password of the setup network (default pianosetup)')
+    ap.add_argument('--ap-password', default='', help='the password of the setup network (default exxpianosetup)')
     ap.add_argument('--country', default='GB', help='Wi-Fi country code (RU, GB ...)')
     ap.add_argument('--timezone', default='UTC')
     ap.add_argument('--locale', default='en_GB.UTF-8')
@@ -252,8 +274,8 @@ def plan_jobs(args, inputs):
     """Every card of this run, fully checked before the first one is made."""
     if args.serials and args.serial:
         raise BuildError('use --serial for one board or --serials for a list, not both')
-    if args.lock and not (args.serial or args.serials):
-        raise BuildError('--lock needs --serial or --serials: a card can only be locked to a board it knows')
+    if not (args.serial or args.serials):
+        raise BuildError('a product image must be bound to a board: give --serial SERIAL or --serials FILE.csv')
     if args.password and len(args.password) < 8:
         raise BuildError('--password: at least 8 characters')
     if args.ap_password:
@@ -265,36 +287,43 @@ def plan_jobs(args, inputs):
         if args.name:
             raise BuildError('--name is for one card: give the name in the list instead')
     else:
-        jobs = [dict(serial=deviceid.normalize_serial(args.serial) if args.serial else None, number=None, name=args.name, note=args.note)]
+        jobs = [dict(serial=deviceid.normalize_serial(args.serial), number=None, name=args.name, note=args.note)]
     plans, taken = [], []
     version = read_version()
-    banks = [] if args.no_banks else [os.path.basename(inputs['piano']), os.path.basename(inputs['mech'])]
+    banks = [os.path.basename(inputs['piano']), os.path.basename(inputs['mech'])]
     for job in jobs:
         number = choose_number(args, job, taken)
         taken.append(number)
-        if job['serial'] and not args.force:
+        if not args.force:
             existing = registry.find_serial(job['serial'], args.registry)
             if existing:
                 raise BuildError('the board %s already has a card in the register: number %s (%s, built %s). --force makes a new one' %
                                  (job['serial'], existing['number'], existing['version'], existing['built_at']))
-        hostname = job['name'] or 'piano-' + number.lower()
+        hostname = job['name'] or 'exxpiano-' + number.lower()
         if not wifilib.HOSTNAME_RE.match(hostname):
             raise BuildError('the name %r: lowercase letters, digits and hyphens' % hostname)
-        plans.append(dict(number=number, hostname=hostname, version=version, out_dir=os.path.abspath(os.path.join(args.out, number)), no_banks=args.no_banks,
+        plans.append(dict(number=number, hostname=hostname, version=version, out_dir=os.path.abspath(os.path.join(args.out, number)),
                           password=args.password, ap_password=args.ap_password, country=args.country, timezone=args.timezone, locale=args.locale,
-                          keyboard=args.keyboard, banks_text=', '.join(banks) or '(none: install later)', serial=job['serial'], lock=bool(args.lock and job['serial']),
+                          keyboard=args.keyboard, banks_text=', '.join(banks), serial=job['serial'], lock=True,
                           note=job['note'], when=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
-                          out_img_in_builder='/out/piano-synth-%s.img' % number))
+                          out_img_in_builder='/out/exxpiano-%s.img' % number,
+                          dietpi_version_out_in_builder='/out/dietpi-version-%s.txt' % number))
     return plans
 
 
 def build_one(args, inputs, plan):
     number, out_dir = plan['number'], plan['out_dir']
     os.makedirs(out_dir, exist_ok=True)
+    img = os.path.join(out_dir, 'exxpiano-%s.img' % number)
+    dietpi_version_file = os.path.join(out_dir, 'dietpi-version-%s.txt' % number)
+    for stale in (img, dietpi_version_file):
+        if os.path.exists(stale):
+            os.unlink(stale)
     if args.no_docker:
         if os.name != 'posix' or sys.platform == 'darwin' or os.geteuid() != 0:
             raise BuildError('--no-docker needs Linux and root')
-        cmd = ['bash', os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')] + inner_args(dict(plan, out_img_in_builder=os.path.join(out_dir, 'piano-synth-%s.img' % number)), lambda k: inputs[k])
+        local_plan = dict(plan, out_img_in_builder=img, dietpi_version_out_in_builder=dietpi_version_file)
+        cmd = ['bash', os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')] + inner_args(local_plan, lambda k: inputs[k])
     else:
         docker_ok()
         cmd = docker_command(plan, inputs, lambda mapping: inner_args(plan, lambda k: mapping[k]))
@@ -302,32 +331,42 @@ def build_one(args, inputs, plan):
     env = dict(os.environ, SD_PASSWORD=args.password, SD_AP_PASSWORD=args.ap_password)
     if subprocess.run(cmd, env=env).returncode != 0:
         raise BuildError('the image could not be made (see the messages above)')
-    img = os.path.join(out_dir, 'piano-synth-%s.img' % number)
     if not os.path.isfile(img):
         raise BuildError('the builder reported success but there is no image')
+    plan['dietpi_version'] = read_dietpi_version(dietpi_version_file)
+    os.unlink(dietpi_version_file)
     if not args.no_smoke and not args.no_docker:
         print('Starting the programs of the finished image in a container ...')
         if subprocess.run(docker_command(plan, {}, None, smoke=True), env=env).returncode != 0:
             raise BuildError('the finished image fails its smoke test (see above); it is left in %s' % out_dir)
-    zip_name = 'piano-synth-%s-sd.zip' % number
+    stem = artifact_stem(plan, plan['dietpi_version'])
+    zip_name = stem + '-sd.zip'
     zip_path = os.path.join(out_dir, zip_name)
     print('Packing %s ...' % zip_name)
-    make_zip(img, zip_path)
-    img_hash = sha256_of(img)
+    make_zip(img, zip_path, stem + '.img')
+    raw_image_hash = sha256_of(img)
+    zip_hash = sha256_of(zip_path)
     if not args.keep_image:
         os.unlink(img)
-    ssid = wifilib.ap_ssid('Piano-Setup', '', number)
+    ssid = wifilib.ap_ssid('exxpiano-Setup', '', number)
     sticker_dir = os.path.join(out_dir, 'sticker')
     subprocess.run([sys.executable, os.path.join(ROOT, 'scripts', 'make-qr.py'), '--number', number, '--password', args.ap_password or wifilib.AP_DEFAULT_PASSWORD,
                     '--out', sticker_dir], check=True, stdout=subprocess.DEVNULL)
     with open(os.path.join(out_dir, 'README-%s.txt' % number), 'w', encoding='utf-8') as f:
         f.write(readme(plan, ssid, zip_name))
-    record = registry.add(dict(number=number, hostname=plan['hostname'], ssid=ssid, version=plan['version'], image=zip_name, image_sha256=img_hash,
-                               banks='' if plan['no_banks'] else plan['banks_text'], note=plan['note'], serial=plan['serial'] or '',
-                               locked='yes' if plan['lock'] else ''), args.registry, replace=args.force)
+    manifest_name = 'manifest-%s.json' % number
+    write_json(os.path.join(out_dir, manifest_name), dict(
+        schema_version=1, product='exxpiano', target_family=TARGET_FAMILY,
+        product_version=plan['version'], dietpi_version=plan['dietpi_version'],
+        dietpi_source=os.path.basename(inputs['dietpi']), dietpi_sha256=plan['dietpi_sha256'],
+        device_number=number, serial=plan['serial'], hostname=plan['hostname'], banks=[os.path.basename(inputs['piano']), os.path.basename(inputs['mech'])],
+        image=zip_name, image_sha256=zip_hash, raw_image_sha256=raw_image_hash, built_at=plan['when']))
+    record = registry.add(dict(number=number, hostname=plan['hostname'], ssid=ssid, version=plan['version'], image=zip_name, image_sha256=zip_hash,
+                               banks=plan['banks_text'], note=plan['note'], serial=plan['serial'], locked='yes'), args.registry, replace=args.force)
     print('\nDone. Device № %s:' % record['number'])
     print('  card image : %s (%.0f MB)' % (zip_path, os.path.getsize(zip_path) / 1e6))
     print('  sticker    : %s' % sticker_dir)
+    print('  manifest   : %s' % os.path.join(out_dir, manifest_name))
     print('  register   : %s' % args.registry)
     return record
 
@@ -339,7 +378,7 @@ def main(argv=None):
         inputs = resolve_inputs(args)
         plans = plan_jobs(args, inputs)
         for plan in plans:
-            print('Device № %s (%s), software %s, setup network %s%s' % (plan['number'], plan['hostname'], plan['version'], wifilib.ap_ssid('Piano-Setup', '', plan['number']),
+            print('Device № %s (%s), software %s, setup network %s%s' % (plan['number'], plan['hostname'], plan['version'], wifilib.ap_ssid('exxpiano-Setup', '', plan['number']),
                                                                      ', board %s%s' % (plan['serial'], ' (locked)' if plan['lock'] else '') if plan['serial'] else ''))
         print('DietPi image: %s%s' % (inputs['dietpi'], ' (will be downloaded)' if args.download and not args.dietpi else ''))
         print('Banks: %s | %d card(s) -> %s' % (plans[0]['banks_text'], len(plans), os.path.abspath(args.out)))
@@ -349,7 +388,10 @@ def main(argv=None):
         if args.download and not args.dietpi:
             print('Downloading %s ...' % DIETPI_URL)
             download(DIETPI_URL, inputs['dietpi'])
-        inputs['deb'] = build_deb(plans[0]['version'], os.environ.get('PIANO_SD_WORK') or os.path.join(ROOT, 'build', 'sd-work'))
+        dietpi_sha256 = sha256_of(inputs['dietpi'])
+        for plan in plans:
+            plan['dietpi_sha256'] = dietpi_sha256
+        inputs['deb'] = build_deb(plans[0]['version'], os.environ.get('EXXPIANO_SD_WORK') or os.path.join(ROOT, 'build', 'sd-work'))
         for plan in plans:
             done.append(build_one(args, inputs, plan)['number'])
         if len(plans) > 1:

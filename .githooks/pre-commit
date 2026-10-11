@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs before every commit: the tests, then builds the DietPi installer and the .deb into dist/.
+# Runs before every commit: the tests, then builds the internal .deb into dist/.
 # Enable it once with   scripts/install-hooks.sh   (git hooks are not copied by "git clone").
 # Skip it in an emergency with   git commit --no-verify
 set -e
@@ -15,7 +15,6 @@ while IFS= read -r f; do
 done < <(git diff --cached --name-only --diff-filter=AM)
 echo "pre-commit: running the tests"
 python3 -I -m unittest discover -s tests -q
-echo "pre-commit: building dist/ (package + DietPi installer)"
-rm -f dist/piano-synth_*_all.deb dist/piano-synth-dietpi-*
+echo "pre-commit: building dist/ (internal package)"
+rm -f dist/exxpiano_*_all.deb
 python3 -I scripts/build-deb.py >/dev/null
-python3 -I scripts/build-dietpi-installer.py

@@ -11,9 +11,9 @@ import sf2info
 
 BANK_EXT = ('.sf2', '.sf3')
 NAME_RE = re.compile(r'^[^/\\\x00-\x1f][^/\\\x00-\x1f]{0,119}$')      # a plain file name
-DEFAULT_DIR = '/var/lib/piano-synth/banks'
+DEFAULT_DIR = '/var/lib/exxpiano/banks'
 RESERVE_MB = 400                  # RAM kept for the system and the rest of the module (the Pi 3 has about 950 MB)
-MECH_PROGRAMS = range(1, 7)       # the mechanics bank answers on bank 0, programs 1..6 (see piano-fx.py: PROGRAMS)
+MECH_PROGRAMS = range(1, 7)       # the mechanics bank answers on bank 0, programs 1..6 (see exxpiano-fx.py: PROGRAMS)
 
 _cache = {}                       # (path, size, mtime_ns) -> sf2info result or error text
 

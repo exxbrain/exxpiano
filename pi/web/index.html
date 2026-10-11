@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Piano module</title>
+<title>exxpiano</title>
 <style>
   :root {
     --bg: #f4f5f7; --card: #ffffff; --text: #1d2129; --muted: #667085; --line: #e3e6ec;
@@ -136,7 +136,7 @@
 </header>
 <div id="backdrop" hidden></div>
 <nav id="drawer" aria-label="Menu" aria-hidden="true">
-  <div class="drawer-head"><b id="title">Piano module</b><b id="devName" class="devname"></b><small id="ver"></small></div>
+  <div class="drawer-head"><b id="title">exxpiano</b><b id="devName" class="devname"></b><small id="ver"></small></div>
   <a href="#/home" data-page="home" data-t="nav_home">Home</a>
   <a href="#/bank" data-page="bank" data-t="nav_bank">Piano bank</a>
   <a href="#/sound" data-page="sound" data-t="nav_sound">Touch and mechanics</a>
@@ -149,7 +149,7 @@
 <div class="card wrong" id="wrongBoard" role="alert" hidden></div>
   <div class="card" id="login">
     <h2 data-t="token_title">Access token</h2>
-    <p class="hint" data-t="token_hint">This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).</p>
+    <p class="hint" data-t="token_hint">This module asks for a token (WEB_TOKEN in /etc/exxpiano.conf).</p>
     <input type="password" id="token" autocomplete="off" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:1rem">
     <p><button id="tokenBtn" data-t="token_btn">Sign in</button></p>
   </div>
@@ -297,10 +297,10 @@ const T = {
     nav_home: "Home", nav_bank: "Piano bank", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", menu: "Menu",
     home_now: "Now playing", home_change: "Change", home_health: "Device", home_more: "Details", h_power: "Power", h_net: "Network",
     h_power_ok: "OK", h_power_now: "Problem", h_power_past: "Earlier", h_net_ap: "Setup mode", h_net_none: "No network", h_loading: "Loading {bank}…",
-    w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (Piano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
-    w_setup_started: "Starting the setup network… join it from your phone: its name begins with Piano-Setup.",
+    w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (exxpiano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
+    w_setup_started: "Starting the setup network… join it from your phone: its name begins with exxpiano-Setup.",
     w_only_way: "in use, the only way to reach the Pi: add another network or plug in a cable first",
-    n_title: "Device name", n_hint: "Every device has a number: the last four digits of its Wi-Fi address (it ends the setup network's name too). With several devices give each its own name, for example piano-<number>: it is shown in the menu and in the browser tab, and the page opens at http://name.local:8080/. Lowercase letters, digits and hyphens.", n_label: "Name", n_save: "Save the name", b_serial: "Serial of this Raspberry Pi: {serial} (give it to build-sd-image.py --serial).", b_bound: "This card was made for {bound}.", b_mismatch: "Warning: this card was made for the Raspberry Pi with serial {bound}, but it is in the board {have}.", b_locked: "This card was made for the Raspberry Pi with serial {bound}, but it is in the board {have}: the synthesizer does not start here.", d_mismatch: "Warning: this code was made for device № {wanted}, but this page is device № {have}. Check the sticker: you may be connected to the wrong device.", n_saved: "Saved: {name}. The page also opens at http://{name}.local:8080/.",
+    n_title: "Device name", n_hint: "Every device has a number: the last four digits of its Wi-Fi address (it ends the setup network's name too). With several devices give each its own name, for example exxpiano-<number>: it is shown in the menu and in the browser tab, and the page opens at http://name.local:8080/. Lowercase letters, digits and hyphens.", n_label: "Name", n_save: "Save the name", b_serial: "Serial of this Raspberry Pi: {serial} (give it to build-sd-image.py --serial).", b_bound: "This card was made for {bound}.", b_mismatch: "Warning: this card was made for the Raspberry Pi with serial {bound}, but it is in the board {have}.", b_locked: "This card was made for the Raspberry Pi with serial {bound}, but it is in the board {have}: the synthesizer does not start here.", d_mismatch: "Warning: this code was made for device № {wanted}, but this page is device № {have}. Check the sticker: you may be connected to the wrong device.", n_saved: "Saved: {name}. The page also opens at http://{name}.local:8080/.",
     q_title: "Phone setup by QR code", q_hint: "Scan with the phone camera: the first code joins the Pi's setup network, the second opens this settings page. Print the page as a sticker for the device.",
     q_join: "1. Join the setup network", q_setup: "2. Open the setup page", q_page: "Open this page on a phone", q_print: "Print",
     w_title: "Wi-Fi", w_add: "Connect to a network", w_network: "Network", w_name: "Network name", w_password: "Password", w_show: "Show the password",
@@ -313,7 +313,7 @@ const T = {
     w_connecting: "Connecting… up to a minute. If this page stops answering, join your own Wi-Fi again and open http://{host}.local:8080/ or the address from the router's list of clients (the Pi is called {host}).",
     w_ok: "Connected to {ssid}.", w_failed: "Could not connect to {ssid}: {error}.", w_forgot: "Forgot {ssid}.", w_ap_failed: "The setup network could not start.",
     w_nm: "This system uses NetworkManager. Connect with the command sudo nmtui; this page cannot change the network here.",
-    w_off: "The Wi-Fi service is not running (systemctl status piano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
+    w_off: "The Wi-Fi service is not running (systemctl status exxpiano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
     m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
     m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
     m_procs_hint: "Share of one core; a service with several threads can pass 100 %.", m_load: "load {a} · {b} · {c}", m_max: "of {n} MHz", m_of: "of {n} MB",
@@ -326,13 +326,13 @@ const T = {
     bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", preset: "Preset",
     sw_switching: "Loading {bank}… about a minute of silence.", sw_done: "Now playing {bank}.", sw_rolled_back: "{bank} did not load; the previous bank is playing again.",
     sw_failed: "{bank} did not load and the previous bank could not be restored either: check the device.", sw_same: "This bank is already in use.",
-    title: "Piano module", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
+    title: "exxpiano", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
     volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
     audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load). Buffers are remembered for each audio interface.",
     device: "Output", buf_size: "Buffer (frames)", buf_count: "Number of buffers", buf_for_usb: "For the USB interface in use; the built-in jack keeps its own.", buf_for_onboard: "For the built-in jack; a USB interface keeps its own.",
     buf_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks. The built-in jack rounds the period up by itself: see the real value on the Monitor tab.",
     reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)",
-    apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).", token_btn: "Sign in",
+    apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/exxpiano.conf).", token_btn: "Sign in",
     auto: "Automatic (USB card if present, otherwise the jack)", usb: "USB", onboard: "onboard",
     synth: "Synthesizer", bridge: "Mechanics bridge", output: "Output", unknown: "unknown",
     saved: "Saved", restart_needed: "Press \"Apply and restart\" for the audio changes.", restarting: "Restarting the synthesizer, about 45 seconds…",
@@ -353,10 +353,10 @@ const T = {
     nav_home: "Главная", nav_bank: "Банк рояля", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", menu: "Меню",
     home_now: "Сейчас играет", home_change: "Сменить", home_health: "Устройство", home_more: "Подробнее", h_power: "Питание", h_net: "Сеть",
     h_power_ok: "В порядке", h_power_now: "Проблема", h_power_past: "Было", h_net_ap: "Режим настройки", h_net_none: "Нет сети", h_loading: "Загружается {bank}…",
-    w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (Piano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
-    w_setup_started: "Запускаю сеть настройки… подключитесь к ней с телефона: имя начинается с Piano-Setup.",
+    w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (exxpiano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
+    w_setup_started: "Запускаю сеть настройки… подключитесь к ней с телефона: имя начинается с exxpiano-Setup.",
     w_only_way: "используется, единственный путь к Pi: сначала добавьте другую сеть или подключите кабель",
-    n_title: "Имя устройства", n_hint: "У каждого устройства есть номер: последние четыре цифры его Wi-Fi-адреса (им же заканчивается имя сети настройки). Если устройств несколько, дайте каждому своё имя, например piano-<номер>: оно показано в меню и во вкладке браузера, а страница открывается по http://имя.local:8080/. Строчные латинские буквы, цифры и дефис.", n_label: "Имя", n_save: "Сохранить имя", b_serial: "Серийный номер этой Raspberry Pi: {serial} (передайте его в build-sd-image.py --serial).", b_bound: "Эта карта сделана для {bound}.", b_mismatch: "Внимание: эта карта сделана для Raspberry Pi с серийным номером {bound}, а стоит в плате {have}.", b_locked: "Эта карта сделана для Raspberry Pi с серийным номером {bound}, а стоит в плате {have}: синтезатор здесь не запускается.", d_mismatch: "Внимание: этот код сделан для устройства № {wanted}, а эта страница принадлежит устройству № {have}. Проверьте наклейку: возможно, вы подключились не к тому устройству.", n_saved: "Сохранено: {name}. Страница открывается и по http://{name}.local:8080/.",
+    n_title: "Имя устройства", n_hint: "У каждого устройства есть номер: последние четыре цифры его Wi-Fi-адреса (им же заканчивается имя сети настройки). Если устройств несколько, дайте каждому своё имя, например exxpiano-<номер>: оно показано в меню и во вкладке браузера, а страница открывается по http://имя.local:8080/. Строчные латинские буквы, цифры и дефис.", n_label: "Имя", n_save: "Сохранить имя", b_serial: "Серийный номер этой Raspberry Pi: {serial} (передайте его в build-sd-image.py --serial).", b_bound: "Эта карта сделана для {bound}.", b_mismatch: "Внимание: эта карта сделана для Raspberry Pi с серийным номером {bound}, а стоит в плате {have}.", b_locked: "Эта карта сделана для Raspberry Pi с серийным номером {bound}, а стоит в плате {have}: синтезатор здесь не запускается.", d_mismatch: "Внимание: этот код сделан для устройства № {wanted}, а эта страница принадлежит устройству № {have}. Проверьте наклейку: возможно, вы подключились не к тому устройству.", n_saved: "Сохранено: {name}. Страница открывается и по http://{name}.local:8080/.",
     q_title: "Настройка с телефона по QR-коду", q_hint: "Наведите камеру телефона: первый код подключает к сети настройки Pi, второй открывает эту страницу. Страницу можно распечатать как наклейку на устройство.",
     q_join: "1. Подключиться к сети настройки", q_setup: "2. Открыть страницу настройки", q_page: "Открыть эту страницу на телефоне", q_print: "Печать",
     w_title: "Wi-Fi", w_add: "Подключение к сети", w_network: "Сеть", w_name: "Имя сети", w_password: "Пароль", w_show: "Показать пароль",
@@ -369,7 +369,7 @@ const T = {
     w_connecting: "Подключаюсь… до минуты. Если страница перестанет отвечать, подключитесь к своей Wi-Fi и откройте http://{host}.local:8080/ или адрес из списка клиентов роутера (устройство называется {host}).",
     w_ok: "Подключено к {ssid}.", w_failed: "Не удалось подключиться к {ssid}: {error}.", w_forgot: "Сеть {ssid} забыта.", w_ap_failed: "Сеть настройки не запустилась.",
     w_nm: "В этой системе сетью управляет NetworkManager. Подключайтесь командой sudo nmtui; отсюда сеть изменить нельзя.",
-    w_off: "Служба Wi-Fi не запущена (systemctl status piano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
+    w_off: "Служба Wi-Fi не запущена (systemctl status exxpiano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
     m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
     m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
     m_procs_hint: "Доля одного ядра; служба с несколькими потоками может превысить 100 %.", m_load: "нагрузка {a} · {b} · {c}", m_max: "из {n} МГц", m_of: "из {n} МБ",
@@ -382,13 +382,13 @@ const T = {
     bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", preset: "Пресет",
     sw_switching: "Загружается {bank}… около минуты тишины.", sw_done: "Теперь играет {bank}.", sw_rolled_back: "{bank} не загрузился; снова играет прежний банк.",
     sw_failed: "{bank} не загрузился, и прежний банк восстановить тоже не удалось: проверьте устройство.", sw_same: "Этот банк уже используется.",
-    title: "Модуль пианино", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
+    title: "exxpiano", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
     volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
     audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки). Буферы запоминаются для каждого звукового интерфейса.",
     device: "Выход", buf_size: "Буфер (кадры)", buf_count: "Число буферов", buf_for_usb: "Для выбранного USB-интерфейса; у встроенного выхода свои значения.", buf_for_onboard: "Для встроенного выхода; у USB-интерфейса свои значения.",
     buf_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки. Встроенный выход сам округляет период вверх: реальное значение видно на вкладке «Монитор».",
     reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)",
-    apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/piano-synth.conf).", token_btn: "Войти",
+    apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/exxpiano.conf).", token_btn: "Войти",
     auto: "Автоматически (USB-карта, если есть, иначе штатный выход)", usb: "USB", onboard: "штатный",
     synth: "Синтезатор", bridge: "Мост механики", output: "Выход", unknown: "неизвестно",
     saved: "Сохранено", restart_needed: "Нажмите «Применить и перезапустить», чтобы изменения звука вступили в силу.", restarting: "Перезапуск синтезатора, около 45 секунд…",
@@ -795,7 +795,7 @@ async function pollHome(force) {
   } catch (e) { /* the next tick tries again */ } finally { home.busy = false; }
 }
 
-// ---- Wi-Fi: the link, the networks, connecting (the Pi's supervisor piano-wifi makes the changes)
+// ---- Wi-Fi: the link, the networks, connecting (the Pi's supervisor exxpiano-wifi makes the changes)
 const wifi = { data: null, busy: false, scanned: false, waiting: false, scanning: false };
 function wText(el, cls, text) { el.className = "wnote " + cls; el.textContent = text; }
 function renderWifi() {
@@ -970,7 +970,7 @@ async function start() {
   $("login").style.display = "none";
   showDeviceName(state.hostname, state.device && state.device.number); $("nameInput").value = state.hostname || "";
   checkDeviceParam(); checkBoard();
-  $("ver").textContent = [state.version ? "piano-synth " + state.version : "", state.fluidsynth ? "FluidSynth " + state.fluidsynth : ""].filter(Boolean).join(" · ");
+  $("ver").textContent = [state.version ? "exxpiano " + state.version : "", state.fluidsynth ? "FluidSynth " + state.fluidsynth : ""].filter(Boolean).join(" · ");
   ["touchRows", "volumeRows", "mechRows"].forEach(id => { $(id).textContent = ""; });
   buildSliders(); drawCurve(state.settings.velocity_curve); fillAudio(); renderStatus(); renderBanks(true);
   $("preset").addEventListener("change", () => { const [bank, program] = $("preset").value.split(":").map(Number); save({ piano_bank: bank, piano_prog: program }); });

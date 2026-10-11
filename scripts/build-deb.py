@@ -3,9 +3,9 @@
 
   scripts/build-deb.py [--version 1.0.0] [--out dist] [--banks PIANO.sf2 MECH.sf2]
 
-Always builds  piano-synth_<version>_all.deb   (program, services, config, dependencies).
-With --banks also builds piano-synth-soundfonts_<version>_all.deb (the two .sf2 files, hundreds of MB).
-Install on the Pi:  sudo apt install ./piano-synth_1.0.0_all.deb
+Always builds  exxpiano_<version>_all.deb   (program, services, config, dependencies).
+With --banks also builds exxpiano-soundfonts_<version>_all.deb (the two .sf2 files, hundreds of MB).
+Install on the Pi:  sudo apt install ./exxpiano_1.0.0_all.deb
 """
 import argparse
 import gzip
@@ -17,7 +17,7 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 MAINTAINER = 'Denis Zakharov <noreply@localhost>'
-# hostapd and dnsmasq-base: the setup access point (no system service of theirs is used: piano-wifi starts them itself)
+# hostapd and dnsmasq-base: the setup access point (no system service of theirs is used: exxpiano-wifi starts them itself)
 DEPENDS = 'fluidsynth, alsa-utils, python3, python3-mido, python3-rtmidi, hostapd, dnsmasq-base, iw, wpasupplicant'
 RECOMMENDS = 'avahi-daemon'
 
@@ -153,61 +153,61 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     import tempfile
     copyright_text = (
-        'piano-synth: scripts MIT (Denis Zakharov). Sounds: Salamander Grand Piano V3 by Alexander Holm, CC-BY.\n\n'
+        'exxpiano: scripts MIT (Denis Zakharov). Sounds: Salamander Grand Piano V3 by Alexander Holm, CC-BY.\n\n'
         + read(src('NOTICE.md')).decode('utf-8') + '\n' + read(src('LICENSE')).decode('utf-8')).encode('utf-8')
 
     main_files = [
-        ('opt/piano-synth/piano-fx.py', src('pi', 'piano-fx.py'), 0o755),
-        ('opt/piano-synth/VERSION', (args.version + '\n').encode(), 0o644),
-        ('opt/piano-synth/piano-synth-run', src('pi', 'piano-synth-run'), 0o755),
-        ('opt/piano-synth/pianoconf.py', src('pi', 'pianoconf.py'), 0o644),
-        ('opt/piano-synth/sf2info.py', src('pi', 'sf2info.py'), 0o755),
-        ('opt/piano-synth/banklib.py', src('pi', 'banklib.py'), 0o644),
-        ('opt/piano-synth/profiles.py', src('pi', 'profiles.py'), 0o644),
-        ('opt/piano-synth/sysmon.py', src('pi', 'sysmon.py'), 0o644),
-        ('opt/piano-synth/wifilib.py', src('pi', 'wifilib.py'), 0o644),
-        ('opt/piano-synth/qrlib.py', src('pi', 'qrlib.py'), 0o644),
-        ('opt/piano-synth/deviceid.py', src('pi', 'deviceid.py'), 0o755),
-        ('opt/piano-synth/piano-wifi.py', src('pi', 'piano-wifi.py'), 0o755),
-        ('lib/systemd/system/piano-wifi.service', src('pi', 'piano-wifi.service'), 0o644),
-        ('opt/piano-synth/piano-web.py', src('pi', 'piano-web.py'), 0o755),
-        ('opt/piano-synth/web/index.html', src('pi', 'web', 'index.html'), 0o644),
-        ('lib/systemd/system/piano-web.service', src('pi', 'piano-web.service'), 0o644),
-        ('lib/udev/rules.d/90-piano-synth.rules', src('pi', '90-piano-synth.rules'), 0o644),
-        ('etc/piano-synth.conf', src('pi', 'piano-synth.conf'), 0o644),
-        ('lib/systemd/system/piano-synth.service', src('pi', 'piano-synth.service'), 0o644),
-        ('lib/systemd/system/piano-fx.service', src('pi', 'piano-fx.service'), 0o644),
-        ('usr/bin/piano-synth-install-banks', src('packaging', 'piano-synth-install-banks'), 0o755),
-        ('usr/share/doc/piano-synth/README.md', src('README.md'), 0o644),
-        ('usr/share/doc/piano-synth/TROUBLESHOOTING.md', src('docs', 'TROUBLESHOOTING.md'), 0o644),
-        ('usr/share/doc/piano-synth/copyright', copyright_text, 0o644),
+        ('opt/exxpiano/exxpiano-fx.py', src('pi', 'exxpiano-fx.py'), 0o755),
+        ('opt/exxpiano/VERSION', (args.version + '\n').encode(), 0o644),
+        ('opt/exxpiano/exxpiano-run', src('pi', 'exxpiano-run'), 0o755),
+        ('opt/exxpiano/exxpianoconf.py', src('pi', 'exxpianoconf.py'), 0o644),
+        ('opt/exxpiano/sf2info.py', src('pi', 'sf2info.py'), 0o755),
+        ('opt/exxpiano/banklib.py', src('pi', 'banklib.py'), 0o644),
+        ('opt/exxpiano/profiles.py', src('pi', 'profiles.py'), 0o644),
+        ('opt/exxpiano/sysmon.py', src('pi', 'sysmon.py'), 0o644),
+        ('opt/exxpiano/wifilib.py', src('pi', 'wifilib.py'), 0o644),
+        ('opt/exxpiano/qrlib.py', src('pi', 'qrlib.py'), 0o644),
+        ('opt/exxpiano/deviceid.py', src('pi', 'deviceid.py'), 0o755),
+        ('opt/exxpiano/exxpiano-wifi.py', src('pi', 'exxpiano-wifi.py'), 0o755),
+        ('lib/systemd/system/exxpiano-wifi.service', src('pi', 'exxpiano-wifi.service'), 0o644),
+        ('opt/exxpiano/exxpiano-web.py', src('pi', 'exxpiano-web.py'), 0o755),
+        ('opt/exxpiano/web/index.html', src('pi', 'web', 'index.html'), 0o644),
+        ('lib/systemd/system/exxpiano-web.service', src('pi', 'exxpiano-web.service'), 0o644),
+        ('lib/udev/rules.d/90-exxpiano.rules', src('pi', '90-exxpiano.rules'), 0o644),
+        ('etc/exxpiano.conf', src('pi', 'exxpiano.conf'), 0o644),
+        ('lib/systemd/system/exxpiano.service', src('pi', 'exxpiano.service'), 0o644),
+        ('lib/systemd/system/exxpiano-fx.service', src('pi', 'exxpiano-fx.service'), 0o644),
+        ('usr/bin/exxpiano-install-banks', src('packaging', 'exxpiano-install-banks'), 0o755),
+        ('usr/share/doc/exxpiano/README.md', src('README.md'), 0o644),
+        ('usr/share/doc/exxpiano/TROUBLESHOOTING.md', src('docs', 'TROUBLESHOOTING.md'), 0o644),
+        ('usr/share/doc/exxpiano/copyright', copyright_text, 0o644),
     ]
     scripts = {name: read(src('packaging', 'debian', name)) for name in ('postinst', 'prerm', 'postrm')}
     description = (
         'Salamander piano on FluidSynth with piano mechanics (Raspberry Pi)\n'
-        ' Systemd services piano-synth (FluidSynth) and piano-fx (MIDI bridge that adds hammer,\n'
-        ' damper, string resonance and pedal noise). Settings: /etc/piano-synth.conf. Web page on\n'
+        ' Systemd services exxpiano (FluidSynth) and exxpiano-fx (MIDI bridge that adds hammer,\n'
+        ' damper, string resonance and pedal noise). Settings: /etc/exxpiano.conf. Web page on\n'
         ' port 8080 with Wi-Fi setup (the Pi starts its own network when it has none).\n'
         ' .\n'
-        ' Sound banks are not included. Install piano-synth-soundfonts or run\n'
-        ' piano-synth-install-banks.\n')
+        ' Sound banks are not included. Install exxpiano-soundfonts or run\n'
+        ' exxpiano-install-banks.\n')
 
     with tempfile.TemporaryDirectory() as tmp:
-        built = [build_package(args.out, 'piano-synth', args.version, DEPENDS, description, main_files,
-                               ['opt/piano-synth/soundfonts', 'var/lib/piano-synth'], scripts, ['/etc/piano-synth.conf'], mtime, tmp, RECOMMENDS)]
+        built = [build_package(args.out, 'exxpiano', args.version, DEPENDS, description, main_files,
+                               ['opt/exxpiano/soundfonts', 'var/lib/exxpiano'], scripts, ['/etc/exxpiano.conf'], mtime, tmp, RECOMMENDS)]
         if args.banks:
             piano, mech = args.banks
             for p in (piano, mech):
                 if not os.path.isfile(p):
                     sys.exit('No such file: ' + p)
-            bank_files = [('opt/piano-synth/soundfonts/piano.sf2', os.path.abspath(piano), 0o644),
-                          ('opt/piano-synth/soundfonts/mech.sf2', os.path.abspath(mech), 0o644)]
+            bank_files = [('opt/exxpiano/soundfonts/piano.sf2', os.path.abspath(piano), 0o644),
+                          ('opt/exxpiano/soundfonts/mech.sf2', os.path.abspath(mech), 0o644)]
             bank_desc = (
-                'Salamander piano sound banks for piano-synth\n'
+                'Salamander piano sound banks for exxpiano\n'
                 ' piano.sf2 (piano) and mech.sf2 (mechanics), built from Salamander Grand Piano V3\n'
                 ' by Alexander Holm (CC-BY).\n')
             built.append(build_package(
-                args.out, 'piano-synth-soundfonts', args.version, 'piano-synth (>= %s)' % args.version,
+                args.out, 'exxpiano-soundfonts', args.version, 'exxpiano (>= %s)' % args.version,
                 bank_desc, bank_files, [],
                 {'postinst': read(src('packaging', 'debian', 'soundfonts-postinst'))}, [], mtime, tmp))
     for path in built:

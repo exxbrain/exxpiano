@@ -12,27 +12,27 @@ configure)
             fi
         done
         systemctl daemon-reload
-        # the setup access point is started by piano-wifi itself: the packages' own services would only get in the way
+        # the setup access point is started by exxpiano-wifi itself: the packages' own services would only get in the way
         for dep in hostapd dnsmasq; do
             if systemctl cat "$dep.service" >/dev/null 2>&1; then
                 systemctl disable --now "$dep.service" >/dev/null 2>&1 || true
             fi
         done
-        # a new device with a generic name (dietpi, raspberrypi ...) gets a unique one: piano-<last digits of its Wi-Fi address>; a chosen name is kept
-        python3 /opt/piano-synth/piano-wifi.py ensure-name >/dev/null 2>&1 || true
-        systemctl enable piano-synth.service piano-fx.service piano-web.service piano-wifi.service >/dev/null 2>&1 || true
+        # a new device with a generic name (dietpi, raspberrypi ...) gets a unique one: exxpiano-<last digits of its Wi-Fi address>; a chosen name is kept
+        python3 /opt/exxpiano/exxpiano-wifi.py ensure-name >/dev/null 2>&1 || true
+        systemctl enable exxpiano.service exxpiano-fx.service exxpiano-web.service exxpiano-wifi.service >/dev/null 2>&1 || true
         # the banks the configuration points to (an installation may keep them anywhere), not a fixed place
-        conf_value() { sed -n "s/^$1=//p" /etc/piano-synth.conf 2>/dev/null | tail -1 | tr -d '"'; }
+        conf_value() { sed -n "s/^$1=//p" /etc/exxpiano.conf 2>/dev/null | tail -1 | tr -d '"'; }
         piano="$(conf_value PIANO_SF2)"; mech="$(conf_value MECH_SF2)"
-        if [ -f "${piano:-/opt/piano-synth/soundfonts/piano.sf2}" ] && [ -f "${mech:-/opt/piano-synth/soundfonts/mech.sf2}" ]; then
-            systemctl restart piano-synth.service
-            systemctl restart piano-fx.service
-            systemctl restart piano-web.service
-            systemctl restart piano-wifi.service || true
+        if [ -f "${piano:-/opt/exxpiano/soundfonts/piano.sf2}" ] && [ -f "${mech:-/opt/exxpiano/soundfonts/mech.sf2}" ]; then
+            systemctl restart exxpiano.service
+            systemctl restart exxpiano-fx.service
+            systemctl restart exxpiano-web.service
+            systemctl restart exxpiano-wifi.service || true
         else
-            echo "piano-synth: the sound banks are not installed yet." >&2
-            echo "  Install the piano-synth-soundfonts package or run:" >&2
-            echo "  sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2" >&2
+            echo "exxpiano: the sound banks are not installed yet." >&2
+            echo "  Install the exxpiano-soundfonts package or run:" >&2
+            echo "  sudo exxpiano-install-banks --piano piano.sf2 --mech mech.sf2" >&2
         fi
     fi
     ;;

@@ -1,4 +1,4 @@
-"""Tests for pi/piano-web.py: the HTTP API with the system actions replaced by fakes (no Pi, no root needed)."""
+"""Tests for pi/exxpiano-web.py: the HTTP API with the system actions replaced by fakes (no Pi, no root needed)."""
 import importlib.util
 import json
 import os
@@ -16,7 +16,7 @@ sys.path.insert(0, PI)
 sys.path.insert(0, HERE)
 from sf2fixture import make_sf2  # noqa: E402
 import profiles  # noqa: E402
-spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'piano-web.py'))
+spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'exxpiano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
 
@@ -43,10 +43,10 @@ class FakeActions:
         self.gate = None                     # an Event: wait_synth_ready blocks until it is set
         self.pid = 100
         self.monitor_calls = []
-        self.host = 'pi-synth'
+        self.host = 'exxpiano'
         self.renamed = []
         self.networks = [dict(ssid='Home', signal=-50, secure=True, freq=2437), dict(ssid='Cafe', signal=-70, secure=False, freq=2412)]
-        self.wifi_st = dict(mode='client', busy=None, link=dict(ssid='Home', ip='192.168.1.9', signal=-50), hostname='pi-synth', ap=None,
+        self.wifi_st = dict(mode='client', busy=None, link=dict(ssid='Home', ip='192.168.1.9', signal=-50), hostname='exxpiano', ap=None,
                             scan=self.networks, scanned_at=5, last_result=None, updated=100)
         self.wifi_saved_list = [dict(ssid='Home', secure=True, hidden=False, priority=0)]
         self.wifi_requests = []
@@ -128,7 +128,7 @@ class ServerCase(unittest.TestCase):
     def start(self, conf=CONF):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.conf = os.path.join(self.tmp.name, 'piano-synth.conf')
+        self.conf = os.path.join(self.tmp.name, 'exxpiano.conf')
         self.profile_file = os.path.join(self.tmp.name, 'state', 'profiles.json')    # never the real /var/lib
         with open(self.conf, 'w') as f:
             f.write(conf + 'PROFILE_FILE=%s\n' % self.profile_file)
@@ -423,7 +423,7 @@ class ActionsCacheTests(unittest.TestCase):
 
             class R:
                 stdout = {'fluidsynth': 'FluidSynth runtime version 2.4.4\n', 'systemctl': 'active\n',
-                          'journalctl': 'piano-synth: audio output plughw:CARD=U24 (usb), period 64 x 3\n'}.get(cmd[0], '')
+                          'journalctl': 'exxpiano: audio output plughw:CARD=U24 (usb), period 64 x 3\n'}.get(cmd[0], '')
                 returncode = 0
             return R()
         web.subprocess.run = fake_run
@@ -434,34 +434,34 @@ class ActionsCacheTests(unittest.TestCase):
         a = self.actions
         for _ in range(5):
             self.assertEqual(a.fluidsynth_version(), '2.4.4')
-            self.assertEqual(a.service_state('piano-synth'), 'active')
-            self.assertEqual(a.service_state('piano-fx'), 'active')
+            self.assertEqual(a.service_state('exxpiano'), 'active')
+            self.assertEqual(a.service_state('exxpiano-fx'), 'active')
             self.assertEqual(a.audio_output()['period'], 64)
         self.assertEqual(sorted(self.calls), ['fluidsynth', 'journalctl', 'systemctl', 'systemctl'])      # one per unit
 
     def test_entries_expire(self):
         a = self.actions
-        a.service_state('piano-synth')
+        a.service_state('exxpiano')
         with a._cache_lock:
-            key = ('service', 'piano-synth')
+            key = ('service', 'exxpiano')
             a._cache[key] = (a._cache[key][0] - 3, a._cache[key][1])        # older than its 2 s
-        a.service_state('piano-synth')
+        a.service_state('exxpiano')
         self.assertEqual(self.calls, ['systemctl', 'systemctl'])
 
     def test_a_restart_forgets_the_service_state_and_the_output(self):
         a = self.actions
-        a.service_state('piano-synth'); a.audio_output(); a.fluidsynth_version()
+        a.service_state('exxpiano'); a.audio_output(); a.fluidsynth_version()
         popen = web.subprocess.Popen
         web.subprocess.Popen = lambda *x, **kw: None
         self.addCleanup(setattr, web.subprocess, 'Popen', popen)
         a.restart_synth()
         self.calls.clear()
-        a.service_state('piano-synth'); a.audio_output(); a.fluidsynth_version()
+        a.service_state('exxpiano'); a.audio_output(); a.fluidsynth_version()
         self.assertEqual(sorted(self.calls), ['journalctl', 'systemctl'])    # the version of the program does not change with a restart
 
     def test_readiness_never_uses_the_cached_state(self):
         a = self.actions
-        a.service_state('piano-synth')
+        a.service_state('exxpiano')
         self.calls.clear()
         a.synth_pid = lambda: 7
         a._seq_has_synth = lambda: True
@@ -480,7 +480,7 @@ class WifiApiTests(ServerCase):
         code, r = self.jcall('/api/wifi')
         self.assertEqual(code, 200)
         self.assertTrue(r['supported'])
-        self.assertEqual((r['mode'], r['link']['ssid'], r['hostname']), ('client', 'Home', 'pi-synth'))
+        self.assertEqual((r['mode'], r['link']['ssid'], r['hostname']), ('client', 'Home', 'exxpiano'))
         self.assertEqual(r['saved'], [dict(ssid='Home', secure=True, hidden=False)])           # no priority, no key
         self.assertEqual([n['ssid'] for n in r['networks']], ['Home', 'Cafe'])
 
@@ -590,13 +590,13 @@ class DeviceNameTests(ServerCase):
     def test_the_state_tells_the_name_and_the_number_of_the_device(self):
         self.start()
         r = self.jcall('/api/state')[1]
-        self.assertEqual(r['hostname'], 'pi-synth')
+        self.assertEqual(r['hostname'], 'exxpiano')
         self.assertEqual(r['device'], dict(number='81DE', serial='00000000d2f2f1de', bound=False, bound_serial=None, serial_ok=None, locked=False))
 
     def test_a_configured_number_is_used_everywhere(self):
         self.start(CONF + 'DEVICE_NUMBER=0007\n')
         self.assertEqual(self.jcall('/api/state')[1]['device']['number'], '0007')
-        self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'Piano-Setup-0007')
+        self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'exxpiano-Setup-0007')
         self.assertEqual(self.jcall('/api/qr?kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0007#/wifi')
 
     def test_a_card_bound_to_this_board_and_to_another_one(self):
@@ -656,15 +656,15 @@ class QrApiTests(ServerCase):
         self.start()
         code, r = self.qr('kind=join')
         self.assertEqual(code, 200)
-        self.assertEqual((r['ssid'], r['password']), ('Piano-Setup-81DE', 'pianosetup'))
-        self.assertEqual(r['text'], 'WIFI:T:WPA;S:Piano-Setup-81DE;P:pianosetup;;')
+        self.assertEqual((r['ssid'], r['password']), ('exxpiano-Setup-81DE', 'exxpianosetup'))
+        self.assertEqual(r['text'], 'WIFI:T:WPA;S:exxpiano-Setup-81DE;P:exxpianosetup;;')
         self.assertTrue(r['svg'].startswith('<svg') and 'viewBox' in r['svg'])
 
     def test_a_changed_name_and_password_and_a_bad_password(self):
         self.start(CONF + 'WIFI_AP_SSID=My-Piano\nWIFI_AP_PASSWORD="much better; secret"\n')
         self.assertEqual(self.qr('kind=join')[1]['text'], 'WIFI:T:WPA;S:My-Piano-81DE;P:much better\\; secret;;')
         self.start(CONF + 'WIFI_AP_PASSWORD=short\n')
-        self.assertEqual(self.qr('kind=join')[1]['password'], 'pianosetup')                  # the same fallback the supervisor makes
+        self.assertEqual(self.qr('kind=join')[1]['password'], 'exxpianosetup')                  # the same fallback the supervisor makes
 
     def test_setup_page_code_uses_the_web_port(self):
         self.start(CONF + 'WEB_PORT=9090\n')
@@ -674,7 +674,7 @@ class QrApiTests(ServerCase):
 
     def test_page_code_is_the_address_the_browser_used_or_the_known_ip(self):
         self.start()
-        self.assertEqual(self.qr('kind=page', 'pi-synth.local:8080')[1]['text'], 'http://pi-synth.local:8080/?d=81DE#/wifi')
+        self.assertEqual(self.qr('kind=page', 'exxpiano.local:8080')[1]['text'], 'http://exxpiano.local:8080/?d=81DE#/wifi')
         self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/?d=81DE#/wifi')
         r = self.qr('kind=page', 'evil.example/<script>')[1]                                  # an odd Host header is not copied into a code
         self.assertEqual(r['text'], 'http://192.168.1.9:8080/?d=81DE#/wifi')

@@ -170,16 +170,16 @@ class ProcessTests(MonitorCase):
     def test_the_piano_services_are_found_and_measured_as_a_share_of_one_core(self):
         self.cpu((100, 100), [(100, 100)])
         self.process(10, 'fluidsynth', '/usr/bin/fluidsynth -a alsa', 1000)
-        self.process(11, 'python3', '/usr/bin/python3 /opt/piano-synth/piano-fx.py --x', 50)
-        self.process(12, 'python3', '/usr/bin/python3 /opt/piano-synth/piano-web.py', 5)
+        self.process(11, 'python3', '/usr/bin/python3 /opt/exxpiano/exxpiano-fx.py --x', 50)
+        self.process(12, 'python3', '/usr/bin/python3 /opt/exxpiano/exxpiano-web.py', 5)
         self.process(13, 'bash', 'bash', 99999)
         self.process(14, 'python3', 'python3 other.py', 99999)
 
         def pause(s):
             self.clock.sleep(s)
             self.process(10, 'fluidsynth', '/usr/bin/fluidsynth', 1025)        # 25 ticks in 0.25 s at 100 Hz: one full core
-            self.process(11, 'python3', '/opt/piano-synth/piano-fx.py', 51)
-            self.process(12, 'python3', '/opt/piano-synth/piano-web.py', 5)
+            self.process(11, 'python3', '/opt/exxpiano/exxpiano-fx.py', 51)
+            self.process(12, 'python3', '/opt/exxpiano/exxpiano-web.py', 5)
         self.mon.sleep = pause
         p = self.mon.get()['now']['procs']
         self.assertEqual(p['synth'], 100.0)

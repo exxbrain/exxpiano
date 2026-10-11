@@ -1,4 +1,4 @@
-"""Unit tests for the mechanics logic of pi/piano-fx.py (no MIDI hardware needed).
+"""Unit tests for the mechanics logic of pi/exxpiano-fx.py (no MIDI hardware needed).
 
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
@@ -8,7 +8,7 @@ import random
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location('piano_fx', os.path.join(HERE, '..', 'pi', 'piano-fx.py'))
+spec = importlib.util.spec_from_file_location('piano_fx', os.path.join(HERE, '..', 'pi', 'exxpiano-fx.py'))
 fx = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fx)
 
@@ -211,7 +211,7 @@ class BridgeMappingTests(unittest.TestCase):
         import tempfile
         b = self.make_bridge(1.0)
         with tempfile.TemporaryDirectory() as tmp:
-            conf = os.path.join(tmp, 'piano-synth.conf')
+            conf = os.path.join(tmp, 'exxpiano.conf')
             with open(conf, 'w') as f:
                 f.write('FX_ARGS="--piano-bank 0 --piano-prog 0"\n')
             b.conf_path = conf

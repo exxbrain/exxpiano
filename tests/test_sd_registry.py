@@ -19,7 +19,7 @@ class RegistryTests(unittest.TestCase):
         self.path = os.path.join(self.tmp.name, 'sub', 'devices.csv')
 
     def add(self, number, **kw):
-        return reg.add(dict(number=number, hostname='piano-' + reg.normalize(number).lower(), version='1.8.1', **kw), self.path)
+        return reg.add(dict(number=number, hostname='exxpiano-' + reg.normalize(number).lower(), version='1.8.1', **kw), self.path)
 
     def test_numbers_are_normalised(self):
         self.assertEqual([reg.normalize(x) for x in ('7', '0007', ' 12 ', 'ab12', 'A1')], ['0007', '0007', '0012', 'AB12', 'A1'])
@@ -43,7 +43,7 @@ class RegistryTests(unittest.TestCase):
 
     def test_replacing_keeps_the_old_line_marked(self):
         self.add('7', note='first card')
-        reg.add(dict(number='7', hostname='piano-0007', version='1.9.0'), self.path, replace=True)
+        reg.add(dict(number='7', hostname='exxpiano-0007', version='1.9.0'), self.path, replace=True)
         rows = reg.load(self.path)
         self.assertEqual([r['number'] for r in rows], ['0007~', '0007'])
         self.assertIn('replaced', rows[0]['note'])
@@ -59,7 +59,7 @@ class RegistryTests(unittest.TestCase):
         self.add('2')
         reg.set_note('2', 'Sold to Ivan', self.path)
         self.assertEqual([r['number'] for r in reg.find('ivan', self.path)], ['0002'])
-        self.assertEqual([r['number'] for r in reg.find('PIANO-0001', self.path)], ['0001'])
+        self.assertEqual([r['number'] for r in reg.find('EXXPIANO-0001', self.path)], ['0001'])
         self.assertEqual(reg.find('nobody', self.path), [])
         with self.assertRaises(reg.RegistryError):
             reg.set_note('9', 'x', self.path)
@@ -74,7 +74,7 @@ class RegistryTests(unittest.TestCase):
     def test_a_damaged_row_does_not_break_reading(self):
         os.makedirs(os.path.dirname(self.path))
         with open(self.path, 'w') as f:
-            f.write('number,hostname\n0001,piano-0001\n')                         # old file with fewer columns
+            f.write('number,hostname\n0001,exxpiano-0001\n')                         # old file with fewer columns
         self.assertEqual(reg.load(self.path)[0]['version'], '')
         self.assertEqual(reg.next_number(self.path), '0002')
 
@@ -88,13 +88,13 @@ class RegistryTests(unittest.TestCase):
         self.assertIn('nothing registered', run('list')[1])
         self.add('1', banks='a.sf2')
         code, out, _ = run('list')
-        self.assertTrue(out.startswith('number') and 'piano-0001' in out)
+        self.assertTrue(out.startswith('number') and 'exxpiano-0001' in out)
         self.assertEqual(run('note', '1', 'for the kitchen')[0], 0)
         self.assertIn('for the kitchen', run('show', '1')[1])
         code, out, err = run('show', '5')
         self.assertEqual(code, 1)
         self.assertIn('no such number', err)
-        self.assertIn('piano-0001', run('find', 'kitchen')[1])
+        self.assertIn('exxpiano-0001', run('find', 'kitchen')[1])
 
 
 if __name__ == '__main__':
