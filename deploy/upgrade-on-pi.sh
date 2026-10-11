@@ -18,16 +18,25 @@ rollback() {
 echo "== 1/6 Checking the package with dpkg"
 dpkg-deb --info "$DEB" >/dev/null || { echo "dpkg rejects the package"; exit 1; }
 dpkg-deb --info "$DEB" | grep -E '^ (Package|Version):' || true
-for p in fluidsynth alsa-utils python3-mido python3-rtmidi; do
-  dpkg -s "$p" >/dev/null 2>&1 || { echo "Dependency missing: $p (apt-get install -y $p)"; exit 1; }
+# dpkg -i does not fetch dependencies: install what a newer version needs (before anything is changed)
+missing=""
+for p in fluidsynth alsa-utils python3-mido python3-rtmidi hostapd dnsmasq-base iw wpasupplicant; do
+  dpkg -s "$p" >/dev/null 2>&1 || missing="$missing $p"
 done
+if [ -n "$missing" ]; then
+  echo "Installing the missing packages:$missing"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y $missing || { echo "Could not install:$missing (check the internet connection)"; exit 1; }
+  for p in $missing; do dpkg -s "$p" >/dev/null 2>&1 || { echo "Dependency missing: $p"; exit 1; }; done
+fi
+# the setup access point is started by piano-wifi: the packages' own services would get in the way
+for dep in hostapd dnsmasq; do systemctl disable --now "$dep" >/dev/null 2>&1 || true; done
 
 echo "== 2/6 Backup into $BACKUP"
 rm -rf "$BACKUP"; mkdir -p "$BACKUP/opt" "$BACKUP/units"
 cp -a /opt/piano-synth/. "$BACKUP/opt/" 2>/dev/null || true
 rm -rf "$BACKUP/opt/soundfonts"                 # banks are big and the upgrade does not touch them
 cp -a /etc/piano-synth.conf "$BACKUP/" 2>/dev/null || true
-for u in piano-synth piano-fx piano-web; do
+for u in piano-synth piano-fx piano-web piano-wifi; do
   [ -e "/lib/systemd/system/$u.service" ] && cp -a "/lib/systemd/system/$u.service" "$BACKUP/units/" || true
 done
 dpkg -s piano-synth 2>/dev/null | grep '^Version' | tee "$BACKUP/version.txt" || echo "(not installed before)" | tee "$BACKUP/version.txt"
@@ -43,17 +52,18 @@ fi
 
 echo "== 4/6 Starting (the banks load for ~40 s)"
 systemctl daemon-reload
-systemctl enable piano-synth piano-fx piano-web >/dev/null 2>&1
+systemctl enable piano-synth piano-fx piano-web piano-wifi >/dev/null 2>&1
 systemctl restart piano-synth
 sleep 45
 systemctl is-active --quiet piano-synth || rollback "the synthesizer is not running"
 systemctl restart piano-fx
 systemctl restart piano-web
+systemctl restart piano-wifi || true           # its failure never takes the piano down: it only matters when there is no network
 sleep 4
 systemctl is-active --quiet piano-fx || rollback "the bridge is not running"
 
 echo "== 5/6 Checks"
-echo "-- services:"; systemctl is-active piano-synth piano-fx piano-web
+echo "-- services:"; systemctl is-active piano-synth piano-fx piano-web piano-wifi
 echo "-- audio output:"; journalctl -u piano-synth --no-pager | grep 'audio output' | tail -1
 echo "-- bridge:"; journalctl -u piano-fx -n 3 --no-pager | tail -3
 echo "-- network ports (9800 must be ABSENT, 8080 present):"; ss -ltn | grep -E ':(9800|8080)\b' || echo "(none listed)"

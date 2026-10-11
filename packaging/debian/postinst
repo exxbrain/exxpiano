@@ -12,11 +12,21 @@ configure)
             fi
         done
         systemctl daemon-reload
-        systemctl enable piano-synth.service piano-fx.service piano-web.service >/dev/null 2>&1 || true
-        if [ -f /opt/piano-synth/soundfonts/piano.sf2 ] && [ -f /opt/piano-synth/soundfonts/mech.sf2 ]; then
+        # the setup access point is started by piano-wifi itself: the packages' own services would only get in the way
+        for dep in hostapd dnsmasq; do
+            if systemctl cat "$dep.service" >/dev/null 2>&1; then
+                systemctl disable --now "$dep.service" >/dev/null 2>&1 || true
+            fi
+        done
+        systemctl enable piano-synth.service piano-fx.service piano-web.service piano-wifi.service >/dev/null 2>&1 || true
+        # the banks the configuration points to (an installation may keep them anywhere), not a fixed place
+        conf_value() { sed -n "s/^$1=//p" /etc/piano-synth.conf 2>/dev/null | tail -1 | tr -d '"'; }
+        piano="$(conf_value PIANO_SF2)"; mech="$(conf_value MECH_SF2)"
+        if [ -f "${piano:-/opt/piano-synth/soundfonts/piano.sf2}" ] && [ -f "${mech:-/opt/piano-synth/soundfonts/mech.sf2}" ]; then
             systemctl restart piano-synth.service
             systemctl restart piano-fx.service
             systemctl restart piano-web.service
+            systemctl restart piano-wifi.service || true
         else
             echo "piano-synth: the sound banks are not installed yet." >&2
             echo "  Install the piano-synth-soundfonts package or run:" >&2

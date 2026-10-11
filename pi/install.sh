@@ -34,7 +34,9 @@ fi
 
 echo "==> Packages"
 apt-get update -qq
-apt-get install -y fluidsynth alsa-utils python3-mido python3-rtmidi
+apt-get install -y fluidsynth alsa-utils python3-mido python3-rtmidi hostapd dnsmasq-base iw wpasupplicant
+apt-get install -y avahi-daemon || true      # optional: http://<hostname>.local:8080/
+for dep in hostapd dnsmasq; do systemctl disable --now "$dep" 2>/dev/null || true; done   # piano-wifi starts them itself
 
 echo "==> Files in $PREFIX"
 install -d "$PREFIX/soundfonts"
@@ -46,6 +48,8 @@ install -m 755 "$HERE/sf2info.py" "$PREFIX/sf2info.py"
 install -m 644 "$HERE/banklib.py" "$PREFIX/banklib.py"
 install -m 644 "$HERE/profiles.py" "$PREFIX/profiles.py"
 install -m 644 "$HERE/sysmon.py" "$PREFIX/sysmon.py"
+install -m 644 "$HERE/wifilib.py" "$PREFIX/wifilib.py"
+install -m 755 "$HERE/piano-wifi.py" "$PREFIX/piano-wifi.py"
 install -d /var/lib/piano-synth
 install -m 755 "$HERE/piano-web.py" "$PREFIX/piano-web.py"
 install -d "$PREFIX/web"
@@ -74,14 +78,16 @@ pkill -x fluidsynth 2>/dev/null || true
 install -m 644 "$HERE/piano-synth.service" /etc/systemd/system/piano-synth.service
 install -m 644 "$HERE/piano-fx.service"    /etc/systemd/system/piano-fx.service
 install -m 644 "$HERE/piano-web.service"   /etc/systemd/system/piano-web.service
+install -m 644 "$HERE/piano-wifi.service"  /etc/systemd/system/piano-wifi.service
 install -m 644 "$HERE/90-piano-synth.rules" /etc/udev/rules.d/90-piano-synth.rules
 udevadm control --reload 2>/dev/null || true
 systemctl daemon-reload
-systemctl enable piano-synth piano-fx piano-web
+systemctl enable piano-synth piano-fx piano-web piano-wifi
 systemctl restart piano-synth
 sleep 2
 systemctl restart piano-fx
 systemctl restart piano-web
+systemctl restart piano-wifi || true
 
 echo "==> Checks"
 if grep -q '^ALSA_DEVICE=.*Headphones' "$CONF" && ! aplay -l 2>/dev/null | grep -qi headphones; then

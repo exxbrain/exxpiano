@@ -43,6 +43,13 @@ class FakeActions:
         self.gate = None                     # an Event: wait_synth_ready blocks until it is set
         self.pid = 100
         self.monitor_calls = []
+        self.networks = [dict(ssid='Home', signal=-50, secure=True, freq=2437), dict(ssid='Cafe', signal=-70, secure=False, freq=2412)]
+        self.wifi_st = dict(mode='client', busy=None, link=dict(ssid='Home', ip='192.168.1.9', signal=-50), hostname='pi-synth', ap=None,
+                            scan=self.networks, scanned_at=5, last_result=None, updated=100)
+        self.wifi_saved_list = [dict(ssid='Home', secure=True, hidden=False, priority=0)]
+        self.wifi_requests = []
+        self.scan_answer = [dict(ssid='Fresh', signal=-40, secure=True, freq=2412)]
+        self.nm = False
         self.monitor_answer = dict(now=dict(t=5, cpu=12.5, cores=[10.0, 15.0], temp=55.0, throttle=None), points=[dict(t=5, cpu=12.5, temp=55.0, freq=1200)])
 
     def mem_total(self):
@@ -83,6 +90,22 @@ class FakeActions:
     def monitor(self, since=0):
         self.monitor_calls.append(since)
         return self.monitor_answer
+
+    def wifi_status(self):
+        return self.wifi_st
+
+    def wifi_saved(self):
+        return self.wifi_saved_list
+
+    def wifi_scan(self):
+        return self.scan_answer
+
+    def wifi_request(self, request):
+        self.wifi_requests.append(request)
+        return '123'
+
+    def network_manager_active(self):
+        return self.nm
 
 
 class ServerCase(unittest.TestCase):
@@ -421,6 +444,99 @@ class ActionsCacheTests(unittest.TestCase):
         self.addCleanup(setattr, web.time, 'sleep', orig)
         self.assertTrue(a.wait_synth_ready(1, timeout=30))
         self.assertGreaterEqual(self.calls.count('systemctl'), 2)
+
+
+class WifiApiTests(ServerCase):
+    def post(self, body):
+        return self.jcall('/api/wifi', body)
+
+    def test_the_state_describes_the_link_the_saved_networks_and_the_scan(self):
+        self.start()
+        code, r = self.jcall('/api/wifi')
+        self.assertEqual(code, 200)
+        self.assertTrue(r['supported'])
+        self.assertEqual((r['mode'], r['link']['ssid'], r['hostname']), ('client', 'Home', 'pi-synth'))
+        self.assertEqual(r['saved'], [dict(ssid='Home', secure=True, hidden=False)])           # no priority, no key
+        self.assertEqual([n['ssid'] for n in r['networks']], ['Home', 'Cafe'])
+
+    def test_without_the_supervisor_the_page_is_told_why(self):
+        self.start()
+        self.actions.wifi_st = None
+        r = self.jcall('/api/wifi')[1]
+        self.assertEqual((r['supported'], r['reason']), (False, 'not_running'))
+        self.assertEqual(r['saved'][0]['ssid'], 'Home')
+        self.actions.nm = True
+        self.assertEqual(self.jcall('/api/wifi')[1]['reason'], 'networkmanager')
+        code, r = self.post(dict(action='connect', ssid='Home', password='12345678'))
+        self.assertEqual(code, 400)
+        self.assertEqual(self.actions.wifi_requests, [])
+
+    def test_connect_sends_the_derived_key_never_the_password(self):
+        self.start()
+        code, r = self.post(dict(action='connect', ssid='IEEE', password='password'))
+        self.assertEqual((code, r), (200, dict(accepted=True, id='123')))
+        (req,) = self.actions.wifi_requests
+        self.assertEqual(req, dict(action='connect', ssid='IEEE', psk='f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e', hidden=False))
+        self.assertNotIn('password', json.dumps(req))
+
+    def test_an_open_network_needs_no_password_but_a_secured_one_does(self):
+        self.start()
+        self.assertEqual(self.post(dict(action='connect', ssid='Cafe'))[0], 200)
+        self.assertEqual(self.actions.wifi_requests[-1]['psk'], None)
+        n = len(self.actions.wifi_requests)
+        code, r = self.post(dict(action='connect', ssid='Home'))
+        self.assertEqual(code, 400)
+        self.assertIn('password', r['error'])
+        self.assertEqual(len(self.actions.wifi_requests), n)
+        self.assertEqual(self.post(dict(action='connect', ssid='Unlisted', password='12345678', hidden=True))[0], 200)
+        self.assertTrue(self.actions.wifi_requests[-1]['hidden'])
+
+    def test_bad_input_is_refused_and_nothing_is_sent(self):
+        self.start()
+        for body in (dict(action='connect', ssid='', password='12345678'), dict(action='connect', ssid='x' * 40, password='12345678'),
+                     dict(action='connect', ssid='Net', password='short'), dict(action='connect', ssid=5, password='12345678'),
+                     dict(action='connect', ssid='Net', password='пароль-пароль'), dict(action='forget', ssid='Unknown'),
+                     dict(action='forget'), dict(action='explode'), dict(), [], 'x'):
+            with self.subTest(body):
+                self.assertEqual(self.post(body)[0], 400)
+        self.assertEqual(self.actions.wifi_requests, [])
+
+    def test_forget_only_works_for_a_saved_network(self):
+        self.start()
+        self.assertEqual(self.post(dict(action='forget', ssid='Home'))[0], 200)
+        self.assertEqual(self.actions.wifi_requests, [dict(action='forget', ssid='Home')])
+
+    def test_a_busy_supervisor_is_not_given_a_second_job(self):
+        self.start()
+        self.actions.wifi_st['busy'] = 'connect'
+        for body in (dict(action='connect', ssid='Cafe'), dict(action='forget', ssid='Home')):
+            self.assertEqual(self.post(body)[0], 409)
+        self.assertEqual(self.actions.wifi_requests, [])
+
+    def test_scan_is_fresh_in_client_mode_and_cached_in_setup_mode(self):
+        self.start()
+        r = self.post(dict(action='scan'))[1]
+        self.assertEqual(([n['ssid'] for n in r['networks']], r['cached']), (['Fresh'], False))
+        self.actions.wifi_st['mode'] = 'ap'
+        r = self.post(dict(action='scan'))[1]
+        self.assertEqual(([n['ssid'] for n in r['networks']], r['cached']), (['Home', 'Cafe'], True))
+        self.actions.wifi_st['mode'] = 'client'
+        self.actions.scan_answer = None
+        self.assertEqual(self.post(dict(action='scan'))[0], 400)
+
+    def test_the_token_protects_everything_about_wifi(self):
+        self.start(CONF + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/wifi')[0], 401)
+        self.assertEqual(self.call('/api/wifi', dict(action='forget', ssid='Home'))[0], 401)
+        self.assertEqual(self.actions.wifi_requests, [])
+        self.assertEqual(self.call('/api/wifi', headers={'X-Token': 's3cret'})[0], 200)
+
+    def test_the_real_actions_survive_a_machine_without_wifi(self):
+        a = web.Actions()
+        a.wifi_run_dir = '/nonexistent/run'
+        a.wpa_conf = '/nonexistent/wpa.conf'
+        self.assertIsNone(a.wifi_status())
+        self.assertEqual(a.wifi_saved(), [])
 
 
 class MonitorEndpointTests(ServerCase):

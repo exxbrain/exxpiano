@@ -17,7 +17,9 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 MAINTAINER = 'Denis Zakharov <noreply@localhost>'
-DEPENDS = 'fluidsynth, alsa-utils, python3, python3-mido, python3-rtmidi'
+# hostapd and dnsmasq-base: the setup access point (no system service of theirs is used: piano-wifi starts them itself)
+DEPENDS = 'fluidsynth, alsa-utils, python3, python3-mido, python3-rtmidi, hostapd, dnsmasq-base, iw, wpasupplicant'
+RECOMMENDS = 'avahi-daemon'
 
 
 def src(*parts):
@@ -98,7 +100,7 @@ def write_deb(deb_path, control_tar, data_tar, mtime):
                 out.write(b'\n')
 
 
-def build_package(out_dir, name, version, depends, description, files, extra_dirs, scripts, conffiles, mtime, tmp):
+def build_package(out_dir, name, version, depends, description, files, extra_dirs, scripts, conffiles, mtime, tmp, recommends=''):
     """files: [(arcname, source_path_or_bytes, mode)]; scripts: {'postinst': bytes, ...}."""
     md5lines, installed = [], 0
     for arc, source, _ in files:
@@ -110,8 +112,8 @@ def build_package(out_dir, name, version, depends, description, files, extra_dir
         installed += size
     control = (
         'Package: %s\nVersion: %s\nArchitecture: all\nMaintainer: %s\nInstalled-Size: %d\n'
-        'Depends: %s\nSection: sound\nPriority: optional\nDescription: %s\n'
-    ) % (name, version, MAINTAINER, (installed + 1023) // 1024, depends, description)
+        'Depends: %s\n%sSection: sound\nPriority: optional\nDescription: %s\n'
+    ) % (name, version, MAINTAINER, (installed + 1023) // 1024, depends, 'Recommends: %s\n' % recommends if recommends else '', description)
     ctl_files = [('control', control.encode('utf-8'), 0o644),
                  ('md5sums', ''.join(md5lines).encode('ascii'), 0o644)]
     if conffiles:
@@ -163,6 +165,9 @@ def main():
         ('opt/piano-synth/banklib.py', src('pi', 'banklib.py'), 0o644),
         ('opt/piano-synth/profiles.py', src('pi', 'profiles.py'), 0o644),
         ('opt/piano-synth/sysmon.py', src('pi', 'sysmon.py'), 0o644),
+        ('opt/piano-synth/wifilib.py', src('pi', 'wifilib.py'), 0o644),
+        ('opt/piano-synth/piano-wifi.py', src('pi', 'piano-wifi.py'), 0o755),
+        ('lib/systemd/system/piano-wifi.service', src('pi', 'piano-wifi.service'), 0o644),
         ('opt/piano-synth/piano-web.py', src('pi', 'piano-web.py'), 0o755),
         ('opt/piano-synth/web/index.html', src('pi', 'web', 'index.html'), 0o644),
         ('lib/systemd/system/piano-web.service', src('pi', 'piano-web.service'), 0o644),
@@ -179,14 +184,15 @@ def main():
     description = (
         'Salamander piano on FluidSynth with piano mechanics (Raspberry Pi)\n'
         ' Systemd services piano-synth (FluidSynth) and piano-fx (MIDI bridge that adds hammer,\n'
-        ' damper, string resonance and pedal noise). Settings: /etc/piano-synth.conf.\n'
+        ' damper, string resonance and pedal noise). Settings: /etc/piano-synth.conf. Web page on\n'
+        ' port 8080 with Wi-Fi setup (the Pi starts its own network when it has none).\n'
         ' .\n'
         ' Sound banks are not included. Install piano-synth-soundfonts or run\n'
         ' piano-synth-install-banks.\n')
 
     with tempfile.TemporaryDirectory() as tmp:
         built = [build_package(args.out, 'piano-synth', args.version, DEPENDS, description, main_files,
-                               ['opt/piano-synth/soundfonts', 'var/lib/piano-synth'], scripts, ['/etc/piano-synth.conf'], mtime, tmp)]
+                               ['opt/piano-synth/soundfonts', 'var/lib/piano-synth'], scripts, ['/etc/piano-synth.conf'], mtime, tmp, RECOMMENDS)]
         if args.banks:
             piano, mech = args.banks
             for p in (piano, mech):

@@ -56,6 +56,8 @@ AUTO_SETUP_CUSTOM_SCRIPT_EXEC=0
 # AUTO_SETUP_NET_ETHERNET_ENABLED=1
 # AUTO_SETUP_GLOBAL_PASSWORD=<choose a password, do not keep the default>
 # AUTO_SETUP_NET_HOSTNAME=piano
+# The first installation needs the internet (packages): Ethernet, or AUTO_SETUP_NET_WIFI_ENABLED=1 with the network in dietpi-wifi.txt.
+# Later, a new network is added without any file: the device starts its own Wi-Fi "Piano-Setup-XXXX" and the page's Wi-Fi tab does the rest.
 """
 
 BANKS_README = """Put the sound banks here, built with scripts/make-soundfonts.sh:

@@ -83,8 +83,10 @@ class DebTests(unittest.TestCase):
         self.assertEqual(control['Package'], 'piano-synth')
         self.assertEqual(control['Version'], '9.9.9')
         self.assertEqual(control['Architecture'], 'all')
-        for dep in ('fluidsynth', 'python3-mido', 'python3-rtmidi', 'alsa-utils'):
+        for dep in ('fluidsynth', 'python3-mido', 'python3-rtmidi', 'alsa-utils', 'hostapd', 'dnsmasq-base', 'iw', 'wpasupplicant'):
             self.assertIn(dep, control['Depends'])
+        self.assertNotIn('dnsmasq,', control['Depends'] + ',')                   # the full package would start its own DNS server on port 53
+        self.assertEqual(control['Recommends'], 'avahi-daemon')
         self.assertTrue(control['Description'].split('\n')[0])
         self.assertTrue(control['Installed-Size'].isdigit())
 
@@ -129,7 +131,7 @@ class DebTests(unittest.TestCase):
         self.assertEqual(data.extractfile('./opt/piano-synth/VERSION').read().decode().strip(), '9.9.9')
         self.assertIn('./lib/udev/rules.d/90-piano-synth.rules', names)
         for web_file in ('./opt/piano-synth/pianoconf.py', './opt/piano-synth/piano-web.py', './opt/piano-synth/sf2info.py',
-                         './opt/piano-synth/banklib.py', './opt/piano-synth/profiles.py', './opt/piano-synth/sysmon.py', './var/lib/piano-synth',
+                         './opt/piano-synth/banklib.py', './opt/piano-synth/profiles.py', './opt/piano-synth/sysmon.py', './opt/piano-synth/wifilib.py', './opt/piano-synth/piano-wifi.py', './lib/systemd/system/piano-wifi.service', './var/lib/piano-synth',
                          './opt/piano-synth/web/index.html', './lib/systemd/system/piano-web.service'):
             self.assertIn(web_file, names)
 

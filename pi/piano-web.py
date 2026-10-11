@@ -6,6 +6,8 @@
   POST /api/settings       {"velocity_curve": 0.8, ...}  - validated, stored in /etc/piano-synth.conf, applied
   POST /api/restart        restart piano-synth (needed after changing audio output / buffer / reverb / polyphony)
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
+  GET  /api/wifi           Wi-Fi: link, saved networks, scan results, access point (the setup mode), result of the last change
+  POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
   GET  /api/monitor        ?since=<ms>  - CPU, temperature, frequency, memory, throttling, load of the piano services, chart points since <ms>
 
 Settings that can be changed are whitelisted with ranges in pianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
@@ -26,6 +28,7 @@ import banklib
 import pianoconf
 import profiles
 import sysmon
+import wifilib
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 MAX_BODY = 4096
@@ -37,6 +40,9 @@ class Actions:
     def __init__(self, asound=None):
         self.asound = asound or os.environ.get('ASOUND_DIR', '/proc/asound')
         self._monitor = sysmon.Monitor(asound=self.asound)
+        self.wifi_run_dir = os.environ.get('PIANO_WIFI_RUN', wifilib.RUN_DIR)
+        self.wifi_iface = os.environ.get('WIFI_IFACE', 'wlan0')
+        self.wpa_conf = os.environ.get('WIFI_WPA_CONF', '/etc/wpa_supplicant/wpa_supplicant.conf')
         self._cache = {}                       # key -> (when, value): the page asks every few seconds, programs are started at most this often
         self._cache_lock = threading.Lock()
 
@@ -131,6 +137,31 @@ class Actions:
     def monitor(self, since=0):
         return self._monitor.get(since)
 
+    # ---- Wi-Fi (the supervisor piano-wifi does the changes; this only reads its status and sends requests)
+    def wifi_status(self):
+        st = wifilib.read_status(self.wifi_run_dir)
+        return st if st and time.time() - st.get('updated', 0) < 30 else None      # an old file: the supervisor is not running
+
+    def wifi_saved(self):
+        try:
+            with open(self.wpa_conf, encoding='utf-8') as f:
+                return wifilib.networks(f.read())
+        except OSError:
+            return []
+
+    def wifi_scan(self):
+        try:
+            r = subprocess.run(['iw', 'dev', self.wifi_iface, 'scan'], capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return wifilib.parse_scan(r.stdout) if r.returncode == 0 else None
+
+    def wifi_request(self, request):
+        return wifilib.post_request(self.wifi_run_dir, request)
+
+    def network_manager_active(self):
+        return self._service_state('NetworkManager') == 'active'
+
     def restart_synth(self):
         self._forget('service', 'output')                # the answers are about to change
         subprocess.Popen(['systemctl', '--no-block', 'restart', 'piano-synth.service'])
@@ -187,6 +218,10 @@ class Actions:
         if not last:
             return None
         return dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)))
+
+
+class WifiBusy(Exception):
+    """The supervisor is in the middle of changing the network."""
 
 
 class Busy(Exception):
@@ -320,6 +355,50 @@ class App:
             print('could not remember the buffers of %s: %s' % (device, exc), file=sys.stderr)
 
     # ---- the piano banks
+    # ---- Wi-Fi
+    def wifi(self):
+        a = self.actions
+        st = a.wifi_status()
+        saved = [dict(ssid=n['ssid'], secure=n['secure'], hidden=n['hidden']) for n in a.wifi_saved()]
+        if st is None:
+            return dict(supported=False, reason='networkmanager' if a.network_manager_active() else 'not_running', saved=saved, networks=[],
+                        link=None, mode=None, busy=None)
+        return dict(supported=True, mode=st.get('mode'), busy=st.get('busy'), link=st.get('link'), hostname=st.get('hostname'), ap=st.get('ap'),
+                    saved=saved, networks=st.get('scan') or [], scanned_at=st.get('scanned_at'), last_result=st.get('last_result'),
+                    now=st.get('updated'))
+
+    def wifi_action(self, body):
+        if not isinstance(body, dict):
+            raise ValueError('expected an object')
+        action = body.get('action')
+        state = self.wifi()
+        if not state['supported']:
+            raise ValueError('Wi-Fi setup is not available here (%s)' % state['reason'])
+        if action == 'scan':
+            if state['mode'] == 'ap' or state['busy']:
+                return dict(networks=state['networks'], scanned_at=state['scanned_at'], cached=True)   # the radio is serving or busy
+            found = self.actions.wifi_scan()
+            if found is None:
+                raise ValueError('the scan failed, try again in a moment')
+            return dict(networks=found, scanned_at=int(time.time()), cached=False)
+        if state['busy']:
+            raise WifiBusy()
+        if action == 'connect':
+            ssid = body.get('ssid')
+            wifilib.validate_ssid(ssid)
+            password = wifilib.validate_passphrase(body.get('password'))
+            if password is None and any(n['ssid'] == ssid and n['secure'] for n in state['networks']):
+                raise ValueError('this network needs a password')
+            psk = wifilib.derive_psk(ssid, password) if password else None
+            rid = self.actions.wifi_request(dict(action='connect', ssid=ssid, psk=psk, hidden=bool(body.get('hidden'))))
+            return dict(accepted=True, id=rid)
+        if action == 'forget':
+            ssid = body.get('ssid')
+            if not isinstance(ssid, str) or not any(n['ssid'] == ssid for n in state['saved']):
+                raise ValueError('that network is not saved')
+            return dict(accepted=True, id=self.actions.wifi_request(dict(action='forget', ssid=ssid)))
+        raise ValueError('unknown action')
+
     def monitor(self, query):
         try:
             since = int((query.get('since') or ['0'])[0])
@@ -433,7 +512,7 @@ def make_handler(app):
 
         def log_request(self, code='-', size='-'):
             # the page polls the state and the monitor all the time: successful polls would only fill the journal with noise
-            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/ping'):
+            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/wifi', '/api/ping'):
                 return
             super().log_request(code, size)
 
@@ -475,6 +554,10 @@ def make_handler(app):
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
                 return self._send(200, dict(app.state(), auth_required=bool(app.token)))
+            if url.path == '/api/wifi':
+                if not self._authorised():
+                    return self._send(401, dict(error='token required'))
+                return self._send(200, app.wifi())
             if url.path == '/api/monitor':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
@@ -495,6 +578,8 @@ def make_handler(app):
                 if self.path == '/api/restart':
                     app.actions.restart_synth()
                     return self._send(200, dict(ok=True))
+                if self.path == '/api/wifi':
+                    return self._send(200, app.wifi_action(self._body()))
                 if self.path == '/api/bank':
                     body = self._body()
                     if not isinstance(body, dict):
@@ -502,6 +587,8 @@ def make_handler(app):
                     return self._send(200, app.switch_bank(body.get('id')))
             except Busy:
                 return self._send(409, dict(error='a bank switch is in progress, wait until it finishes'))
+            except WifiBusy:
+                return self._send(409, dict(error='the Pi is changing the network right now, wait a moment'))
             except (ValueError, json.JSONDecodeError) as exc:
                 return self._send(400, dict(error=str(exc)))
             except OSError as exc:

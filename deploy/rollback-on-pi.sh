@@ -3,7 +3,7 @@
 BACKUP="${PIANO_BACKUP:-/root/piano-synth-backup}"
 [ -d "$BACKUP/opt" ] || { echo "No backup in $BACKUP"; exit 1; }
 
-systemctl stop piano-web piano-fx piano-synth 2>/dev/null
+systemctl stop piano-wifi piano-web piano-fx piano-synth 2>/dev/null     # piano-wifi gives the radio back if it was serving its own network
 # program files and units as they were (the banks were never touched)
 cp -a "$BACKUP/opt/." /opt/piano-synth/
 [ -e "$BACKUP/piano-synth.conf" ] && cp -a "$BACKUP/piano-synth.conf" /etc/piano-synth.conf
@@ -15,6 +15,11 @@ if [ ! -e "$BACKUP/units/piano-web.service" ]; then
   systemctl disable piano-web 2>/dev/null
   rm -f /lib/systemd/system/piano-web.service /opt/piano-synth/piano-web.py /opt/piano-synth/pianoconf.py
   rm -rf /opt/piano-synth/web
+fi
+# an older version had no Wi-Fi setup either
+if [ ! -e "$BACKUP/units/piano-wifi.service" ]; then
+  systemctl disable piano-wifi 2>/dev/null
+  rm -f /lib/systemd/system/piano-wifi.service /opt/piano-synth/piano-wifi.py /opt/piano-synth/wifilib.py
 fi
 systemctl daemon-reload
 systemctl restart piano-synth

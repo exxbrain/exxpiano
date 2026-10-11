@@ -61,6 +61,15 @@
   .tabs button { flex: 1; background: transparent; color: var(--muted); border: 1px solid var(--line); }
   .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   [hidden] { display: none !important; }
+  .wnote { font-size: .92rem; margin: 0 0 8px; } .wnote.ok { color: var(--ok); } .wnote.warn { color: var(--warn); } .wnote.bad { color: var(--bad); }
+  .wnote b { overflow-wrap: anywhere; }
+  .net { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .net:first-child { border-top: 0; }
+  .net .meta { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .net .meta small { display: block; color: var(--muted); }
+  .net button { padding: 6px 12px; font-size: .9rem; }
+  .wform input[type=text], .wform input[type=password] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line);
+         background: var(--bg); color: var(--text); font-size: 1rem; }
   .thr { font-size: .95rem; }
   .thr p { margin: 0 0 6px; } .thr p:last-child { margin: 0; }
   .thr .ok { color: var(--ok); } .thr .warn { color: var(--warn); } .thr .bad { color: var(--bad); font-weight: 600; }
@@ -102,6 +111,7 @@
   <div class="tabs" role="tablist">
     <button id="tabMain" class="on" role="tab" data-t="tab_main">Settings</button>
     <button id="tabMon" role="tab" data-t="tab_mon">Monitor</button>
+    <button id="tabWifi" role="tab" data-t="tab_wifi">Wi-Fi</button>
   </div>
 
   <div id="paneMain">
@@ -145,6 +155,21 @@
   </div>
   </div>
 
+  <div id="paneWifi" hidden>
+    <div class="card"><h2 data-t="w_title">Wi-Fi</h2><div id="wState"></div></div>
+    <div class="card wform" id="wAdd">
+      <h2 data-t="w_add">Connect to a network</h2>
+      <p class="hint" data-t="w_add_hint">Choose the network and type its password. The Pi tries it for up to a minute and keeps the previous settings if it does not work.</p>
+      <div class="row"><label data-t="w_network" for="wNet">Network</label><select id="wNet" style="grid-column:1/3"></select></div>
+      <div class="row" id="wNameRow" hidden><label data-t="w_name" for="wName">Network name</label><input type="text" id="wName" maxlength="32" autocomplete="off" autocapitalize="off" style="grid-column:1/3"></div>
+      <div class="row"><label data-t="w_password" for="wPass">Password</label><input type="password" id="wPass" maxlength="63" autocomplete="off" style="grid-column:1/3"></div>
+      <div class="check"><input type="checkbox" id="wShow"><label for="wShow" data-t="w_show">Show the password</label></div>
+      <p><button id="wConnect" data-t="w_connect">Connect</button> <button class="secondary" id="wScan" data-t="w_scan">Scan again</button></p>
+      <p class="wnote" id="wResult" role="status"></p>
+    </div>
+    <div class="card"><h2 data-t="w_saved">Saved networks</h2><div id="wSaved"></div></div>
+  </div>
+
   <div id="paneMon" hidden>
     <div class="card"><h2 data-t="m_throttle">Power and throttling</h2><div class="thr" id="thr"></div></div>
     <div class="card"><h2 data-t="a_title">Audio interface</h2><p class="hint" data-t="a_hint">What the driver really negotiated for the stream that is playing now, not what was asked for.</p><div id="mAudio"></div></div>
@@ -178,6 +203,17 @@ const T = {
     a_none: "No stream is open: the synthesizer is not playing right now.", a_card: "Card", a_state: "State", a_format: "Format", a_channels: "Channels", a_rate: "Sample rate",
     a_period: "Period", a_buffer: "Buffer (latency)", a_delay: "Queued now", a_clock: "USB clock", a_rates: "Supported rates",
     a_asked: "Asked for {p} × {n} frames; the driver gave {rp} × {rn}.", a_frames: "{n} frames", a_bit: "{n} bit",
+    tab_wifi: "Wi-Fi", w_title: "Wi-Fi", w_add: "Connect to a network", w_network: "Network", w_name: "Network name", w_password: "Password", w_show: "Show the password",
+    w_add_hint: "Choose the network and type its password. The Pi tries it for up to a minute and keeps the previous settings if it does not work.",
+    w_connect: "Connect", w_scan: "Scan again", w_saved: "Saved networks", w_forget: "Forget", w_other: "Another network (type the name)…", w_none_saved: "No saved networks.",
+    w_open: "open", w_secured: "password", w_hidden: "hidden", w_scanning: "Scanning…", w_cached: "The radio is serving the setup network, so this is the list from before it started.",
+    w_confirm_forget: "Forget {ssid}? If it is the network in use, the Pi disconnects from it.", w_need_name: "Type the network name.", w_need_pass: "This network needs a password.",
+    w_connected: "Connected to {ssid}", w_ip: "address {ip}", w_signal: "signal {dbm} dBm", w_find: "Open it at http://{host}.local:8080/ or from the router's list of clients.",
+    w_not_connected: "Not connected to a network.", w_ap: "Setup mode: the Pi has no network and runs its own: {ap}. Choose your Wi-Fi below; this page stays reachable at http://10.42.0.1:8080/.",
+    w_connecting: "Connecting… up to a minute. If this page stops answering, join your own Wi-Fi again and open http://{host}.local:8080/ .",
+    w_ok: "Connected to {ssid}.", w_failed: "Could not connect to {ssid}: {error}.", w_forgot: "Forgot {ssid}.", w_ap_failed: "The setup network could not start.",
+    w_nm: "This system uses NetworkManager. Connect with the command sudo nmtui; this page cannot change the network here.",
+    w_off: "The Wi-Fi service is not running (systemctl status piano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
     tab_main: "Settings", tab_mon: "Monitor", m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
     m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
     m_procs_hint: "Share of one core; a service with several threads can pass 100 %.", m_load: "load {a} · {b} · {c}", m_max: "of {n} MHz", m_of: "of {n} MB",
@@ -214,6 +250,17 @@ const T = {
     a_none: "Ни один поток не открыт: синтезатор сейчас не играет.", a_card: "Карта", a_state: "Состояние", a_format: "Формат", a_channels: "Каналы", a_rate: "Частота дискретизации",
     a_period: "Период", a_buffer: "Буфер (задержка)", a_delay: "В очереди сейчас", a_clock: "Тактирование USB", a_rates: "Поддерживаемые частоты",
     a_asked: "Запрошено {p} × {n} кадров; драйвер дал {rp} × {rn}.", a_frames: "{n} кадров", a_bit: "{n} бит",
+    tab_wifi: "Wi-Fi", w_title: "Wi-Fi", w_add: "Подключение к сети", w_network: "Сеть", w_name: "Имя сети", w_password: "Пароль", w_show: "Показать пароль",
+    w_add_hint: "Выберите сеть и введите пароль. Pi пробует подключиться до минуты и при неудаче оставляет прежние настройки.",
+    w_connect: "Подключить", w_scan: "Обновить список", w_saved: "Сохранённые сети", w_forget: "Забыть", w_other: "Другая сеть (ввести имя)…", w_none_saved: "Сохранённых сетей нет.",
+    w_open: "открытая", w_secured: "с паролем", w_hidden: "скрытая", w_scanning: "Поиск сетей…", w_cached: "Радио занято сетью настройки, поэтому показан список, снятый до её запуска.",
+    w_confirm_forget: "Забыть {ssid}? Если это текущая сеть, Pi от неё отключится.", w_need_name: "Введите имя сети.", w_need_pass: "Для этой сети нужен пароль.",
+    w_connected: "Подключено к {ssid}", w_ip: "адрес {ip}", w_signal: "сигнал {dbm} дБм", w_find: "Откройте http://{host}.local:8080/ или найдите адрес в списке клиентов роутера.",
+    w_not_connected: "К сети не подключено.", w_ap: "Режим настройки: у Pi нет сети, он создал свою: {ap}. Выберите ниже свою Wi-Fi; эта страница доступна по адресу http://10.42.0.1:8080/.",
+    w_connecting: "Подключаюсь… до минуты. Если страница перестанет отвечать, подключитесь к своей Wi-Fi и откройте http://{host}.local:8080/ .",
+    w_ok: "Подключено к {ssid}.", w_failed: "Не удалось подключиться к {ssid}: {error}.", w_forgot: "Сеть {ssid} забыта.", w_ap_failed: "Сеть настройки не запустилась.",
+    w_nm: "В этой системе сетью управляет NetworkManager. Подключайтесь командой sudo nmtui; отсюда сеть изменить нельзя.",
+    w_off: "Служба Wi-Fi не запущена (systemctl status piano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
     tab_main: "Настройки", tab_mon: "Монитор", m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
     m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
     m_procs_hint: "Доля одного ядра; служба с несколькими потоками может превысить 100 %.", m_load: "нагрузка {a} · {b} · {c}", m_max: "из {n} МГц", m_of: "из {n} МБ",
@@ -566,20 +613,113 @@ async function pollMon() {
     renderMon(r.now);
   } catch (e) { /* the next tick tries again */ } finally { mon.busy = false; }
 }
+const TABS = { main: ["tabMain", "paneMain"], mon: ["tabMon", "paneMon"], wifi: ["tabWifi", "paneWifi"] };
 function showTab(name) {
-  const m = name === "mon";
-  $("paneMain").hidden = m; $("paneMon").hidden = !m;
-  $("tabMain").classList.toggle("on", !m); $("tabMon").classList.toggle("on", m);
+  if (!TABS[name]) name = "main";
+  for (const [k, [btn, pane]] of Object.entries(TABS)) { $(pane).hidden = k !== name; $(btn).classList.toggle("on", k === name); }
   try { localStorage.setItem("pianoTab", name); } catch (e) { /* private window: the tab is simply not remembered */ }
-  if (m) pollMon();
+  if (name === "mon") pollMon();
+  if (name === "wifi") pollWifi(true);
+}
+
+// ---- Wi-Fi: the link, the networks, connecting (the Pi's supervisor piano-wifi makes the changes)
+const wifi = { data: null, busy: false, scanned: false, waiting: false, scanning: false };
+function wText(el, cls, text) { el.className = "wnote " + cls; el.textContent = text; }
+function renderWifi() {
+  const d = wifi.data, box = $("wState"); box.textContent = "";
+  const line = (cls, text) => { const p = document.createElement("p"); wText(p, cls, text); box.append(p); };
+  if (!d) { line("warn", tr("w_waiting")); return; }
+  if (!d.supported) { line("warn", tr(d.reason === "networkmanager" ? "w_nm" : "w_off")); }
+  else if (d.mode === "ap") line("warn", fmt(tr("w_ap"), { ap: d.ap ? d.ap.ssid : "" }));
+  else if (d.link) {
+    const parts = [fmt(tr("w_connected"), { ssid: d.link.ssid })];
+    if (d.link.ip) parts.push(fmt(tr("w_ip"), { ip: d.link.ip }));
+    if (d.link.signal != null) parts.push(fmt(tr("w_signal"), { dbm: d.link.signal }));
+    line("ok", parts.join(" · "));
+    if (d.hostname) line("", fmt(tr("w_find"), { host: d.hostname }));
+  } else line("warn", tr("w_not_connected"));
+  if (d.busy === "connect" || wifi.waiting) line("warn", fmt(tr("w_connecting"), { host: d.hostname || "pi" }));
+  const r = d.last_result;
+  if (r && d.now && d.now - r.at < 600 && !d.busy) {
+    if (r.kind === "connect") line(r.ok ? "ok" : "bad", r.ok ? fmt(tr("w_ok"), { ssid: r.ssid }) : fmt(tr("w_failed"), { ssid: r.ssid, error: r.error || "" }));
+    else if (r.kind === "forget" && r.ok) line("ok", fmt(tr("w_forgot"), { ssid: r.ssid }));
+    else if (r.kind === "ap" && !r.ok) line("bad", tr("w_ap_failed"));
+  }
+  $("wAdd").hidden = !d.supported;
+  renderSaved(d);
+  if (d.supported && !wifi.scanned) { wifi.scanned = true; fillNetworks(d.networks); }
+}
+function renderSaved(d) {
+  const box = $("wSaved"); box.textContent = "";
+  if (!d.saved.length) { const p = document.createElement("p"); p.className = "hint"; p.textContent = tr("w_none_saved"); box.append(p); return; }
+  for (const n of d.saved) {
+    const row = document.createElement("div"); row.className = "net";
+    const meta = document.createElement("div"); meta.className = "meta";
+    const name = document.createElement("b"); name.textContent = n.ssid;
+    const small = document.createElement("small"); small.textContent = [tr(n.secure ? "w_secured" : "w_open"), n.hidden ? tr("w_hidden") : ""].filter(Boolean).join(" · ");
+    meta.append(name, small);
+    const b = document.createElement("button"); b.className = "secondary"; b.textContent = tr("w_forget");
+    b.addEventListener("click", () => forgetNetwork(n.ssid));
+    row.append(meta, b); box.append(row);
+  }
+}
+function fillNetworks(list) {
+  const sel = $("wNet"), prev = sel.value; sel.textContent = "";
+  for (const n of list || []) {
+    const o = document.createElement("option"); o.value = n.ssid; o.dataset.secure = n.secure ? "1" : "";
+    o.textContent = n.ssid + "  ·  " + n.signal + " dBm" + (n.secure ? "" : "  ·  " + tr("w_open")); sel.append(o);
+  }
+  const other = document.createElement("option"); other.value = "\u0000other"; other.textContent = tr("w_other"); sel.append(other);
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  netChosen();
+}
+function netChosen() { $("wNameRow").hidden = $("wNet").value !== "\u0000other"; }
+async function pollWifi(force) {
+  if ((wifi.busy && !force) || $("paneWifi").hidden) return;
+  wifi.busy = true;
+  try {
+    wifi.data = await api("/api/wifi"); wifi.waiting = false; renderWifi();
+  } catch (e) { wifi.data = wifi.data && wifi.waiting ? wifi.data : null; renderWifi(); }
+  finally { wifi.busy = false; }
+}
+async function scanNetworks() {
+  const out = $("wResult"); wText(out, "", tr("w_scanning")); $("wScan").disabled = true;
+  try {
+    const r = await api("/api/wifi", { action: "scan" });
+    fillNetworks(r.networks); wText(out, r.cached ? "warn" : "", r.cached ? tr("w_cached") : "");
+  } catch (e) { wText(out, "bad", tr("err") + ": " + e.message); }
+  finally { $("wScan").disabled = false; }
+}
+async function connectNetwork() {
+  const other = $("wNet").value === "\u0000other", ssid = other ? $("wName").value.trim() : $("wNet").value, out = $("wResult");
+  const opt = $("wNet").selectedOptions[0], secure = other ? !!$("wPass").value : !!(opt && opt.dataset.secure);
+  if (!ssid) { wText(out, "bad", tr("w_need_name")); return; }
+  if (secure && !$("wPass").value) { wText(out, "bad", tr("w_need_pass")); return; }
+  try {
+    await api("/api/wifi", { action: "connect", ssid, password: $("wPass").value, hidden: other });
+    $("wPass").value = ""; wText(out, "warn", fmt(tr("w_connecting"), { host: (wifi.data && wifi.data.hostname) || "pi" }));
+    wifi.waiting = true; setTimeout(() => pollWifi(true), 1200);
+  } catch (e) { wText(out, "bad", tr("err") + ": " + e.message); }
+}
+async function forgetNetwork(ssid) {
+  if (!window.confirm(fmt(tr("w_confirm_forget"), { ssid }))) return;
+  try { await api("/api/wifi", { action: "forget", ssid }); setTimeout(() => pollWifi(true), 800); }
+  catch (e) { wText($("wResult"), "bad", tr("err") + ": " + e.message); }
+}
+async function initWifi() {
+  $("wNet").addEventListener("change", netChosen);
+  $("wShow").addEventListener("change", () => { $("wPass").type = $("wShow").checked ? "text" : "password"; });
+  $("wConnect").addEventListener("click", connectNetwork);
+  $("wScan").addEventListener("click", scanNetworks);
+  setInterval(() => pollWifi(false), wifi.waiting ? 1000 : 2500);
+  try { const d = await api("/api/wifi"); if (d.supported && d.mode === "ap") showTab("wifi"); } catch (e) { /* the page works without it */ }
 }
 function initMon() {
-  $("tabMain").addEventListener("click", () => showTab("main"));
-  $("tabMon").addEventListener("click", () => showTab("mon"));
+  for (const [k, [btn]] of Object.entries(TABS)) $(btn).addEventListener("click", () => showTab(k));
   setInterval(pollMon, 1000);
   window.addEventListener("resize", () => { if (!$("paneMon").hidden && mon.points.length) renderMonCharts(); });
   let saved = null; try { saved = localStorage.getItem("pianoTab"); } catch (e) { /* ignore */ }
-  if (saved === "mon") showTab("mon");
+  if (saved && saved !== "main") showTab(saved);
 }
 function renderMonCharts() {
   drawChart($("chCpu"), mon.points.map(p => p.cpu), 0, 100, " %", "--accent");
@@ -614,6 +754,7 @@ async function start() {
   $("device").addEventListener("change", deviceChosen);
   $("applyRestart").addEventListener("click", applyRestart);
   initMon();
+  initWifi();
   setInterval(refresh, 3000);
 }
 $("tokenBtn").addEventListener("click", () => { token = $("token").value; sessionStorage.setItem("pianoToken", token); start(); });
