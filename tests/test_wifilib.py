@@ -164,6 +164,35 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(wifilib.parse_scan('command failed: Resource busy (-16)\n'), [])
 
 
+class HostnameTests(unittest.TestCase):
+    def test_the_number_and_the_suggested_name_come_from_the_wifi_address(self):
+        self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de'), '81DE')
+        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de'), 'piano-81de')
+        self.assertEqual(wifilib.device_number(''), '0000')
+        self.assertEqual(wifilib.ap_ssid('Piano-Setup', 'b8:27:eb:d2:81:de'), 'Piano-Setup-81DE')   # the same number in the setup network
+        self.assertTrue(wifilib.HOSTNAME_RE.match(wifilib.suggested_hostname('b8:27:eb:d2:81:de')))
+
+    def test_apply_hostname_sets_it_fixes_the_hosts_file_and_restarts_avahi(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as d:
+            hosts = os.path.join(d, 'hosts')
+            with open(hosts, 'w') as f:
+                f.write('127.0.0.1\tlocalhost\n127.0.1.1\told-name\n::1 localhost ip6-localhost\n')
+            self.assertEqual(wifilib.apply_hostname('piano-81de', lambda cmd: (calls.append(cmd), (0, ''))[1], hosts), 'piano-81de')
+            with open(hosts) as f:
+                text = f.read()
+        self.assertEqual(text, '127.0.0.1\tlocalhost\n127.0.1.1\tpiano-81de\n::1 localhost ip6-localhost\n')
+        self.assertEqual(calls, [['hostnamectl', 'set-hostname', 'piano-81de'], ['systemctl', 'try-restart', 'avahi-daemon.service']])
+
+    def test_bad_names_and_failures(self):
+        for bad in ('', '-a', 'a-', 'A', 'a b', 'a_b', 'x' * 64, None):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                wifilib.apply_hostname(bad, lambda cmd: (0, ''))
+        with self.assertRaises(OSError):
+            wifilib.apply_hostname('ok', lambda cmd: (1, 'Access denied'), '/nonexistent/hosts')
+        self.assertEqual(wifilib.apply_hostname('ok', lambda cmd: (0, ''), '/nonexistent/hosts'), 'ok')    # a missing hosts file is not fatal
+
+
 class AccessPointTests(unittest.TestCase):
     def test_the_name_ends_with_the_adapter_address(self):
         self.assertEqual(wifilib.ap_ssid('Piano-Setup', 'ba:27:eb:d2:81:de'), 'Piano-Setup-81DE')

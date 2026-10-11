@@ -43,6 +43,8 @@ class FakeActions:
         self.gate = None                     # an Event: wait_synth_ready blocks until it is set
         self.pid = 100
         self.monitor_calls = []
+        self.host = 'pi-synth'
+        self.renamed = []
         self.networks = [dict(ssid='Home', signal=-50, secure=True, freq=2437), dict(ssid='Cafe', signal=-70, secure=False, freq=2412)]
         self.wifi_st = dict(mode='client', busy=None, link=dict(ssid='Home', ip='192.168.1.9', signal=-50), hostname='pi-synth', ap=None,
                             scan=self.networks, scanned_at=5, last_result=None, updated=100)
@@ -109,6 +111,14 @@ class FakeActions:
 
     def wifi_mac(self):
         return 'b8:27:eb:d2:81:de'
+
+    def hostname(self):
+        return self.host
+
+    def set_hostname(self, name):
+        self.renamed.append(name)
+        self.host = name
+        return name
 
 
 class ServerCase(unittest.TestCase):
@@ -562,6 +572,51 @@ class WifiApiTests(ServerCase):
         a.wpa_conf = '/nonexistent/wpa.conf'
         self.assertIsNone(a.wifi_status())
         self.assertEqual(a.wifi_saved(), [])
+
+
+class DeviceNameTests(ServerCase):
+    def test_the_state_tells_the_name_and_the_number_of_the_device(self):
+        self.start()
+        r = self.jcall('/api/state')[1]
+        self.assertEqual(r['hostname'], 'pi-synth')
+        self.assertEqual(r['device'], dict(number='81DE', suggested='piano-81de'))
+
+    def test_rename_stores_a_clean_name_and_the_state_follows(self):
+        self.start()
+        code, r = self.jcall('/api/device', {'name': '  Piano-Kitchen '})
+        self.assertEqual((code, r), (200, dict(hostname='piano-kitchen')))
+        self.assertEqual(self.actions.renamed, ['piano-kitchen'])
+        self.assertEqual(self.jcall('/api/state')[1]['hostname'], 'piano-kitchen')
+
+    def test_bad_names_are_refused_and_nothing_is_changed(self):
+        self.start()
+        for bad in ('', ' ', '-x', 'x-', 'a b', 'a_b', 'a.b', 'пианино', 'x' * 64, 'a;reboot', '$(id)', '../x', None, 5, ['a']):
+            with self.subTest(bad):
+                self.assertEqual(self.jcall('/api/device', {'name': bad})[0], 400)
+        for bad in ([], 'x', {}):
+            self.assertEqual(self.jcall('/api/device', bad)[0], 400)
+        self.assertEqual(self.actions.renamed, [])
+        self.assertEqual(self.jcall('/api/device', {'name': 'a' * 63})[0], 200)               # the longest allowed
+
+    def test_the_token_protects_renaming(self):
+        self.start(CONF + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/device', {'name': 'x'})[0], 401)
+        self.assertEqual(self.actions.renamed, [])
+
+    def test_the_real_action_runs_hostnamectl_and_keeps_the_hosts_file_when_it_cannot_write_it(self):
+        calls = []
+        real = web.subprocess.run
+
+        class R:
+            returncode, stdout, stderr = 0, '', ''
+        web.subprocess.run = lambda cmd, *a, **kw: (calls.append(cmd), R())[1]
+        self.addCleanup(setattr, web.subprocess, 'run', real)
+        web.Actions().set_hostname('piano-test')
+        self.assertEqual(calls[0], ['hostnamectl', 'set-hostname', 'piano-test'])
+        self.assertIn(['systemctl', 'try-restart', 'avahi-daemon.service'], calls)
+        R.returncode, R.stderr = 1, 'Access denied'
+        with self.assertRaises(OSError):
+            web.Actions().set_hostname('piano-test')
 
 
 class QrApiTests(ServerCase):

@@ -32,7 +32,7 @@ PAGE = """<!doctype html>
   @media print {{ body {{ margin: 8mm; }} .noprint {{ display: none; }} }}
 </style></head><body>
 <h1>Piano module: Wi-Fi setup / Настройка Wi-Fi</h1>
-<p class="sub">Network <b>{ssid}</b> &middot; password <b>{password}</b></p>
+<p class="sub">Device <b>&#8470; {number}</b> &middot; network <b>{ssid}</b> &middot; password <b>{password}</b></p>
 <div class="codes">
   <div class="code"><img alt="Join the network" src="data:image/png;base64,{join_png}">
     <b>1. Join the network / Подключитесь к сети</b><span>{ssid}</span></div>
@@ -63,6 +63,7 @@ def main():
     wifilib.validate_ssid(ssid)
     wifilib.validate_passphrase(args.password)
     page_url = 'http://%s:%d/#/wifi' % (args.address, args.port)
+    number = wifilib.device_number(args.mac) if args.mac else (ssid.rsplit('-', 1)[-1] if ssid.rsplit('-', 1)[-1].isalnum() else '')
     codes = {'join-wifi': qrlib.wifi_text(ssid, args.password), 'open-page': page_url}
     os.makedirs(args.out, exist_ok=True)
     import base64
@@ -77,9 +78,9 @@ def main():
             f.write(qrlib.to_svg(matrix))
     sheet = os.path.join(args.out, 'setup-codes-%s.html' % ssid)
     with open(sheet, 'w', encoding='utf-8') as f:
-        f.write(PAGE.format(ssid=html.escape(ssid), password=html.escape(args.password), page_url=html.escape(page_url),
+        f.write(PAGE.format(number=html.escape(number), ssid=html.escape(ssid), password=html.escape(args.password), page_url=html.escape(page_url),
                             join_png=images['join-wifi'], page_png=images['open-page']))
-    print('Network:', ssid, '| password:', args.password)
+    print('Device number:', number, '| network:', ssid, '| password:', args.password)
     print('Join code text :', codes['join-wifi'])
     print('Page code text :', page_url)
     for name in sorted(os.listdir(args.out)):

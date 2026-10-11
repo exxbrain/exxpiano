@@ -192,10 +192,21 @@ def parse_scan(text):
 
 
 # ---- access point
+GENERIC_HOSTNAMES = ('dietpi', 'raspberrypi', 'raspberry', 'piano', 'debian', 'localhost', 'pi')
+
+
+def device_number(mac):
+    """The number of the device: the last four hex digits of its Wi-Fi address (also the end of the setup network's name)."""
+    return re.sub(r'[^0-9A-Fa-f]', '', mac or '')[-4:].upper() or '0000'
+
+
+def suggested_hostname(mac):
+    return 'piano-' + device_number(mac).lower()
+
+
 def ap_ssid(prefix, mac):
     """`Piano-Setup-AB12`: the prefix and the last four hex digits of the adapter's address."""
-    tail = re.sub(r'[^0-9A-Fa-f]', '', mac or '')[-4:].upper() or '0000'
-    return ('%s-%s' % (prefix or 'Piano-Setup', tail))[:SSID_MAX_BYTES]
+    return ('%s-%s' % (prefix or 'Piano-Setup', device_number(mac)))[:SSID_MAX_BYTES]
 
 
 def setup_credentials(conf, mac):
@@ -233,6 +244,32 @@ def dnsmasq_conf(interface, run_dir, address=AP_ADDRESS):
         'dhcp-range=%s.10,%s.60,255.255.255.0,2h' % (base, base), 'dhcp-option=3,' + address, 'dhcp-option=6,' + address,
         'address=/#/' + address, 'pid-file=' + os.path.join(run_dir, 'dnsmasq.pid'), 'dhcp-leasefile=' + os.path.join(run_dir, 'dnsmasq.leases'), '']
     )
+
+
+HOSTNAME_RE = re.compile(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$')
+
+
+def apply_hostname(name, run, hosts_path='/etc/hosts'):
+    """Set the network name: hostnamectl, the 127.0.1.1 line of the hosts file, a restart of avahi (it advertises name.local).
+    `run(cmd)` returns (returncode, text). Raises ValueError for a bad name and OSError when hostnamectl fails."""
+    if not isinstance(name, str) or not HOSTNAME_RE.match(name):
+        raise ValueError('use lowercase letters, digits and hyphens (1 to 63 characters, no hyphen at the ends)')
+    rc, out = run(['hostnamectl', 'set-hostname', name])
+    if rc != 0:
+        raise OSError((out or 'hostnamectl failed').strip()[-200:])
+    try:
+        with open(hosts_path, encoding='utf-8') as f:
+            lines = f.read().split('\n')
+        lines = [l for l in lines if not re.match(r'^127\.0\.1\.1\s', l)]
+        while lines and lines[-1] == '':
+            lines.pop()
+        lines.insert(1 if lines else 0, '127.0.1.1\t%s' % name)
+        write_secret(hosts_path, '\n'.join(lines) + '\n')
+        os.chmod(hosts_path, 0o644)
+    except OSError:
+        pass                                         # the name is set; a missing hosts line only slows sudo down
+    run(['systemctl', 'try-restart', 'avahi-daemon.service'])
+    return name
 
 
 # ---- the exchange between the web page and the supervisor (files in /run/piano-wifi, root only)

@@ -4,6 +4,7 @@
   piano-wifi.py            run the supervisor (the systemd service does this)
   piano-wifi.py status     print what the supervisor says
   piano-wifi.py scan       scan now (client mode only)
+  piano-wifi.py ensure-name give a device that still has a generic name (dietpi, raspberrypi ...) the unique name piano-<number>
   piano-wifi.py ap-test N  start the access point for N seconds, then go back to the normal network by itself
 
 The supervisor is the only process that touches wlan0. The web page asks it for things through files in /run/piano-wifi
@@ -460,6 +461,17 @@ def main(argv=None):
     if cmd == 'scan':
         for n in System().scan():
             print('%4d dBm  %-6s %s' % (n['signal'], 'secure' if n['secure'] else 'open', n['ssid']))
+        return 0
+    if cmd == 'ensure-name':
+        system = System()
+        current = system.hostname().lower()
+        mac = system.mac()
+        if current in wifilib.GENERIC_HOSTNAMES and mac:
+            name = wifilib.suggested_hostname(mac)
+            wifilib.apply_hostname(name, system.run)
+            print('The device is now called %s (it was %s)' % (name, current))
+        else:
+            print('The name %s is kept' % current)
         return 0
     if cmd == 'ap-test':
         seconds = int(argv[1]) if len(argv) > 1 else 120

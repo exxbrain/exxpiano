@@ -28,6 +28,10 @@ if [ -n "$missing" ]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y $missing || { echo "Could not install:$missing (check the internet connection)"; exit 1; }
   for p in $missing; do dpkg -s "$p" >/dev/null 2>&1 || { echo "Dependency missing: $p"; exit 1; }; done
 fi
+# a name that survives a change of address: http://<hostname>.local:8080/ (optional: the upgrade goes on without it)
+if ! dpkg -s avahi-daemon >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y avahi-daemon >/dev/null 2>&1 && echo "avahi-daemon installed: this device is now reachable as $(hostname).local" || echo "(avahi-daemon could not be installed: the page stays reachable by its address)"
+fi
 # the setup access point is started by piano-wifi: the packages' own services would get in the way
 for dep in hostapd dnsmasq; do systemctl disable --now "$dep" >/dev/null 2>&1 || true; done
 

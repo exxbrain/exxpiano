@@ -1,5 +1,7 @@
 """Tests for pi/piano-wifi.py: the supervisor's state machine on a fake system (no radio, no root), the system wrapper with a fake command runner."""
+import contextlib
 import importlib.util
+import io
 import os
 import re
 import sys
@@ -507,6 +509,47 @@ class ConfigTests(unittest.TestCase):
                          ('My-Piano', 'much-better-secret', 11, 5, 150, False, 9090))
         self.assertEqual(pw.config_from_env({'WIFI_AP_PASSWORD': 'short'})['ap_password'], 'pianosetup')    # an unusable password is not used
         self.assertEqual(pw.config_from_env({'WIFI_AP_CHANNEL': '3'})['channel'], 6)                       # only 1, 6, 11
+
+
+class EnsureNameTests(unittest.TestCase):
+    def run_cli(self, hostname, mac='b8:27:eb:d2:81:de'):
+        calls = []
+
+        class FakeSystem(pw.System):
+            def __init__(self):
+                super().__init__('wlan0', '/tmp/none', '/tmp/none.conf', lambda cmd, timeout=15: (calls.append(cmd), (0, ''))[1])
+
+            def hostname(self):
+                return hostname
+
+            def mac(self):
+                return mac
+        real = pw.System
+        pw.System = FakeSystem
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = pw.main(['ensure-name'])
+        finally:
+            pw.System = real
+        return code, out.getvalue(), calls
+
+    def test_a_generic_name_gets_the_unique_one(self):
+        for generic in ('DietPi', 'raspberrypi', 'piano', 'localhost'):
+            code, out, calls = self.run_cli(generic)
+            self.assertEqual(code, 0)
+            self.assertIn(['hostnamectl', 'set-hostname', 'piano-81de'], calls)
+            self.assertIn('piano-81de', out)
+
+    def test_a_chosen_name_is_kept(self):
+        for chosen in ('pi-synth', 'kitchen-piano', 'piano-81de'):
+            code, out, calls = self.run_cli(chosen)
+            self.assertEqual(calls, [])
+            self.assertIn('kept', out)
+
+    def test_without_a_wifi_adapter_nothing_is_changed(self):
+        code, out, calls = self.run_cli('dietpi', mac='')
+        self.assertEqual(calls, [])
 
 
 class ExchangeTests(unittest.TestCase):

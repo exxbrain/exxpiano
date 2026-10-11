@@ -7,6 +7,7 @@
   POST /api/restart        restart piano-synth (needed after changing audio output / buffer / reverb / polyphony)
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
   GET  /api/wifi           Wi-Fi: link, saved networks, scan results, access point (the setup mode), result of the last change
+  POST /api/device         {"name": "piano-kitchen"}  - rename the device (its network name, http://<name>.local:8080/); useful with several devices
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
   GET  /api/qr             ?kind=join|setup|page  - {text, svg}: a QR code to join the setup network, to open its page, to open this page
   GET  /api/monitor        ?since=<ms>  - CPU, temperature, frequency, memory, throttling, load of the piano services, chart points since <ms>
@@ -18,6 +19,7 @@ import hmac
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -34,6 +36,7 @@ import wifilib
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 MAX_BODY = 4096
+HOSTNAME_RE = wifilib.HOSTNAME_RE
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
 
 class Actions:
@@ -160,6 +163,19 @@ class Actions:
 
     def wifi_request(self, request):
         return wifilib.post_request(self.wifi_run_dir, request)
+
+    def hostname(self):
+        return socket.gethostname()
+
+    def set_hostname(self, name):
+        def run(cmd):
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                return r.returncode, r.stdout + r.stderr
+            except (OSError, subprocess.SubprocessError) as exc:
+                return 127, str(exc)
+        wifilib.apply_hostname(name, run)
+        return socket.gethostname()
 
     def wifi_mac(self):
         try:
@@ -334,6 +350,7 @@ class App:
         return dict(
             banks=self.banks_state(),
             version=a.version(),
+            hostname=a.hostname(), device=self.device_info(),
             fluidsynth=a.fluidsynth_version(),
             settings=pianoconf.get_settings(self.conf_path),
             device_profiles=profiles.load(self.devices_path, pianoconf.PER_DEVICE_NAMES),
@@ -433,6 +450,19 @@ class App:
         else:
             raise ValueError('kind must be join, setup or page')
         return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(qrlib.encode(text, 'M')))
+
+    def device_info(self):
+        mac = self.actions.wifi_mac()
+        return dict(number=wifilib.device_number(mac), suggested=wifilib.suggested_hostname(mac))
+
+    def rename(self, body):
+        name = body.get('name') if isinstance(body, dict) else None
+        if not isinstance(name, str):
+            raise ValueError('expected {"name": ...}')
+        name = name.strip().lower()
+        if not HOSTNAME_RE.match(name):
+            raise ValueError('use lowercase letters, digits and hyphens (1 to 63 characters, no hyphen at the ends)')
+        return dict(hostname=self.actions.set_hostname(name))
 
     def monitor(self, query):
         try:
@@ -622,6 +652,8 @@ def make_handler(app):
                     return self._send(200, dict(ok=True))
                 if self.path == '/api/wifi':
                     return self._send(200, app.wifi_action(self._body()))
+                if self.path == '/api/device':
+                    return self._send(200, app.rename(self._body()))
                 if self.path == '/api/bank':
                     body = self._body()
                     if not isinstance(body, dict):

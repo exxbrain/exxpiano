@@ -18,6 +18,8 @@ configure)
                 systemctl disable --now "$dep.service" >/dev/null 2>&1 || true
             fi
         done
+        # a new device with a generic name (dietpi, raspberrypi ...) gets a unique one: piano-<last digits of its Wi-Fi address>; a chosen name is kept
+        python3 /opt/piano-synth/piano-wifi.py ensure-name >/dev/null 2>&1 || true
         systemctl enable piano-synth.service piano-fx.service piano-web.service piano-wifi.service >/dev/null 2>&1 || true
         # the banks the configuration points to (an installation may keep them anywhere), not a fixed place
         conf_value() { sed -n "s/^$1=//p" /etc/piano-synth.conf 2>/dev/null | tail -1 | tr -d '"'; }
