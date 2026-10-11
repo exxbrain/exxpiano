@@ -243,6 +243,7 @@ class App:
         conf = pianoconf.parse_conf(self.conf_path)
         self.token = conf.get('WEB_TOKEN', '')
         self.profile_path = conf.get('PROFILE_FILE') or profiles.DEFAULT_PATH
+        self.devices_path = conf.get('DEVICE_PROFILE_FILE') or os.path.join(os.path.dirname(self.profile_path), 'devices.json')
         self.switcher = Switcher(self)
 
     def spec(self):
@@ -256,6 +257,7 @@ class App:
             version=a.version(),
             fluidsynth=a.fluidsynth_version(),
             settings=pianoconf.get_settings(self.conf_path),
+            device_profiles=profiles.load(self.devices_path, pianoconf.PER_DEVICE_NAMES),
             spec=self.spec(),
             status=dict(synth=a.service_state('piano-synth'), bridge=a.service_state('piano-fx'),
                         output=a.audio_output(), cards=a.cards()),
@@ -274,6 +276,13 @@ class App:
             profiles.save(self.profile_path, key, settings)
         except OSError as exc:
             print('could not remember the settings of %s: %s' % (key, exc), file=sys.stderr)
+
+    def remember_device(self, device, settings):
+        """Store the buffers of an audio interface under its ALSA_DEVICE value (a failure is logged, never fatal)."""
+        try:
+            profiles.save(self.devices_path, device, settings, pianoconf.PER_DEVICE_NAMES)
+        except OSError as exc:
+            print('could not remember the buffers of %s: %s' % (device, exc), file=sys.stderr)
 
     # ---- the piano banks
     def _bank_context(self):
@@ -336,15 +345,35 @@ class App:
         if pair not in usable:
             raise ValueError('no such preset in the current bank, or the mechanics bank shadows it')
 
+    def _with_device_profile(self, body):
+        """Choosing another audio interface: keep the buffers of the old one and, unless the request names buffers itself,
+        bring back the ones this interface was used with."""
+        if not isinstance(body, dict) or 'alsa_device' not in body:
+            return body
+        cur = pianoconf.get_settings(self.conf_path)
+        try:
+            new = pianoconf.validate({'alsa_device': body['alsa_device']})['alsa_device']
+        except ValueError:
+            return body                                    # apply_updates reports it
+        if new == cur['alsa_device']:
+            return body
+        self.remember_device(cur['alsa_device'], {n: cur[n] for n in pianoconf.PER_DEVICE_NAMES})
+        saved = profiles.get(self.devices_path, new, pianoconf.PER_DEVICE_NAMES) or {}
+        merged = {k: v for k, v in saved.items() if k not in body}
+        return dict(merged, **body)
+
     def update(self, body):
         per_bank = isinstance(body, dict) and any(k in pianoconf.PER_BANK_NAMES for k in body)
         if per_bank and self.switcher.busy():
             raise Busy()                                   # the switch is writing these very values
         if isinstance(body, dict):
             self._check_preset(body)
+        body = self._with_device_profile(body)
         settings, scopes = pianoconf.apply_updates(body, self.conf_path)     # ValueError -> 400
         if per_bank:
             self.remember(self.current_key(), {n: settings[n] for n in pianoconf.PER_BANK_NAMES})
+        if isinstance(body, dict) and ('alsa_device' in body or any(k in pianoconf.PER_DEVICE_NAMES for k in body)):
+            self.remember_device(settings['alsa_device'], {n: settings[n] for n in pianoconf.PER_DEVICE_NAMES})
         done = dict(fx='fx' in scopes, gain=None)         # gain: True live, False failed, None unchanged
         if 'gain' in scopes:
             done['gain'] = bool(self.actions.set_gain(settings['gain']))

@@ -38,6 +38,14 @@ class ProfilesTests(unittest.TestCase):
         for name in ('velocity_curve', 'gain', 'hammer_boost', 'piano_prog'):
             self.assertIn(name, pianoconf.PER_BANK_NAMES)
 
+    def test_a_second_store_keeps_only_the_names_it_is_given(self):
+        names = pianoconf.PER_DEVICE_NAMES
+        profiles.save(self.path, 'plughw:CARD=U24', {'usb_period_size': 128, 'gain': 2.0, 'periods': 4}, names)
+        self.assertEqual(profiles.get(self.path, 'plughw:CARD=U24', names), {'usb_period_size': 128, 'periods': 4})
+        self.assertEqual(profiles.load(self.path), {})                  # read as bank settings nothing of it is valid
+        profiles.save(self.path, 'plughw:CARD=U24', {'usb_period_size': 9999}, names)    # out of range: dropped on reading
+        self.assertEqual(profiles.get(self.path, 'plughw:CARD=U24', names), None)
+
     def test_a_missing_file_gives_nothing(self):
         self.assertEqual(profiles.load(self.path), {})
 

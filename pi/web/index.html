@@ -104,7 +104,7 @@
     <div id="mechRows"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="audioCard">
     <h2 data-t="audio">Audio output</h2>
     <p class="hint" data-t="audio_hint">These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).</p>
     <div class="row"><label data-t="device">Output</label><select id="device" style="grid-column:1/3"></select></div>
@@ -130,7 +130,7 @@ const T = {
     sw_failed: "{bank} did not load and the previous bank could not be restored either: check the device.", sw_same: "This bank is already in use.",
     title: "Piano module", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
     volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
-    audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).",
+    audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load). Buffers are remembered for each audio interface.",
     device: "Output", onb_period: "Built-in output buffer (frames)", onb_period_hint: "Default 256. Lower means less delay; raise it if you hear clicks.", onb_periods: "Built-in output buffers", usb_period: "USB buffer (frames)", usb_period_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks.",
     usb_periods: "USB buffers", reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)",
     apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).", token_btn: "Sign in",
@@ -154,7 +154,7 @@ const T = {
     sw_failed: "{bank} не загрузился, и прежний банк восстановить тоже не удалось: проверьте устройство.", sw_same: "Этот банк уже используется.",
     title: "Модуль пианино", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
     volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
-    audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки).",
+    audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки). Буферы запоминаются для каждого звукового интерфейса.",
     device: "Выход", onb_period: "Буфер встроенного выхода (кадры)", onb_period_hint: "По умолчанию 256. Меньше — меньше задержка; увеличьте, если слышны щелчки.", onb_periods: "Число буферов встроенного выхода", usb_period: "Буфер USB (кадры)", usb_period_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.",
     usb_periods: "Число буферов USB", reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)",
     apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/piano-synth.conf).", token_btn: "Войти",
@@ -340,6 +340,16 @@ function renderStatus() {
   else item(tr("output"), null, tr("unknown"));
 }
 
+const BUFFER_FIELDS = ["period_size", "periods", "usb_period_size", "usb_periods"];
+// choosing another interface brings back the buffers it was used with (the server remembers them per interface)
+function deviceChosen() {
+  const saved = (state.device_profiles || {})[$("device").value];
+  if (saved) for (const k of BUFFER_FIELDS) if (saved[k] !== undefined) $(k).value = saved[k];
+  $("applyRestart").disabled = !dirty();
+}
+
+function audioSignature(s) { return JSON.stringify([s.settings.alsa_device, BUFFER_FIELDS.map(k => s.settings[k]), s.settings.reverb, s.settings.polyphony, s.device_profiles, (s.status.cards || []).map(c => c.id)]); }
+
 function dirty() {
   const s = state.settings;
   return $("device").value !== s.alsa_device || +$("reverb").checked !== s.reverb || +$("polyphony").value !== s.polyphony ||
@@ -362,6 +372,7 @@ async function applyRestart() {
                 usb_period_size: +$("usb_period_size").value, usb_periods: +$("usb_periods").value,
                 reverb: $("reverb").checked ? 1 : 0, polyphony: +$("polyphony").value };
     const r = await api("/api/settings", u); Object.assign(state.settings, r.settings);
+    state.device_profiles = Object.assign(state.device_profiles || {}, { [r.settings.alsa_device]: Object.fromEntries(BUFFER_FIELDS.map(k => [k, r.settings[k]])) });
     await api("/api/restart", {});
     $("applyRestart").disabled = true; say(tr("restarting"), "warn");
   } catch (e) { say(tr("err") + ": " + e.message, "err"); }
@@ -372,7 +383,9 @@ async function refresh() {
     const s = await api("/api/state");
     const prev = state.banks, dragging = document.activeElement && document.activeElement.type === "range";
     const bankChanged = prev && (s.banks.current !== prev.current || (prev.switch.state === "switching" && s.banks.switch.state !== "switching"));
-    state.status = s.status; state.banks = s.banks; renderStatus(); renderBanks(false);
+    const audioChanged = audioSignature(s) !== audioSignature(state), editing = $("audioCard").contains(document.activeElement) || dirty();
+    state.status = s.status; state.banks = s.banks; state.device_profiles = s.device_profiles; renderStatus(); renderBanks(false);
+    if (audioChanged && !editing) { Object.assign(state.settings, s.settings); fillAudio(); $("applyRestart").disabled = true; }
     if (bankChanged && !dragging) { state.settings = s.settings; syncSliders(); }
     if (s.banks.switch.state === "switching") setTimeout(refresh, 1500);
   } catch (e) { /* the page keeps working */ }
@@ -390,6 +403,7 @@ async function start() {
   for (const id of SYNTH_FIELDS) {
     $(id).addEventListener("input", () => { $("applyRestart").disabled = !dirty(); });
   }
+  $("device").addEventListener("change", deviceChosen);
   $("applyRestart").addEventListener("click", applyRestart);
   setInterval(refresh, 3000);
 }

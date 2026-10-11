@@ -41,6 +41,10 @@ FX_NAMES = [n for n, s in SETTINGS.items() if s['key'] == 'FX_ARGS']
 # belong to the device and stay the same whichever bank plays.
 PER_BANK_NAMES = ('piano_bank', 'piano_prog', 'velocity_curve', 'gain', 'hammer_boost', 'hammer_exp', 'random', 'res_boost', 'pedal_boost')
 assert all(n in SETTINGS for n in PER_BANK_NAMES)
+# Buffers belong to the audio interface that is in use (the onboard jack and a USB interface need different sizes): remembered per
+# interface, keyed by the ALSA_DEVICE value, in a second file (see profiles.py).
+PER_DEVICE_NAMES = ('period_size', 'periods', 'usb_period_size', 'usb_periods')
+assert all(n in SETTINGS for n in PER_DEVICE_NAMES)
 # Raw keys the server may write itself (never taken from a request as they are): paths of banks it has checked.
 RAW_KEYS = ('PIANO_SF2', 'PIANO_SF2_LAST_GOOD')
 PATH_RE = re.compile(r'^/[^\x00-\x1f"\\$`]{1,300}$')

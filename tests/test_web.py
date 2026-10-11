@@ -357,6 +357,59 @@ class BankWebTests(ServerCase):
         self.assertEqual(self.actions.restarts, 0)
 
 
+class DeviceProfileTests(ServerCase):
+    """The buffers belong to the audio interface: each one gets its own back when it is chosen again."""
+    U24 = 'plughw:CARD=U24'
+
+    def put(self, body):
+        code, r = self.jcall('/api/settings', body)
+        self.assertEqual(code, 200)
+        return r['settings']
+
+    def test_each_interface_brings_its_own_buffers_back(self):
+        self.start()
+        self.put({'alsa_device': self.U24, 'usb_period_size': 128, 'usb_periods': 4})
+        self.put({'alsa_device': 'auto', 'period_size': 64, 'periods': 2})
+        s = self.put({'alsa_device': self.U24})                                  # only the interface is named
+        self.assertEqual((s['usb_period_size'], s['usb_periods']), (128, 4))
+        s = self.put({'alsa_device': 'auto'})
+        self.assertEqual((s['period_size'], s['periods']), (64, 2))
+        self.assertIn('PERIOD_SIZE=64', self.conf_text())
+
+    def test_a_request_that_names_buffers_wins_over_the_remembered_ones(self):
+        self.start()
+        self.put({'alsa_device': self.U24, 'usb_period_size': 128})
+        self.put({'alsa_device': 'auto'})
+        s = self.put({'alsa_device': self.U24, 'usb_period_size': 256})
+        self.assertEqual(s['usb_period_size'], 256)
+        self.assertEqual(self.jcall('/api/state')[1]['device_profiles'][self.U24]['usb_period_size'], 256)
+
+    def test_an_interface_never_used_keeps_the_current_buffers(self):
+        self.start()
+        self.put({'period_size': 128})
+        s = self.put({'alsa_device': 'plughw:CARD=Other'})
+        self.assertEqual(s['period_size'], 128)
+
+    def test_the_state_lists_what_is_remembered_and_the_bank_profiles_stay_apart(self):
+        self.start()
+        self.assertEqual(self.jcall('/api/state')[1]['device_profiles'], {})
+        self.put({'alsa_device': self.U24, 'usb_period_size': 128})
+        remembered = self.jcall('/api/state')[1]['device_profiles']
+        self.assertEqual(sorted(remembered), ['auto', self.U24])
+        self.assertEqual(sorted(remembered[self.U24]), ['period_size', 'periods', 'usb_period_size', 'usb_periods'])
+        self.assertFalse(os.path.exists(self.app.profile_path))                # nothing leaked into the per-bank file
+
+    def test_changes_that_are_not_about_the_interface_remember_nothing(self):
+        self.start()
+        self.put({'gain': 1.5, 'polyphony': 64})
+        self.assertEqual(self.jcall('/api/state')[1]['device_profiles'], {})
+
+    def test_a_bad_interface_is_refused_and_nothing_is_stored(self):
+        self.start()
+        self.assertEqual(self.jcall('/api/settings', {'alsa_device': 'hw:1; rm -rf /'})[0], 400)
+        self.assertEqual(self.jcall('/api/state')[1]['device_profiles'], {})
+
+
 class InstrumentProfileTests(ServerCase):
     """Every bank remembers its own touch, volume, mechanics and preset; switching brings them back."""
 

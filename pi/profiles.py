@@ -11,11 +11,14 @@ import tempfile
 import pianoconf
 
 DEFAULT_PATH = '/var/lib/piano-synth/profiles.json'
+DEVICES_DEFAULT_PATH = '/var/lib/piano-synth/devices.json'
 MAX_BYTES = 256 * 1024
 
 
-def load(path):
-    """{bank key: {setting: value}} with only valid, per-instrument settings. A missing, huge or corrupt file gives {}."""
+def load(path, names=None):
+    """{key: {setting: value}} with only valid settings from `names` (default: the per-instrument ones).
+    A missing, huge or corrupt file gives {}."""
+    names = pianoconf.PER_BANK_NAMES if names is None else names
     try:
         if os.path.getsize(path) > MAX_BYTES:
             return {}
@@ -31,7 +34,7 @@ def load(path):
             continue
         clean = {}
         for name, raw in values.items():
-            if name in pianoconf.PER_BANK_NAMES:
+            if name in names:
                 try:
                     clean[name] = pianoconf._coerce(name, raw)
                 except ValueError:
@@ -41,14 +44,15 @@ def load(path):
     return out
 
 
-def get(path, key):
-    return load(path).get(key)
+def get(path, key, names=None):
+    return load(path, names).get(key)
 
 
-def save(path, key, values):
-    """Remember `values` (a dict of typed settings; only per-instrument names are kept) for the bank called `key`."""
-    data = load(path)
-    data[key] = {n: values[n] for n in pianoconf.PER_BANK_NAMES if n in values}
+def save(path, key, values, names=None):
+    """Remember `values` (a dict of typed settings; only `names` are kept) under `key`: a bank's file name or an audio device."""
+    names = pianoconf.PER_BANK_NAMES if names is None else names
+    data = load(path, names)
+    data[key] = {n: values[n] for n in names if n in values}
     directory = os.path.dirname(os.path.abspath(path))
     os.makedirs(directory, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix='.profiles.', dir=directory)
