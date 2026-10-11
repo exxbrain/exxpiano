@@ -112,6 +112,9 @@ class FakeActions:
     def wifi_mac(self):
         return 'b8:27:eb:d2:81:de'
 
+    def device_serial(self):
+        return '00000000d2f2f1de'
+
     def hostname(self):
         return self.host
 
@@ -588,13 +591,23 @@ class DeviceNameTests(ServerCase):
         self.start()
         r = self.jcall('/api/state')[1]
         self.assertEqual(r['hostname'], 'pi-synth')
-        self.assertEqual(r['device'], dict(number='81DE'))
+        self.assertEqual(r['device'], dict(number='81DE', serial='00000000d2f2f1de', bound=False, bound_serial=None, serial_ok=None, locked=False))
 
     def test_a_configured_number_is_used_everywhere(self):
         self.start(CONF + 'DEVICE_NUMBER=0007\n')
-        self.assertEqual(self.jcall('/api/state')[1]['device'], dict(number='0007'))
+        self.assertEqual(self.jcall('/api/state')[1]['device']['number'], '0007')
         self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'Piano-Setup-0007')
         self.assertEqual(self.jcall('/api/qr?kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0007#/wifi')
+
+    def test_a_card_bound_to_this_board_and_to_another_one(self):
+        self.start(CONF + 'DEVICE_SERIAL=d2f2f1de\n')
+        d = self.jcall('/api/state')[1]['device']
+        self.assertEqual((d['bound'], d['serial_ok'], d['bound_serial'], d['locked']), (True, True, '00000000d2f2f1de', False))
+        self.start(CONF + 'DEVICE_SERIAL=000000001234abcd\nDEVICE_LOCK=1\n')
+        d = self.jcall('/api/state')[1]['device']
+        self.assertEqual((d['bound'], d['serial_ok'], d['locked']), (True, False, True))
+        self.start(CONF + 'DEVICE_SERIAL=nonsense\n')
+        self.assertEqual(self.jcall('/api/state')[1]['device']['bound'], False)
 
     def test_rename_stores_a_clean_name_and_the_state_follows(self):
         self.start()

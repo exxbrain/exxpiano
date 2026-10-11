@@ -111,6 +111,28 @@ class AudioSelectTests(unittest.TestCase):
         self.assertIn('plughw:CARD=First', r.stdout)
 
 
+class DeviceLockTests(unittest.TestCase):
+    """A card made for one board does not start the synthesizer on another (exit 78: systemd must not retry)."""
+
+    def run_script(self, env_extra):
+        with tempfile.TemporaryDirectory() as d:
+            cpuinfo = os.path.join(d, 'cpuinfo')
+            with open(cpuinfo, 'w') as f:
+                f.write('Serial\t\t: 00000000d2f2f1de\n')
+            env = dict(os.environ, PIANO_CPUINFO=cpuinfo, DRY_RUN='1', ASOUND_DIR=d, PIANO_SF2='/x/p.sf2', MECH_SF2='/x/m.sf2', **env_extra)
+            return subprocess.run(['bash', RUN], capture_output=True, text=True, env=env)
+
+    def test_another_board_is_refused_with_78(self):
+        r = self.run_script(dict(DEVICE_SERIAL='000000001234abcd', DEVICE_LOCK='1'))
+        self.assertEqual(r.returncode, 78)
+        self.assertIn('000000001234abcd', r.stderr)
+
+    def test_this_board_and_unlocked_cards_run(self):
+        for extra in (dict(DEVICE_SERIAL='d2f2f1de', DEVICE_LOCK='1'), dict(DEVICE_SERIAL='000000001234abcd'), dict()):
+            with self.subTest(extra):
+                self.assertNotEqual(self.run_script(extra).returncode, 78)
+
+
 class LastGoodBankTests(unittest.TestCase):
     """A missing or damaged piano bank must fall back to the last good one instead of leaving the module silent."""
 

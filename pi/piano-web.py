@@ -29,6 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import banklib
+import deviceid
 import pianoconf
 import profiles
 import qrlib
@@ -177,6 +178,9 @@ class Actions:
                 return 127, str(exc)
         wifilib.apply_hostname(name, run)
         return socket.gethostname()
+
+    def device_serial(self):
+        return deviceid.read_serial()
 
     def wifi_mac(self):
         try:
@@ -454,7 +458,10 @@ class App:
         return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(qrlib.encode(text, 'M')))
 
     def device_info(self):
-        return dict(number=wifilib.device_number(self.actions.wifi_mac(), pianoconf.parse_conf(self.conf_path).get('DEVICE_NUMBER')))
+        conf = pianoconf.parse_conf(self.conf_path)
+        board = deviceid.status(conf.get('DEVICE_SERIAL'), self.actions.device_serial())
+        return dict(number=wifilib.device_number(self.actions.wifi_mac(), conf.get('DEVICE_NUMBER')), serial=board['serial'], bound=board['bound'],
+                    bound_serial=board['bound_serial'], serial_ok=board['ok'], locked=conf.get('DEVICE_LOCK') == '1')
 
     def rename(self, body):
         name = body.get('name') if isinstance(body, dict) else None

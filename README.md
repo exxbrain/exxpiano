@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.9.0                                # -> dist/piano-synth_1.9.0_all.deb
-python3 scripts/build-deb.py --version 1.9.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.9.0_all.deb
+python3 scripts/build-deb.py --version 1.10.0                                # -> dist/piano-synth_1.10.0_all.deb
+python3 scripts/build-deb.py --version 1.10.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.10.0_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.9.0_all.deb ./piano-synth-soundfonts_1.9.0_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.10.0_all.deb ./piano-synth-soundfonts_1.10.0_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.9.0_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.9.0_all.deb && dpkg-deb --contents piano-synth_1.9.0_all.deb`.
+`dpkg-deb --info piano-synth_1.10.0_all.deb && dpkg-deb --contents piano-synth_1.10.0_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -163,7 +163,7 @@ On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bas
 
 **Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
 builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
-and keeps the files as a downloadable artifact; a tag such as `v1.9.0` (it must equal the `VERSION` file) publishes them as a release.
+and keeps the files as a downloadable artifact; a tag such as `v1.10.0` (it must equal the `VERSION` file) publishes them as a release.
 Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
 
 What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
@@ -188,6 +188,8 @@ Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as
 its partitions, which only an image carries. Switch the Pi on with an Ethernet cable plugged in (DietPi's own first-run setup needs the internet once); after that the
 device is `http://piano-<number>.local:8080/` and, with no network, it starts its setup network (see "Connecting to a new Wi-Fi").
 
+- **Tied to a board.** `--serial <the Raspberry Pi's serial>` (from `grep Serial /proc/cpuinfo`, also shown on the Wi-Fi page) binds the card to that board: a red warning on any other
+  one, and with `--lock` the synthesizer does not start there. `--serials boards.csv` makes a card for every board in a list; a board gets one card unless `--force`. Step by step: **[docs/BUILD-IMAGE.md](docs/BUILD-IMAGE.md)**.
 - **Numbers.** `--number auto` takes the next free one; a number that is in the register is refused (`--force` replaces it, the old line stays marked). Look things up with
   `python3 scripts/sd-registry.py list | show 0007 | find ivan | note 0007 "sold 12 Oct"`. The register is a plain CSV (a spreadsheet opens it); it is kept out of git because
   the notes may name customers: back it up.

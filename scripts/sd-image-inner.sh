@@ -4,13 +4,13 @@
 #
 #   sd-image-inner.sh --image IN.img[.xz] --out OUT.img --deb piano-synth_X_all.deb --piano P.sf2 --mech M.sf2 --number 0007 [options]
 #
-# Options: --hostname NAME (default piano-<number>)  --password PW (DietPi's global password)  --ap-password PW  --country RU  --timezone Europe/Moscow
+# Options: --serial S (the board this card is made for: 8-16 hex digits)  --lock (the synthesizer refuses another board)  --hostname NAME (default piano-<number>)  --password PW (DietPi's global password)  --ap-password PW  --country RU  --timezone Europe/Moscow
 #          --locale en_GB.UTF-8  --keyboard us  --extra-mb N (room added to the image)  --workdir DIR  --no-banks  --keep-going
 # The image is NOT started here: nothing can be tried without a Pi. It is checked by reading it back (the last step).
 set -euo pipefail
 
 IMAGE="" OUT="" DEB="" PIANO="" MECH="" NUMBER="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
-KEYBOARD="us" EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work" NO_BANKS=0 NETWORK_IN_CHROOT=1
+KEYBOARD="us" SERIAL="" LOCK=0 EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work" NO_BANKS=0 NETWORK_IN_CHROOT=1
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 die() { echo "sd-image: $*" >&2; exit 1; }
@@ -31,6 +31,8 @@ while [ $# -gt 0 ]; do
     --timezone) TIMEZONE="$2"; shift 2 ;;
     --locale) LOCALE="$2"; shift 2 ;;
     --keyboard) KEYBOARD="$2"; shift 2 ;;
+    --serial) SERIAL="$2"; shift 2 ;;
+    --lock) LOCK=1; shift ;;
     --extra-mb) EXTRA_MB="$2"; shift 2 ;;
     --workdir) WORKDIR="$2"; shift 2 ;;
     --no-banks) NO_BANKS=1; shift ;;
@@ -46,6 +48,9 @@ PASSWORD="${PASSWORD:-${SD_PASSWORD:-}}"; AP_PASSWORD="${AP_PASSWORD:-${SD_AP_PA
 [ -f "$DEB" ] || die "no such package: $DEB"
 [ -n "$OUT" ] || die "--out is required"
 [[ "$NUMBER" =~ ^[0-9A-Za-z]{1,8}$ ]] || die "--number: 1 to 8 letters or digits"
+[ -z "$SERIAL" ] || [[ "$SERIAL" =~ ^[0-9a-fA-F]{8,16}$ ]] || die "--serial: 8 to 16 hex digits (cat /proc/cpuinfo shows the Serial of the board)"
+[ -z "$SERIAL" ] || SERIAL="$(printf '%016s' "$(echo "$SERIAL" | tr A-F a-f)" | tr ' ' 0)"
+[ "$LOCK" = 0 ] || [ -n "$SERIAL" ] || die "--lock needs --serial"
 NUMBER="$(echo "$NUMBER" | tr a-z A-Z)"
 [[ "$NUMBER" =~ ^[0-9]+$ ]] && NUMBER="$(printf '%04d' "$((10#$NUMBER))")"        # 7 -> 0007 (the same rule as sd-registry.py)
 [ -n "$HOSTNAME_NEW" ] || HOSTNAME_NEW="piano-$(echo "$NUMBER" | tr A-Z a-z)"
@@ -139,6 +144,7 @@ say "6/9 The number and the name of the device: $NUMBER, $HOSTNAME_NEW"
 CONF="$MNT/etc/piano-synth.conf"
 set_kv "$CONF" DEVICE_NUMBER "$NUMBER"
 [ -z "$AP_PASSWORD" ] || set_kv "$CONF" WIFI_AP_PASSWORD "$(quote_conf "$AP_PASSWORD")"
+[ -z "$SERIAL" ] || { set_kv "$CONF" DEVICE_SERIAL "$SERIAL"; set_kv "$CONF" DEVICE_LOCK "$LOCK"; }
 echo "$HOSTNAME_NEW" > "$MNT/etc/hostname"
 if grep -q '^127\.0\.1\.1' "$MNT/etc/hosts" 2>/dev/null; then sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME_NEW/" "$MNT/etc/hosts"; else printf '127.0.1.1\t%s\n' "$HOSTNAME_NEW" >> "$MNT/etc/hosts"; fi
 
@@ -174,6 +180,7 @@ check "dnsmasq-base and hostapd are installed" "[ -x '$MNT/usr/sbin/dnsmasq' ] &
 check "avahi is installed" "[ -x '$MNT/usr/sbin/avahi-daemon' ]"
 [ "$NO_BANKS" = 1 ] || check "the banks are in place" "[ -s '$MNT/opt/piano-synth/soundfonts/piano.sf2' ] && [ -s '$MNT/opt/piano-synth/soundfonts/mech.sf2' ]"
 check "the number is in the configuration" "grep -qx 'DEVICE_NUMBER=$NUMBER' '$CONF'"
+[ -z "$SERIAL" ] || check "the card is bound to the board $SERIAL (lock: $LOCK)" "grep -qx 'DEVICE_SERIAL=$SERIAL' '$CONF' && grep -qx 'DEVICE_LOCK=$LOCK' '$CONF'"
 check "the host name is set" "[ \"\$(cat '$MNT/etc/hostname')\" = '$HOSTNAME_NEW' ] && grep -q '$HOSTNAME_NEW' '$MNT/etc/hosts'"
 check "dietpi.txt: automated, host name, no wait for network" "grep -qx 'AUTO_SETUP_AUTOMATED=1' '$DT' && grep -qx 'AUTO_SETUP_NET_HOSTNAME=$HOSTNAME_NEW' '$DT' && grep -qx 'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0' '$DT'"
 check "the first-start script is on the boot partition" "[ -x '$MNT$BOOTDIR/Automation_Custom_Script.sh' ]"
@@ -187,4 +194,4 @@ umount "$MNT$BOOTDIR"; umount "$MNT"
 e2fsck -fy "$ROOT_DEV" >/dev/null || [ $? -le 1 ] || die "the file system check after the changes failed"
 for l in "${LOOPS[@]}"; do losetup -d "$l"; done; LOOPS=()
 mkdir -p "$(dirname "$OUT")"; mv "$DISK" "$OUT"
-echo "Image: $OUT ($(( $(stat -c %s "$OUT") / 1048576 )) MB), number $NUMBER, name $HOSTNAME_NEW${OLD_VERSION:+, DietPi $OLD_VERSION}"
+echo "Image: $OUT ($(( $(stat -c %s "$OUT") / 1048576 )) MB), number $NUMBER, name $HOSTNAME_NEW${SERIAL:+, board $SERIAL}${OLD_VERSION:+, DietPi $OLD_VERSION}"

@@ -14,6 +14,8 @@ LimitRTPRIO=95
 LimitMEMLOCK=infinity
 Restart=always
 RestartSec=2
+# 78: the card was made for another Raspberry Pi (DEVICE_LOCK): retrying would change nothing
+RestartPreventExitStatus=78
 
 [Install]
 WantedBy=multi-user.target

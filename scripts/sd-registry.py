@@ -20,7 +20,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PATH = os.environ.get('PIANO_REGISTRY') or os.path.join(ROOT, 'registry', 'devices.csv')
-COLUMNS = ['number', 'hostname', 'ssid', 'version', 'built_at', 'image', 'image_sha256', 'banks', 'note']
+COLUMNS = ['number', 'hostname', 'ssid', 'version', 'built_at', 'image', 'image_sha256', 'banks', 'note', 'serial', 'locked']
 NUMBER_RE = re.compile(r'^[0-9A-Za-z]{1,8}$')
 
 
@@ -58,6 +58,15 @@ def get(number, path=DEFAULT_PATH):
     number = normalize(number)
     for row in load(path):
         if row['number'] == number:
+            return row
+    return None
+
+
+def find_serial(serial, path=DEFAULT_PATH):
+    """The current registered card for a board (compared by the low 32 bits, the way the device does), or None."""
+    tail = str(serial).strip().lower().zfill(16)[-8:]
+    for row in load(path):
+        if row['serial'] and row['serial'].lower().zfill(16)[-8:] == tail and not row['number'].endswith('~'):
             return row
     return None
 
@@ -106,7 +115,7 @@ def find(text, path=DEFAULT_PATH):
 def format_table(rows):
     if not rows:
         return '(nothing registered yet)'
-    cols = ['number', 'hostname', 'version', 'built_at', 'banks', 'note']
+    cols = ['number', 'hostname', 'serial', 'version', 'built_at', 'banks', 'note']
     width = {c: max(len(c), *(len(r[c]) for r in rows)) for c in cols}
     line = lambda r: '  '.join(r[c].ljust(width[c]) for c in cols).rstrip()
     return '\n'.join([line({c: c for c in cols})] + [line(r) for r in rows])

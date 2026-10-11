@@ -12,6 +12,11 @@
 # For tests: ASOUND_DIR points to a fake /proc/asound, DRY_RUN=1 prints the command instead of running it.
 set -euo pipefail
 
+# a card made for one Raspberry Pi (DEVICE_LOCK=1, see deviceid.py) does not start on another board; 78 tells systemd not to retry
+if [ "${DEVICE_LOCK:-0}" = 1 ] && command -v python3 >/dev/null 2>&1; then
+  python3 "$(dirname "$0")/deviceid.py" check || exit 78
+fi
+
 ASOUND="${ASOUND_DIR:-/proc/asound}"
 ALSA_DEVICE="${ALSA_DEVICE:-auto}"
 PERIOD_SIZE="${PERIOD_SIZE:-64}"

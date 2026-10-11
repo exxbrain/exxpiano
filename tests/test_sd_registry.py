@@ -64,6 +64,13 @@ class RegistryTests(unittest.TestCase):
         with self.assertRaises(reg.RegistryError):
             reg.set_note('9', 'x', self.path)
 
+    def test_a_board_is_found_by_its_low_32_bits_and_replaced_cards_are_ignored(self):
+        reg.add(dict(number='1', serial='00000000d2f2f1de', version='1'), self.path)
+        self.assertEqual(reg.find_serial('D2F2F1DE', self.path)['number'], '0001')
+        self.assertIsNone(reg.find_serial('00000000aaaabbbb', self.path))
+        reg.add(dict(number='1', serial='00000000d2f2f1de', version='2'), self.path, replace=True)
+        self.assertEqual(reg.find_serial('00000000d2f2f1de', self.path)['version'], '2')            # the old line (0001~) does not count
+
     def test_a_damaged_row_does_not_break_reading(self):
         os.makedirs(os.path.dirname(self.path))
         with open(self.path, 'w') as f:

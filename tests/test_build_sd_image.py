@@ -32,6 +32,13 @@ if args[:1] == ['run']:
         host = [a.split(':')[0] for a in args if a.endswith(':/out')][0]
         if os.environ.get('FAKE_DOCKER_FAIL_BUILD'):
             sys.exit(1)
+        after = os.environ.get('FAKE_DOCKER_FAIL_AFTER')
+        if after:                                                  # the builds after the first N fail
+            counter = log + '.builds'
+            n = int(open(counter).read()) + 1 if os.path.exists(counter) else 1
+            open(counter, 'w').write(str(n))
+            if n > int(after):
+                sys.exit(1)
         with open(os.path.join(host, os.path.basename(out)), 'wb') as f:
             f.write(b'fake image ' * 1000)
     if 'sd-smoke-test.sh' in ' '.join(args) and os.environ.get('FAKE_DOCKER_FAIL_SMOKE'):
@@ -196,6 +203,91 @@ class BuildTests(Case):
         self.assertEqual(r.returncode, 1)
         self.assertIn('Docker is not running', r.stderr)
         self.assertFalse(os.path.exists(self.registry))
+
+
+class SerialTests(Case):
+    ME = '00000000d2f2f1de'
+
+    def registry_module(self):
+        spec2 = importlib.util.spec_from_file_location('reg2', os.path.join(ROOT, 'scripts', 'sd-registry.py'))
+        reg = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(reg)
+        return reg
+
+    def inner_args(self):
+        build = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])]
+        return [c['args'] for c in build]
+
+    def test_a_card_for_one_board_carries_its_serial_and_the_lock(self):
+        r = self.run_build('--serial', 'D2F2F1DE', '--lock', '--number', 'serial')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        (args,) = self.inner_args()
+        self.assertEqual(args[args.index('--serial') + 1], self.ME)                         # normalised to 16 digits
+        self.assertIn('--lock', args)
+        self.assertEqual(args[args.index('--number') + 1], 'F1DE')                           # the last four digits of the serial
+        row = self.registry_module().get('F1DE', self.registry)
+        self.assertEqual((row['serial'], row['locked']), (self.ME, 'yes'))
+        with open(os.path.join(self.out, 'F1DE', 'README-F1DE.txt'), encoding='utf-8') as f:
+            text = f.read()
+        self.assertIn(self.ME, text)
+        self.assertIn('refuses another board', text)
+
+    def test_without_the_lock_only_the_serial_is_written(self):
+        self.run_build('--serial', self.ME)
+        (args,) = self.inner_args()
+        self.assertIn('--serial', args)
+        self.assertNotIn('--lock', args)
+        self.assertEqual(self.registry_module().get('1', self.registry)['locked'], '')
+
+    def test_bad_serials_and_a_lock_without_a_serial_are_refused(self):
+        for extra, text in ((('--serial', 'nonsense'), 'hex digits'), (('--lock',), 'needs --serial'), (('--serial', self.ME, '--serials', 'x.csv'), 'not both'),
+                            (('--number', 'serial'), 'needs --serial')):
+            with self.subTest(extra):
+                r = self.run_build('--dry-run', *extra)
+                self.assertEqual(r.returncode, 1)
+                self.assertIn(text, r.stderr)
+
+    def test_a_board_gets_one_card_unless_forced(self):
+        self.assertEqual(self.run_build('--serial', self.ME).returncode, 0)
+        r = self.run_build('--serial', 'D2F2F1DE')                                           # the same board, written differently
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('already has a card', r.stderr)
+        self.assertEqual(self.run_build('--serial', self.ME, '--force').returncode, 0)
+
+    def write_list(self, text):
+        path = os.path.join(self.tmp.name, 'boards.csv')
+        with open(path, 'w') as f:
+            f.write(text)
+        return path
+
+    def test_a_list_makes_a_card_per_board_with_numbers_names_and_notes(self):
+        path = self.write_list('# the boards of the first batch\nserial,number,name,note\n00000000d2f2f1de,,,Ivan\n00000000aaaabbbb,0042,piano-kitchen,Olga\n100000001234cdef,,,\n')
+        r = self.run_build('--serials', path, '--lock', '--note', 'batch 1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('All 3 cards are made: 0001, 0042, 0043', r.stdout)
+        reg = self.registry_module()
+        self.assertEqual([(r_['number'], r_['hostname'], r_['note'], r_['locked']) for r_ in reg.load(self.registry)],
+                         [('0001', 'piano-0001', 'Ivan', 'yes'), ('0042', 'piano-kitchen', 'Olga', 'yes'), ('0043', 'piano-0043', 'batch 1', 'yes')])
+        self.assertEqual(len(self.inner_args()), 3)
+
+    def test_a_bad_list_is_refused_before_the_first_card(self):
+        for text, needle in (('serial\n00000000d2f2f1de\n00000000D2F2F1DE\n', 'listed twice'), ('serial\nxyz\n', 'hex digits'), ('number\n7\n', 'columns'),
+                             ('', 'columns'), ('serial,number\n00000000d2f2f1de,7\n00000000aaaabbbb,0007\n', 'twice in this run')):
+            with self.subTest(text):
+                r = self.run_build('--serials', self.write_list(text))
+                self.assertEqual(r.returncode, 1)
+                self.assertIn(needle, r.stderr)
+                self.assertEqual(self.inner_args(), [])
+                self.assertFalse(os.path.exists(self.registry))
+
+    def test_a_failure_in_the_middle_says_which_cards_were_made(self):
+        path = self.write_list('serial\n00000000d2f2f1de\n00000000aaaabbbb\n100000001234cdef\n')
+        r = self.run_build('--serials', path, env=dict(FAKE_DOCKER_FAIL_AFTER='1'))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('could not be made', r.stderr)
+        self.assertIn('made before the failure: 0001', r.stderr)
+        self.assertEqual([row['number'] for row in self.registry_module().load(self.registry)], ['0001'])       # only the finished card is registered
+        self.assertEqual(len(self.inner_args()), 2)                                                             # and the third was not attempted
 
 
 class DownloadTests(unittest.TestCase):
