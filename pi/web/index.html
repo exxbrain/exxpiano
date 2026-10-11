@@ -137,10 +137,8 @@
     <h2 data-t="audio">Audio output</h2>
     <p class="hint" data-t="audio_hint">These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).</p>
     <div class="row"><label data-t="device">Output</label><select id="device" style="grid-column:1/3"></select></div>
-    <div class="row"><label data-t="onb_period">Built-in output buffer (frames)</label><input type="number" id="period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="onb_period_hint">Default 64, the lowest FluidSynth accepts. Raise it if you hear clicks.</span></div>
-    <div class="row"><label data-t="onb_periods">Built-in output buffers</label><input type="number" id="periods" min="2" max="8" style="grid-column:1/3"></div>
-    <div class="row"><label data-t="usb_period">USB buffer (frames)</label><input type="number" id="usb_period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="usb_period_hint">64 is the lowest FluidSynth accepts. Raise it if you hear clicks.</span></div>
-    <div class="row"><label data-t="usb_periods">USB buffers</label><input type="number" id="usb_periods" min="2" max="8" style="grid-column:1/3"></div>
+    <div class="row"><label data-t="buf_size">Buffer (frames)</label><input type="number" id="bufSize" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" id="bufFor"></span><span class="small" data-t="buf_hint">64 is the lowest FluidSynth accepts. Raise it if you hear clicks. The built-in jack rounds the period up by itself: see the real value on the Monitor tab.</span></div>
+    <div class="row"><label data-t="buf_count">Number of buffers</label><input type="number" id="bufCount" min="2" max="8" style="grid-column:1/3"></div>
     <div class="check"><input type="checkbox" id="reverb"><label for="reverb" data-t="reverb">Reverb (more CPU load)</label></div>
     <div class="row"><label data-t="polyphony">Polyphony (voices)</label><input type="number" id="polyphony" min="16" max="256" step="16" style="grid-column:1/3"></div>
     <p><button id="applyRestart" data-t="apply_restart" disabled>Apply and restart synthesizer</button></p>
@@ -195,8 +193,9 @@ const T = {
     title: "Piano module", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
     volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
     audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load). Buffers are remembered for each audio interface.",
-    device: "Output", onb_period: "Built-in output buffer (frames)", onb_period_hint: "Default 64, the lowest FluidSynth accepts. Raise it if you hear clicks.", onb_periods: "Built-in output buffers", usb_period: "USB buffer (frames)", usb_period_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks.",
-    usb_periods: "USB buffers", reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)",
+    device: "Output", buf_size: "Buffer (frames)", buf_count: "Number of buffers", buf_for_usb: "For the USB interface in use; the built-in jack keeps its own.", buf_for_onboard: "For the built-in jack; a USB interface keeps its own.",
+    buf_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks. The built-in jack rounds the period up by itself: see the real value on the Monitor tab.",
+    reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)",
     apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).", token_btn: "Sign in",
     auto: "Automatic (USB card if present, otherwise the jack)", usb: "USB", onboard: "onboard",
     synth: "Synthesizer", bridge: "Mechanics bridge", output: "Output", unknown: "unknown",
@@ -230,8 +229,9 @@ const T = {
     title: "Модуль пианино", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
     volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
     audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки). Буферы запоминаются для каждого звукового интерфейса.",
-    device: "Выход", onb_period: "Буфер встроенного выхода (кадры)", onb_period_hint: "По умолчанию 64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.", onb_periods: "Число буферов встроенного выхода", usb_period: "Буфер USB (кадры)", usb_period_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.",
-    usb_periods: "Число буферов USB", reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)",
+    device: "Выход", buf_size: "Буфер (кадры)", buf_count: "Число буферов", buf_for_usb: "Для выбранного USB-интерфейса; у встроенного выхода свои значения.", buf_for_onboard: "Для встроенного выхода; у USB-интерфейса свои значения.",
+    buf_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки. Встроенный выход сам округляет период вверх: реальное значение видно на вкладке «Монитор».",
+    reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)",
     apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/piano-synth.conf).", token_btn: "Войти",
     auto: "Автоматически (USB-карта, если есть, иначе штатный выход)", usb: "USB", onboard: "штатный",
     synth: "Синтезатор", bridge: "Мост механики", output: "Выход", unknown: "неизвестно",
@@ -260,8 +260,7 @@ const LIVE = {
   mechRows: [["hammer_boost", 0.5], ["hammer_exp", 0.1], ["random", 0.1], ["res_boost", 0.5], ["pedal_boost", 0.5]],
 };
 // settings that need a restart of the synthesizer: the id of the field and of the setting are the same except the output ("device")
-const SYNTH_KEYS = ["alsa_device", "period_size", "periods", "usb_period_size", "usb_periods", "reverb", "polyphony"];
-const SYNTH_FIELDS = ["device", "period_size", "periods", "usb_period_size", "usb_periods", "reverb", "polyphony"];
+const SYNTH_FIELDS = ["device", "bufSize", "bufCount", "reverb", "polyphony"];
 let state = null, token = sessionStorage.getItem("pianoToken") || "";
 const timers = {};
 const showers = {};          // name -> function that refreshes the number next to a slider
@@ -338,7 +337,7 @@ function fillAudio() {
   if (!opts.some(o => o[0] === cur)) opts.push([cur, cur]);
   for (const [v, t] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.append(o); }
   sel.value = cur;
-  for (const k of ["period_size", "periods", "usb_period_size", "usb_periods"]) $(k).value = state.settings[k];
+  fillBuffers(cur, state.settings);
   $("reverb").checked = !!state.settings.reverb;
   $("polyphony").value = state.settings.polyphony;
 }
@@ -415,20 +414,38 @@ function renderStatus() {
   else item(tr("output"), null, tr("unknown"));
 }
 
-const BUFFER_FIELDS = ["period_size", "periods", "usb_period_size", "usb_periods"];
+const BUFFER_KEYS = ["period_size", "periods", "usb_period_size", "usb_periods"];
+// The synthesizer keeps one buffer pair for a USB interface and one for the built-in jack (with "auto" it chooses between them at start);
+// the page shows a single pair for the interface that is selected and writes it to the matching setting.
+function kindOf(device) {
+  const cards = state.status.cards || [];
+  if (device === "auto") {
+    const o = state.status.output;
+    if (o && o.kind) return o.kind;
+    return cards.some(c => c.usb) ? "usb" : "onboard";
+  }
+  const card = cards.find(c => "plughw:CARD=" + c.id === device);
+  return card && card.usb ? "usb" : "onboard";
+}
+const bufferKeys = kind => (kind === "usb" ? ["usb_period_size", "usb_periods"] : ["period_size", "periods"]);
+function fillBuffers(device, values) {
+  const kind = kindOf(device), [size, count] = bufferKeys(kind);
+  $("bufSize").value = values[size]; $("bufCount").value = values[count];
+  $("bufFor").textContent = tr(kind === "usb" ? "buf_for_usb" : "buf_for_onboard");
+}
 // choosing another interface brings back the buffers it was used with (the server remembers them per interface)
 function deviceChosen() {
-  const saved = (state.device_profiles || {})[$("device").value];
-  if (saved) for (const k of BUFFER_FIELDS) if (saved[k] !== undefined) $(k).value = saved[k];
+  const device = $("device").value, saved = (state.device_profiles || {})[device], [size] = bufferKeys(kindOf(device));
+  fillBuffers(device, saved && saved[size] !== undefined ? saved : state.settings);
   $("applyRestart").disabled = !dirty();
 }
 
-function audioSignature(s) { return JSON.stringify([s.settings.alsa_device, BUFFER_FIELDS.map(k => s.settings[k]), s.settings.reverb, s.settings.polyphony, s.device_profiles, (s.status.cards || []).map(c => c.id)]); }
+function audioSignature(s) { return JSON.stringify([s.settings.alsa_device, BUFFER_KEYS.map(k => s.settings[k]), s.settings.reverb, s.settings.polyphony, s.device_profiles, (s.status.cards || []).map(c => c.id)]); }
 
 function dirty() {
   const s = state.settings;
   return $("device").value !== s.alsa_device || +$("reverb").checked !== s.reverb || +$("polyphony").value !== s.polyphony ||
-    ["period_size", "periods", "usb_period_size", "usb_periods"].some(k => +$(k).value !== s[k]);
+    bufferKeys(kindOf($("device").value)).some((k, i) => +$(i ? "bufCount" : "bufSize").value !== s[k]);
 }
 
 async function save(updates) {
@@ -443,11 +460,11 @@ async function save(updates) {
 
 async function applyRestart() {
   try {
-    const u = { alsa_device: $("device").value, period_size: +$("period_size").value, periods: +$("periods").value,
-                usb_period_size: +$("usb_period_size").value, usb_periods: +$("usb_periods").value,
+    const [size, count] = bufferKeys(kindOf($("device").value));
+    const u = { alsa_device: $("device").value, [size]: +$("bufSize").value, [count]: +$("bufCount").value,
                 reverb: $("reverb").checked ? 1 : 0, polyphony: +$("polyphony").value };
     const r = await api("/api/settings", u); Object.assign(state.settings, r.settings);
-    state.device_profiles = Object.assign(state.device_profiles || {}, { [r.settings.alsa_device]: Object.fromEntries(BUFFER_FIELDS.map(k => [k, r.settings[k]])) });
+    state.device_profiles = Object.assign(state.device_profiles || {}, { [r.settings.alsa_device]: Object.fromEntries(BUFFER_KEYS.map(k => [k, r.settings[k]])) });
     await api("/api/restart", {});
     $("applyRestart").disabled = true; say(tr("restarting"), "warn");
   } catch (e) { say(tr("err") + ": " + e.message, "err"); }

@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.5.0                                # -> dist/piano-synth_1.5.0_all.deb
-python3 scripts/build-deb.py --version 1.5.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.5.0_all.deb
+python3 scripts/build-deb.py --version 1.5.1                                # -> dist/piano-synth_1.5.1_all.deb
+python3 scripts/build-deb.py --version 1.5.1 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.5.1_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.5.0_all.deb ./piano-synth-soundfonts_1.5.0_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.5.1_all.deb ./piano-synth-soundfonts_1.5.1_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.5.0_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.5.0_all.deb && dpkg-deb --contents piano-synth_1.5.0_all.deb`.
+`dpkg-deb --info piano-synth_1.5.1_all.deb && dpkg-deb --contents piano-synth_1.5.1_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -163,7 +163,7 @@ On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bas
 
 **Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
 builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
-and keeps the files as a downloadable artifact; a tag such as `v1.5.0` (it must equal the `VERSION` file) publishes them as a release.
+and keeps the files as a downloadable artifact; a tag such as `v1.5.1` (it must equal the `VERSION` file) publishes them as a release.
 Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
 
 What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
@@ -273,7 +273,7 @@ host name on DietPi is shown in your router). The page has:
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web page, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
   chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
-- **Audio output**: the output card, the buffers of the built-in and of the USB output, reverb and polyphony. The buffers are remembered **per audio interface**
+- **Audio output**: the output card, the buffer (size and number) of the selected interface, reverb and polyphony. The buffers are remembered **per audio interface**
   (`/var/lib/piano-synth/devices.json`, keyed by the `ALSA_DEVICE` value): choose another interface and the page fills in the buffers it was
   last used with; an interface never used before keeps the current ones. These need a restart of the synthesizer (~45 s), so they are
   applied with a separate button.
