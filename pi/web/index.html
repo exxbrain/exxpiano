@@ -61,15 +61,25 @@
   .tabs button { flex: 1; background: transparent; color: var(--muted); border: 1px solid var(--line); }
   .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   [hidden] { display: none !important; }
-  .logbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 10px; font-size: .92rem; }
-  .logbar label { display: inline-flex; gap: 6px; align-items: center; }
-  .logbar select { width: auto; padding: 6px 8px; font-size: .92rem; }
-  .logbar button { padding: 6px 12px; font-size: .9rem; }
-  #logBox { height: 58vh; min-height: 260px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
-            padding: 6px 8px; font: .76rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  #logBox div { white-space: pre-wrap; overflow-wrap: anywhere; }
-  #logBox .t, #logBox .u { color: var(--muted); }
-  #logBox .p3 { color: var(--bad); } #logBox .p4 { color: var(--warn); } #logBox .p7 { color: var(--muted); }
+  .thr { font-size: .95rem; }
+  .thr p { margin: 0 0 6px; } .thr p:last-child { margin: 0; }
+  .thr .ok { color: var(--ok); } .thr .warn { color: var(--warn); } .thr .bad { color: var(--bad); font-weight: 600; }
+  .kv { display: grid; grid-template-columns: minmax(8em, 11em) minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: .9rem; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .kv dd.warn { color: var(--warn); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .tile { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+  .tile .k { display: block; color: var(--muted); font-size: .8rem; }
+  .tile b { font-size: 1.35rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tile.ok b { color: var(--ok); } .tile.warn b { color: var(--warn); } .tile.bad b { color: var(--bad); }
+  .tile small { display: block; color: var(--muted); font-size: .78rem; white-space: nowrap; }
+  canvas.chart { width: 100%; max-width: none; height: 96px; aspect-ratio: auto; margin-bottom: 8px; }
+  .chart-title { font-size: .85rem; color: var(--muted); margin: 6px 0 2px; }
+  .bar { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 4.4em; gap: 8px; align-items: center; font-size: .88rem; padding: 3px 0; }
+  .bar i { display: block; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bar i span { display: block; height: 100%; background: var(--accent); }
+  .bar i span.warn { background: var(--warn); } .bar i span.bad { background: var(--bad); }
+  .bar output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
   #bankStatus { min-height: 2.9em; font-size: .9rem; margin: 6px 0 0; }
   #bankStatus.warn { color: var(--warn); } #bankStatus.err { color: var(--bad); } #bankStatus.ok { color: var(--ok); }
 </style>
@@ -91,7 +101,7 @@
 
   <div class="tabs" role="tablist">
     <button id="tabMain" class="on" role="tab" data-t="tab_main">Settings</button>
-    <button id="tabLog" role="tab" data-t="tab_log">Log</button>
+    <button id="tabMon" role="tab" data-t="tab_mon">Monitor</button>
   </div>
 
   <div id="paneMain">
@@ -137,18 +147,26 @@
   </div>
   </div>
 
-  <div id="paneLog" hidden>
+  <div id="paneMon" hidden>
+    <div class="card"><h2 data-t="m_throttle">Power and throttling</h2><div class="thr" id="thr"></div></div>
+    <div class="card"><h2 data-t="a_title">Audio interface</h2><p class="hint" data-t="a_hint">What the driver really negotiated for the stream that is playing now, not what was asked for.</p><div id="mAudio"></div></div>
     <div class="card">
-      <div class="logbar">
-        <label><input type="checkbox" id="lu_synth" checked><span data-t="log_synth">Synthesizer</span></label>
-        <label><input type="checkbox" id="lu_bridge" checked><span data-t="log_bridge">Mechanics</span></label>
-        <label><input type="checkbox" id="lu_web" checked><span data-t="log_web">Web</span></label>
-        <select id="logLevel" aria-label="level"><option value="7" data-t="lvl_all">Everything</option><option value="4" data-t="lvl_warn">Warnings and errors</option><option value="3" data-t="lvl_err">Errors only</option></select>
-        <button class="secondary" id="logPause" data-t="log_pause">Pause</button>
-        <button class="secondary" id="logClear" data-t="log_clear">Clear</button>
+      <div class="tiles">
+        <div class="tile"><span class="k" data-t="m_cpu">CPU</span><b id="mCpu">–</b><small id="mLoad"></small></div>
+        <div class="tile"><span class="k" data-t="m_temp">Temperature</span><b id="mTemp">–</b></div>
+        <div class="tile"><span class="k" data-t="m_freq">Frequency</span><b id="mFreq">–</b><small id="mFreqMax"></small></div>
+        <div class="tile"><span class="k" data-t="m_mem">Memory</span><b id="mMem">–</b><small id="mMemTotal"></small></div>
       </div>
-      <div id="logBox" role="log" aria-live="off"></div>
-      <p class="hint" id="logInfo"></p>
+      <div class="chart-title" data-t="m_chart_cpu">CPU load, last 2.5 minutes</div>
+      <canvas class="chart" id="chCpu"></canvas>
+      <div class="chart-title" data-t="m_chart_temp">Temperature, last 2.5 minutes</div>
+      <canvas class="chart" id="chTemp"></canvas>
+    </div>
+    <div class="card">
+      <h2 data-t="m_cores">Cores</h2><div id="mCores"></div>
+      <h2 style="margin-top:12px" data-t="m_procs">Piano services</h2>
+      <p class="hint" data-t="m_procs_hint">Share of one core; a service with several threads can pass 100 %.</p>
+      <div id="mProcs"></div>
     </div>
   </div>
 </main>
@@ -158,9 +176,17 @@
 "use strict";
 const T = {
   en: {
-    tab_main: "Settings", tab_log: "Log", log_synth: "Synthesizer", log_bridge: "Mechanics", log_web: "Web", lvl_all: "Everything", lvl_warn: "Warnings and errors",
-    lvl_err: "Errors only", log_pause: "Pause", log_resume: "Resume", log_clear: "Clear", log_live: "Live: updates every 1.5 s, newest at the bottom.",
-    log_paused: "Paused.", log_empty: "No entries yet.", log_unavailable: "The log cannot be read on this device.",
+    a_title: "Audio interface", a_hint: "What the driver really negotiated for the stream that is playing now, not what was asked for.",
+    a_none: "No stream is open: the synthesizer is not playing right now.", a_card: "Card", a_state: "State", a_format: "Format", a_channels: "Channels", a_rate: "Sample rate",
+    a_period: "Period", a_buffer: "Buffer (latency)", a_delay: "Queued now", a_clock: "USB clock", a_rates: "Supported rates",
+    a_asked: "Asked for {p} × {n} frames; the driver gave {rp} × {rn}.", a_frames: "{n} frames", a_bit: "{n} bit",
+    tab_main: "Settings", tab_mon: "Monitor", m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
+    m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
+    m_procs_hint: "Share of one core; a service with several threads can pass 100 %.", m_load: "load {a} · {b} · {c}", m_max: "of {n} MHz", m_of: "of {n} MB",
+    m_core: "Core {n}", m_synth: "Synthesizer", m_bridge: "Mechanics", m_web: "Web page", m_na: "unavailable",
+    th_unknown: "The throttling state cannot be read on this device.", th_ok: "No throttling now.", th_now: "Right now: {list}.", th_past: "Since the boot: {list}.",
+    th_clean: "Nothing since the boot.", th_power: "Under-voltage: use a 5 V / 2.5 A supply and a short, thick cable.",
+    th_undervoltage: "under-voltage (weak power supply)", th_freq_capped: "frequency capped", th_throttled: "CPU slowed down", th_soft_limit: "temperature limit reached",
     bank_title: "Piano bank", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
     bank_profile: "Touch, volume and mechanics settings are remembered for each instrument.",
     bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", preset: "Preset",
@@ -185,9 +211,17 @@ const T = {
     s_pedal_boost: ["Pedal noise level", "dB relative to the original.", " dB"],
   },
   ru: {
-    tab_main: "Настройки", tab_log: "Журнал", log_synth: "Синтезатор", log_bridge: "Механика", log_web: "Веб", lvl_all: "Всё", lvl_warn: "Предупреждения и ошибки",
-    lvl_err: "Только ошибки", log_pause: "Пауза", log_resume: "Продолжить", log_clear: "Очистить", log_live: "Онлайн: обновляется каждые 1,5 с, новое внизу.",
-    log_paused: "На паузе.", log_empty: "Записей пока нет.", log_unavailable: "На этом устройстве журнал недоступен.",
+    a_title: "Звуковой интерфейс", a_hint: "Что драйвер на самом деле согласовал для играющего потока, а не то, что запрашивалось.",
+    a_none: "Ни один поток не открыт: синтезатор сейчас не играет.", a_card: "Карта", a_state: "Состояние", a_format: "Формат", a_channels: "Каналы", a_rate: "Частота дискретизации",
+    a_period: "Период", a_buffer: "Буфер (задержка)", a_delay: "В очереди сейчас", a_clock: "Тактирование USB", a_rates: "Поддерживаемые частоты",
+    a_asked: "Запрошено {p} × {n} кадров; драйвер дал {rp} × {rn}.", a_frames: "{n} кадров", a_bit: "{n} бит",
+    tab_main: "Настройки", tab_mon: "Монитор", m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
+    m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
+    m_procs_hint: "Доля одного ядра; служба с несколькими потоками может превысить 100 %.", m_load: "нагрузка {a} · {b} · {c}", m_max: "из {n} МГц", m_of: "из {n} МБ",
+    m_core: "Ядро {n}", m_synth: "Синтезатор", m_bridge: "Механика", m_web: "Веб-страница", m_na: "недоступно",
+    th_unknown: "На этом устройстве состояние троттлинга прочитать нельзя.", th_ok: "Сейчас троттлинга нет.", th_now: "Сейчас: {list}.", th_past: "С момента включения: {list}.",
+    th_clean: "С момента включения ничего не было.", th_power: "Недостаточное напряжение: нужен блок питания 5 В / 2,5 А и короткий толстый кабель.",
+    th_undervoltage: "недостаточное напряжение (слабый блок питания)", th_freq_capped: "частота ограничена", th_throttled: "процессор замедлен", th_soft_limit: "достигнут температурный предел",
     bank_title: "Банк рояля", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
     bank_profile: "Чувствительность, громкость и механика запоминаются для каждого инструмента.",
     bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", preset: "Пресет",
@@ -419,72 +453,120 @@ async function applyRestart() {
   } catch (e) { say(tr("err") + ": " + e.message, "err"); }
 }
 
-// ---- live log (the journal of the three services), a separate tab
-const LOG_UNITS = ["synth", "bridge", "web"], LOG_KEEP = 1000;
-const logs = { cursor: null, items: [], paused: false, busy: false, gen: 0, reset: false };
+// ---- monitor: CPU, temperature, throttling (a separate tab, polled once a second while it is open)
+const MON_POINTS = 150;
+const mon = { points: [], since: 0, busy: false };
+const level = (v, warn, bad) => (v == null ? "" : v >= bad ? "bad" : v >= warn ? "warn" : "ok");
+const pct1 = v => (v == null ? "–" : v.toFixed(0) + " %");
 
-function logTime(ms) { const d = new Date(ms); return d.toTimeString().slice(0, 8) + "." + String(d.getMilliseconds()).padStart(3, "0"); }
-function logNode(e) {
-  const row = document.createElement("div"); row.className = "p" + (e.p <= 3 ? 3 : e.p);
-  const t = document.createElement("span"); t.className = "t"; t.textContent = logTime(e.t) + " ";
-  const u = document.createElement("span"); u.className = "u"; u.textContent = (e.u ? e.u : "?").padEnd(6) + " ";
-  row.append(t, u, document.createTextNode(e.m));        // text only: nothing from the journal is ever read as markup
-  return row;
+function setTile(id, text, cls) { const el = $(id); el.textContent = text; el.parentElement.className = "tile " + (cls || ""); }
+function names(list) { return list.map(n => tr("th_" + n)).join(", "); }
+function renderThrottle(t) {
+  const box = $("thr"); box.textContent = "";
+  const line = (text, cls) => { const p = document.createElement("p"); p.className = cls; p.textContent = text; box.append(p); };
+  if (!t) { line(tr("th_unknown"), "warn"); return; }
+  line(t.now.length ? fmt(tr("th_now"), { list: names(t.now) }) : tr("th_ok"), t.now.length ? "bad" : "ok");
+  line(t.past.length ? fmt(tr("th_past"), { list: names(t.past) }) : tr("th_clean"), t.past.length ? "warn" : "ok");
+  if (t.now.includes("undervoltage") || t.past.includes("undervoltage")) line(tr("th_power"), "warn");
 }
-function logVisible(e) { return e.p <= +$("logLevel").value; }
-function logInfo() { $("logInfo").textContent = logs.paused ? tr("log_paused") : (logs.items.length ? tr("log_live") : tr("log_empty")); }
-function renderLog() {
-  const box = $("logBox"); box.textContent = "";
-  const frag = document.createDocumentFragment();
-  for (const e of logs.items) if (logVisible(e)) frag.append(logNode(e));
-  box.append(frag); box.scrollTop = box.scrollHeight; logInfo();
+function bar(label, v, warn, bad) {
+  const row = document.createElement("div"); row.className = "bar";
+  const l = document.createElement("span"); l.textContent = label;
+  const i = document.createElement("i"), f = document.createElement("span");
+  f.style.width = Math.max(0, Math.min(100, v == null ? 0 : v)) + "%"; f.className = level(v, warn, bad); i.append(f);
+  const o = document.createElement("output"); o.textContent = v == null ? tr("m_na") : v.toFixed(0) + " %";
+  row.append(l, i, o); return row;
 }
-function addLog(entries) {
-  if (!entries.length) return;
-  const box = $("logBox"), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
-  logs.items.push(...entries);
-  if (logs.items.length > LOG_KEEP) logs.items.splice(0, logs.items.length - LOG_KEEP);
-  const frag = document.createDocumentFragment();
-  for (const e of entries) if (logVisible(e)) frag.append(logNode(e));
-  box.append(frag);
-  while (box.childElementCount > LOG_KEEP) box.firstChild.remove();
-  if (atEnd) box.scrollTop = box.scrollHeight;
-  logInfo();
+function drawChart(cv, values, lo, hi, unit, color) {
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (!w || !h) return;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const g = cv.getContext("2d"), css = getComputedStyle(document.documentElement);
+  g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+  g.strokeStyle = css.getPropertyValue("--line"); g.lineWidth = 1;
+  for (const f of [0.25, 0.5, 0.75]) { g.beginPath(); g.moveTo(0, h * f); g.lineTo(w, h * f); g.stroke(); }
+  g.fillStyle = css.getPropertyValue("--muted"); g.font = "11px system-ui, sans-serif";
+  g.fillText(hi + unit, 4, 12); g.fillText(lo + unit, 4, h - 4);
+  const y = v => h - 3 - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * (h - 6);
+  g.strokeStyle = css.getPropertyValue(color); g.lineWidth = 1.6; g.beginPath();
+  let pen = false;
+  values.forEach((v, i) => {
+    if (v == null) { pen = false; return; }
+    const x = w - (values.length - 1 - i) / (MON_POINTS - 1) * w;
+    if (pen) g.lineTo(x, y(v)); else g.moveTo(x, y(v)); pen = true;
+  });
+  g.stroke();
 }
-function logUnits() { return LOG_UNITS.filter(u => $("lu_" + u).checked); }
-function restartLog() { logs.gen++; logs.cursor = null; logs.items = []; logs.reset = false; renderLog(); pollLog(); }
-async function pollLog() {
-  if (logs.busy || logs.paused || $("paneLog").hidden || document.hidden || !logUnits().length) return;
-  logs.busy = true; const gen = logs.gen;
+function renderAudio(list) {
+  const box = $("mAudio"); box.textContent = "";
+  if (!list || !list.length) { const p = document.createElement("p"); p.className = "hint"; p.textContent = tr("a_none"); box.append(p); return; }
+  list.forEach(a => {
+    const dl = document.createElement("dl"); dl.className = "kv";
+    const row = (k, v, cls) => { if (v == null || v === "") return; const dt = document.createElement("dt"), dd = document.createElement("dd");
+      dt.textContent = tr(k); dd.textContent = v; if (cls) dd.className = cls; dl.append(dt, dd); };
+    const ms = v => (v == null ? "" : " · " + v + " ms");
+    row("a_card", [a.id, a.name].filter(Boolean).join(" · ") + " (hw:" + a.card + "," + a.device + ")");
+    row("a_state", a.state);
+    row("a_format", a.format ? a.format + (a.usb && a.usb.bits ? " · " + fmt(tr("a_bit"), { n: a.usb.bits }) : "") : null);
+    row("a_channels", a.channels);
+    row("a_rate", a.rate ? a.rate + " Hz" : null);
+    row("a_period", a.period ? fmt(tr("a_frames"), { n: a.period }) + ms(a.period_ms) : null);
+    row("a_buffer", a.buffer ? fmt(tr("a_frames"), { n: a.buffer }) + ms(a.buffer_ms) : null);
+    row("a_delay", a.delay != null ? fmt(tr("a_frames"), { n: a.delay }) + (a.rate ? " · " + (a.delay * 1000 / a.rate).toFixed(2) + " ms" : "") : null);
+    if (a.usb) { row("a_clock", a.usb.sync); row("a_rates", (a.usb.rates || []).join(", ") + (a.usb.rates && a.usb.rates.length ? " Hz" : "")); }
+    const o = state && state.status && state.status.output;
+    if (o && a.period && o.period && o.period !== a.period)
+      row("a_period", fmt(tr("a_asked"), { p: o.period, n: o.periods, rp: a.period, rn: Math.round(a.buffer / a.period) }), "warn");
+    box.append(dl);
+  });
+}
+function renderMon(n) {
+  renderAudio(n.audio);
+  setTile("mCpu", pct1(n.cpu), level(n.cpu, 70, 90));
+  $("mLoad").textContent = n.load ? fmt(tr("m_load"), { a: n.load[0], b: n.load[1], c: n.load[2] }) : "";
+  setTile("mTemp", n.temp == null ? "–" : n.temp.toFixed(1) + " °C", level(n.temp, 65, 80));
+  setTile("mFreq", n.freq == null ? "–" : n.freq + " MHz", "");          // below the maximum is normal at idle; throttling is reported above
+  $("mFreqMax").textContent = n.freq_max ? fmt(tr("m_max"), { n: n.freq_max }) : "";
+  const m = n.mem, usedPct = m ? m.used / m.total * 100 : null;
+  setTile("mMem", m ? m.used + " MB" : "–", level(usedPct, 80, 92));
+  $("mMemTotal").textContent = m ? fmt(tr("m_of"), { n: m.total }) : "";
+  renderThrottle(n.throttle);
+  const cores = $("mCores"); cores.textContent = "";
+  (n.cores || []).forEach((v, i) => cores.append(bar(fmt(tr("m_core"), { n: i + 1 }), v, 70, 90)));
+  const procs = $("mProcs"); procs.textContent = "";
+  for (const k of ["synth", "bridge", "web"]) procs.append(bar(tr("m_" + k), n.procs ? n.procs[k] : null, 70, 90));
+  renderMonCharts();
+}
+async function pollMon() {
+  if (mon.busy || $("paneMon").hidden || document.hidden) return;
+  mon.busy = true;
   try {
-    const q = new URLSearchParams({ units: logUnits().join(","), limit: logs.cursor ? "300" : "200" });
-    if (logs.cursor) q.set("cursor", logs.cursor);
-    const r = await api("/api/logs?" + q.toString());
-    if (gen !== logs.gen) return;                           // the selection changed while this answer was on its way
-    if (r.error) { logs.cursor = null; logs.reset = true; $("logInfo").textContent = tr("log_unavailable"); return; }
-    if (logs.reset) { logs.items = []; renderLog(); logs.reset = false; }
-    logs.cursor = r.cursor; addLog(r.entries);
-  } catch (e) { /* the next tick tries again */ } finally { logs.busy = false; }
+    const r = await api("/api/monitor?since=" + mon.since);
+    if (r.now.t < mon.since) { mon.points = []; }                       // the device's clock went back: start the charts again
+    mon.points.push(...r.points);
+    if (mon.points.length > MON_POINTS) mon.points.splice(0, mon.points.length - MON_POINTS);
+    mon.since = mon.points.length ? mon.points[mon.points.length - 1].t : 0;
+    renderMon(r.now);
+  } catch (e) { /* the next tick tries again */ } finally { mon.busy = false; }
 }
 function showTab(name) {
-  const log = name === "log";
-  $("paneMain").hidden = log; $("paneLog").hidden = !log;
-  $("tabMain").classList.toggle("on", !log); $("tabLog").classList.toggle("on", log);
+  const m = name === "mon";
+  $("paneMain").hidden = m; $("paneMon").hidden = !m;
+  $("tabMain").classList.toggle("on", !m); $("tabMon").classList.toggle("on", m);
   try { localStorage.setItem("pianoTab", name); } catch (e) { /* private window: the tab is simply not remembered */ }
-  if (log) { logInfo(); pollLog(); }
+  if (m) pollMon();
 }
-function initLog() {
+function initMon() {
   $("tabMain").addEventListener("click", () => showTab("main"));
-  $("tabLog").addEventListener("click", () => showTab("log"));
-  for (const u of LOG_UNITS) $("lu_" + u).addEventListener("change", restartLog);
-  $("logLevel").addEventListener("change", renderLog);
-  $("logPause").addEventListener("click", () => {
-    logs.paused = !logs.paused; $("logPause").textContent = tr(logs.paused ? "log_resume" : "log_pause"); logInfo(); if (!logs.paused) pollLog();
-  });
-  $("logClear").addEventListener("click", () => { logs.items = []; renderLog(); });
-  setInterval(pollLog, 1500);
+  $("tabMon").addEventListener("click", () => showTab("mon"));
+  setInterval(pollMon, 1000);
+  window.addEventListener("resize", () => { if (!$("paneMon").hidden && mon.points.length) renderMonCharts(); });
   let saved = null; try { saved = localStorage.getItem("pianoTab"); } catch (e) { /* ignore */ }
-  if (saved === "log") showTab("log");
+  if (saved === "mon") showTab("mon");
+}
+function renderMonCharts() {
+  drawChart($("chCpu"), mon.points.map(p => p.cpu), 0, 100, " %", "--accent");
+  drawChart($("chTemp"), mon.points.map(p => p.temp), 30, 90, " °", "--warn");
 }
 
 async function refresh() {
@@ -514,7 +596,7 @@ async function start() {
   }
   $("device").addEventListener("change", deviceChosen);
   $("applyRestart").addEventListener("click", applyRestart);
-  initLog();
+  initMon();
   setInterval(refresh, 3000);
 }
 $("tokenBtn").addEventListener("click", () => { token = $("token").value; sessionStorage.setItem("pianoToken", token); start(); });
