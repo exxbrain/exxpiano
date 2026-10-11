@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.6.0                                # -> dist/piano-synth_1.6.0_all.deb
-python3 scripts/build-deb.py --version 1.6.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.6.0_all.deb
+python3 scripts/build-deb.py --version 1.7.0                                # -> dist/piano-synth_1.7.0_all.deb
+python3 scripts/build-deb.py --version 1.7.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.7.0_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.6.0_all.deb ./piano-synth-soundfonts_1.6.0_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.7.0_all.deb ./piano-synth-soundfonts_1.7.0_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.6.0_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.6.0_all.deb && dpkg-deb --contents piano-synth_1.6.0_all.deb`.
+`dpkg-deb --info piano-synth_1.7.0_all.deb && dpkg-deb --contents piano-synth_1.7.0_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -163,7 +163,7 @@ On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bas
 
 **Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
 builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
-and keeps the files as a downloadable artifact; a tag such as `v1.6.0` (it must equal the `VERSION` file) publishes them as a release.
+and keeps the files as a downloadable artifact; a tag such as `v1.7.0` (it must equal the `VERSION` file) publishes them as a release.
 Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
 
 What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
@@ -264,16 +264,18 @@ flash drive is planned (`docs/plans/usb-banks.md`).
 ## Web interface
 
 Open `http://<device>:8080/` from a phone or a computer on the same network (the address is printed by `install.sh`; the default
-host name on DietPi is shown in your router). The page has:
+host name on DietPi is shown in your router). The **menu** (the ☰ button) opens the pages: **Home** (the status of the services, what is playing, the volume, and a
+glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch and mechanics**, **Audio output**, **Monitor** and **Wi-Fi**. An address like
+`http://<device>:8080/#/wifi` opens a page directly (Back works, bookmarks work). The pages have:
 
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
-- **Monitor tab**: live, once a second. Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
+- **Monitor page**: live, once a second. Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web page, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
   chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
-- **Wi-Fi tab**: the connection (network, address, signal), the saved networks (with *Forget*), and **Connect to a network**: pick one from the scan (or type a
+- **Wi-Fi page**: the connection (network, address, signal), the saved networks (with *Forget*), and **Connect to a network**: pick one from the scan (or type a
   hidden network's name), type the password, press *Connect*. The Pi tries the network for up to a minute and keeps the previous settings if it does not work.
   See *Connecting to a new Wi-Fi* below.
 - **Audio output**: the output card, the buffer (size and number) of the selected interface, reverb and polyphony. The buffers are remembered **per audio interface**
@@ -292,21 +294,27 @@ the synthesizer; hardening that is a task for a real product.
 
 When the Pi has **no network** (no Ethernet cable and no Wi-Fi it knows: a new device, a new router, you moved) it starts **its own Wi-Fi network** and waits:
 
-1. On a phone join the network **`Piano-Setup-XXXX`** (XXXX = the last digits of the Pi's Wi-Fi address), password **`pianosetup`**.
-2. The phone shows its "sign in to network" window with the page; if not, open `http://10.42.0.1:8080/`. The **Wi-Fi** tab opens by itself.
+1. On a phone join the network **`Piano-Setup-XXXX`** (XXXX = the last digits of the Pi's Wi-Fi address), password **`pianosetup`**: or **scan the first QR code** (see below).
+2. The phone shows its "sign in to network" window with the page; if not, scan the second QR code or open `http://10.42.0.1:8080/#/wifi`. The **Wi-Fi** page opens by itself.
 3. Pick your home network, type its password, press **Connect**. The setup network disappears; join your own Wi-Fi again and open
    `http://<host name>.local:8080/` (the host name is shown on the page; `avahi-daemon` provides it) or find the address in the router's client list.
 
 If the network or the password is wrong, the Pi puts the previous settings back; in setup mode it starts its setup network again and the page says why it failed.
 Good to know:
 
-- The Pi waits before starting its network: 30 s if it has no saved network, **150 s** if it has some (after a power cut it boots faster than the router).
+- The Pi waits before starting its network: 10 s if it has no saved network, **150 s** if it has some (after a power cut it boots faster than the router).
   With saved networks, an unused setup network is left every 2 minutes to look for them again; a phone connected to it is never thrown out.
 - Plugging in an Ethernet cable closes the setup network. Change the name, the password and the times with `WIFI_AP_SSID`, `WIFI_AP_PASSWORD`, `WIFI_GRACE_*`
   in `/etc/piano-synth.conf`; `WIFI_SETUP=0` turns the feature off. **Change the default password before you give a device to somebody**: it protects the
   Wi-Fi password typed during the setup.
 - The password of the home network is turned into a key before it is saved (as `wpa_passphrase` does) and is never logged.
 - This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the tab says so; use `sudo nmtui` there.
+- **QR codes.** Two codes do the whole job from the phone camera: one joins the setup network, one opens the setup page. The Wi-Fi page shows them (and a
+  third one: this page for a phone on the same network) with a **Print** button; `python3 scripts/make-qr.py --mac <the Pi's Wi-Fi address>` writes PNG, SVG and a
+  sticker page to `build/qr/` for a device you are about to hand over. They are made by the built-in generator `pi/qrlib.py` (no internet, no packages).
+- The setup network starts **10 s** after the Pi finds itself without a network (immediately after you remove the last saved network and no cable is plugged
+  in). The **Start the setup network for 5 minutes** button on the Wi-Fi page does it by hand and the Pi comes back to its network by itself. The only network in use
+  cannot be forgotten while it is the only way to reach the Pi (no cable, no other saved network).
 - Test without risk: `sudo python3 /opt/piano-synth/piano-wifi.py ap-test 120` starts the setup network for 2 minutes and then returns to the normal one by itself.
   (An SSH session over Wi-Fi is cut for that time.)
 

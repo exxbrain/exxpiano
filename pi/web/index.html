@@ -18,8 +18,32 @@
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 760px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 1.25rem; margin: 8px 0 12px; }
-  #ver { display: block; font-size: .8rem; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  h1 { font-size: 1.15rem; margin: 0; }
+  .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg);
+         border-bottom: 1px solid var(--line); }
+  .top h1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button.icon { width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;
+         color: var(--text); border: 1px solid var(--line); }
+  #backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 30; }
+  #drawer { position: fixed; top: 0; bottom: 0; left: 0; width: min(290px, 86vw); background: var(--card); border-right: 1px solid var(--line);
+         z-index: 40; display: flex; flex-direction: column; overflow-y: auto; transform: translateX(-102%); visibility: hidden;
+         transition: transform .2s ease, visibility 0s linear .2s; }
+  #drawer.open { transform: none; visibility: visible; transition: transform .2s ease; }
+  .drawer-head { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .drawer-head b { display: block; font-size: 1.05rem; }
+  .drawer-head small { display: block; color: var(--muted); font-size: .8rem; margin-top: 2px; overflow-wrap: anywhere; }
+  #drawer a { display: block; padding: 13px 18px; color: var(--text); text-decoration: none; border-left: 3px solid transparent; }
+  #drawer a:hover { background: var(--bg); }
+  #drawer a[aria-current=page] { border-left-color: var(--accent); background: var(--bg); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { #drawer, #drawer.open { transition: none; } }
+  a { color: var(--accent); }
+  .linkbtn { display: inline-block; padding: 8px 14px; border: 1px solid var(--accent); border-radius: 8px; text-decoration: none; white-space: nowrap; }
+  .now { display: flex; gap: 12px; align-items: center; }
+  .now .meta { flex: 1; min-width: 0; }
+  .now .meta b { display: block; font-size: 1.1rem; overflow-wrap: anywhere; }
+  .now .meta small { color: var(--muted); display: block; overflow-wrap: anywhere; }
+  .tile b.wrap { font-size: 1rem; white-space: normal; overflow-wrap: anywhere; }
+  .hint.warn { color: var(--warn); }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
   .card h2 { font-size: 1rem; margin: 0 0 4px; }
   .hint { color: var(--muted); font-size: .88rem; margin: 0 0 8px; }
@@ -57,10 +81,18 @@
   .bank .meta small { color: var(--muted); display: block; overflow-wrap: anywhere; }
   .bank .why { color: var(--warn); font-size: .82rem; }
   .badge { background: var(--ok); color: #fff; padding: 2px 10px; border-radius: 999px; font-size: .78rem; white-space: nowrap; }
-  .tabs { display: flex; gap: 8px; margin: 0 0 14px; }
-  .tabs button { flex: 1; background: transparent; color: var(--muted); border: 1px solid var(--line); }
-  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   [hidden] { display: none !important; }
+  .qrs { display: flex; flex-wrap: wrap; gap: 18px; }
+  .qrs figure { margin: 0; width: 220px; max-width: 100%; text-align: center; }
+  .qrs img { width: 100%; background: #fff; border-radius: 6px; image-rendering: crisp-edges; }
+  .qrs figcaption b { display: block; margin-top: 6px; font-size: .95rem; }
+  .qrs figcaption span { display: block; color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+  @media print {
+    .top, #drawer, #backdrop, #msg, #login, main > section:not(#paneWifi), #paneWifi > :not(#qrCard), #qrCard .noprint, #qrCard .hint { display: none !important; }
+    body { background: #fff; color: #000; }
+    #qrCard { border: 0; padding: 0; }
+    .qrs figcaption span { color: #333; }
+  }
   .wnote { font-size: .92rem; margin: 0 0 8px; } .wnote.ok { color: var(--ok); } .wnote.warn { color: var(--warn); } .wnote.bad { color: var(--bad); }
   .wnote b { overflow-wrap: anywhere; }
   .net { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
@@ -94,9 +126,23 @@
 </style>
 </head>
 <body>
+<header class="top">
+  <button id="menuBtn" class="icon" aria-label="Menu" aria-expanded="false" aria-controls="drawer">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+  </button>
+  <h1 id="pageTitle" data-t="nav_home">Home</h1>
+</header>
+<div id="backdrop" hidden></div>
+<nav id="drawer" aria-label="Menu" aria-hidden="true">
+  <div class="drawer-head"><b id="title">Piano module</b><small id="ver"></small></div>
+  <a href="#/home" data-page="home" data-t="nav_home">Home</a>
+  <a href="#/bank" data-page="bank" data-t="nav_bank">Piano bank</a>
+  <a href="#/sound" data-page="sound" data-t="nav_sound">Touch and mechanics</a>
+  <a href="#/audio" data-page="audio" data-t="nav_audio">Audio output</a>
+  <a href="#/mon" data-page="mon" data-t="nav_mon">Monitor</a>
+  <a href="#/wifi" data-page="wifi" data-t="nav_wifi">Wi-Fi</a>
+</nav>
 <main>
-  <h1><span id="title">Piano module</span><span id="ver"></span></h1>
-
   <div class="card" id="login">
     <h2 data-t="token_title">Access token</h2>
     <p class="hint" data-t="token_hint">This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).</p>
@@ -104,17 +150,39 @@
     <p><button id="tokenBtn" data-t="token_btn">Sign in</button></p>
   </div>
 
+
+  <section id="paneHome">
   <div class="card">
     <div class="status" id="status"></div>
   </div>
 
-  <div class="tabs" role="tablist">
-    <button id="tabMain" class="on" role="tab" data-t="tab_main">Settings</button>
-    <button id="tabMon" role="tab" data-t="tab_mon">Monitor</button>
-    <button id="tabWifi" role="tab" data-t="tab_wifi">Wi-Fi</button>
+  <div class="card" id="nowCard">
+    <h2 data-t="home_now">Now playing</h2>
+    <div class="now">
+      <div class="meta"><b id="nowBank">–</b><small id="nowPreset"></small></div>
+      <a class="linkbtn" href="#/bank" data-t="home_change">Change</a>
+    </div>
+    <p class="hint" id="nowStatus" role="status"></p>
   </div>
 
-  <div id="paneMain">
+  <div class="card">
+    <h2 data-t="volume">Volume</h2>
+    <div id="volumeRows"></div>
+  </div>
+
+  <div class="card" id="healthCard">
+    <h2 data-t="home_health">Device</h2>
+    <div class="tiles">
+      <div class="tile"><span class="k" data-t="m_cpu">CPU</span><b id="hCpu">–</b></div>
+      <div class="tile"><span class="k" data-t="m_temp">Temperature</span><b id="hTemp">–</b></div>
+      <div class="tile"><span class="k" data-t="h_power">Power</span><b id="hPower">–</b><small id="hPowerNote"></small></div>
+      <div class="tile"><span class="k" data-t="h_net">Network</span><b id="hNet" class="wrap">–</b><small id="hNetNote"></small></div>
+    </div>
+    <p class="hint"><a href="#/mon" data-t="home_more">Details</a></p>
+  </div>
+  </section>
+
+  <section id="paneBank" hidden>
   <div class="card">
     <h2 data-t="bank_title">Piano bank</h2>
     <p class="hint" id="bankHint"></p>
@@ -123,6 +191,9 @@
     <p id="bankStatus" role="status"></p>
   </div>
 
+  </section>
+
+  <section id="paneSound" hidden>
   <div class="card">
     <h2 data-t="touch">Touch</h2>
     <p class="hint" data-t="touch_hint">How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.</p>
@@ -133,16 +204,14 @@
   </div>
 
   <div class="card">
-    <h2 data-t="volume">Volume</h2>
-    <div id="volumeRows"></div>
-  </div>
-
-  <div class="card">
     <h2 data-t="mech">Piano mechanics</h2>
     <p class="hint" data-t="mech_hint">Hammer, damper, string resonance and pedal noises. Changes apply within a second.</p>
     <div id="mechRows"></div>
   </div>
 
+  </section>
+
+  <section id="paneAudio" hidden>
   <div class="card" id="audioCard">
     <h2 data-t="audio">Audio output</h2>
     <p class="hint" data-t="audio_hint">These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).</p>
@@ -153,10 +222,21 @@
     <div class="row"><label data-t="polyphony">Polyphony (voices)</label><input type="number" id="polyphony" min="16" max="256" step="16" style="grid-column:1/3"></div>
     <p><button id="applyRestart" data-t="apply_restart" disabled>Apply and restart synthesizer</button></p>
   </div>
-  </div>
+  </section>
 
   <div id="paneWifi" hidden>
-    <div class="card"><h2 data-t="w_title">Wi-Fi</h2><div id="wState"></div></div>
+    <div class="card"><h2 data-t="w_title">Wi-Fi</h2><div id="wState"></div>
+      <p id="wSetupRow" hidden><button class="secondary" id="wSetup" data-t="w_setup">Start the setup network for 5 minutes</button></p></div>
+    <div class="card" id="qrCard">
+      <h2 data-t="q_title">Phone setup by QR code</h2>
+      <p class="hint" data-t="q_hint">Scan with the phone camera: the first code joins the Pi's setup network, the second opens this settings page. Print the page as a sticker for the device.</p>
+      <div class="qrs">
+        <figure id="qrJoinBox"><img id="qrJoin" alt=""><figcaption><b data-t="q_join">1. Join the setup network</b><span id="qrJoinText"></span></figcaption></figure>
+        <figure id="qrSetupBox"><img id="qrSetup" alt=""><figcaption><b data-t="q_setup">2. Open the setup page</b><span>http://10.42.0.1:8080/#/wifi</span></figcaption></figure>
+        <figure id="qrPageBox"><img id="qrPage" alt=""><figcaption><b data-t="q_page">Open this page on a phone</b><span id="qrPageText"></span></figcaption></figure>
+      </div>
+      <p class="noprint"><button class="secondary" id="qrPrint" data-t="q_print">Print</button></p>
+    </div>
     <div class="card wform" id="wAdd">
       <h2 data-t="w_add">Connect to a network</h2>
       <p class="hint" data-t="w_add_hint">Choose the network and type its password. The Pi tries it for up to a minute and keeps the previous settings if it does not work.</p>
@@ -203,7 +283,15 @@ const T = {
     a_none: "No stream is open: the synthesizer is not playing right now.", a_card: "Card", a_state: "State", a_format: "Format", a_channels: "Channels", a_rate: "Sample rate",
     a_period: "Period", a_buffer: "Buffer (latency)", a_delay: "Queued now", a_clock: "USB clock", a_rates: "Supported rates",
     a_asked: "Asked for {p} × {n} frames; the driver gave {rp} × {rn}.", a_frames: "{n} frames", a_bit: "{n} bit",
-    tab_wifi: "Wi-Fi", w_title: "Wi-Fi", w_add: "Connect to a network", w_network: "Network", w_name: "Network name", w_password: "Password", w_show: "Show the password",
+    nav_home: "Home", nav_bank: "Piano bank", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", menu: "Menu",
+    home_now: "Now playing", home_change: "Change", home_health: "Device", home_more: "Details", h_power: "Power", h_net: "Network",
+    h_power_ok: "OK", h_power_now: "Problem", h_power_past: "Earlier", h_net_ap: "Setup mode", h_net_none: "No network", h_loading: "Loading {bank}…",
+    w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (Piano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
+    w_setup_started: "Starting the setup network… join it from your phone: its name begins with Piano-Setup.",
+    w_only_way: "in use, the only way to reach the Pi: add another network or plug in a cable first",
+    q_title: "Phone setup by QR code", q_hint: "Scan with the phone camera: the first code joins the Pi's setup network, the second opens this settings page. Print the page as a sticker for the device.",
+    q_join: "1. Join the setup network", q_setup: "2. Open the setup page", q_page: "Open this page on a phone", q_print: "Print",
+    w_title: "Wi-Fi", w_add: "Connect to a network", w_network: "Network", w_name: "Network name", w_password: "Password", w_show: "Show the password",
     w_add_hint: "Choose the network and type its password. The Pi tries it for up to a minute and keeps the previous settings if it does not work.",
     w_connect: "Connect", w_scan: "Scan again", w_saved: "Saved networks", w_forget: "Forget", w_other: "Another network (type the name)…", w_none_saved: "No saved networks.",
     w_open: "open", w_secured: "password", w_hidden: "hidden", w_scanning: "Scanning…", w_cached: "The radio is serving the setup network, so this is the list from before it started.",
@@ -214,7 +302,7 @@ const T = {
     w_ok: "Connected to {ssid}.", w_failed: "Could not connect to {ssid}: {error}.", w_forgot: "Forgot {ssid}.", w_ap_failed: "The setup network could not start.",
     w_nm: "This system uses NetworkManager. Connect with the command sudo nmtui; this page cannot change the network here.",
     w_off: "The Wi-Fi service is not running (systemctl status piano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
-    tab_main: "Settings", tab_mon: "Monitor", m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
+    m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
     m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
     m_procs_hint: "Share of one core; a service with several threads can pass 100 %.", m_load: "load {a} · {b} · {c}", m_max: "of {n} MHz", m_of: "of {n} MB",
     m_core: "Core {n}", m_synth: "Synthesizer", m_bridge: "Mechanics", m_web: "Web page", m_na: "unavailable",
@@ -250,7 +338,15 @@ const T = {
     a_none: "Ни один поток не открыт: синтезатор сейчас не играет.", a_card: "Карта", a_state: "Состояние", a_format: "Формат", a_channels: "Каналы", a_rate: "Частота дискретизации",
     a_period: "Период", a_buffer: "Буфер (задержка)", a_delay: "В очереди сейчас", a_clock: "Тактирование USB", a_rates: "Поддерживаемые частоты",
     a_asked: "Запрошено {p} × {n} кадров; драйвер дал {rp} × {rn}.", a_frames: "{n} кадров", a_bit: "{n} бит",
-    tab_wifi: "Wi-Fi", w_title: "Wi-Fi", w_add: "Подключение к сети", w_network: "Сеть", w_name: "Имя сети", w_password: "Пароль", w_show: "Показать пароль",
+    nav_home: "Главная", nav_bank: "Банк рояля", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", menu: "Меню",
+    home_now: "Сейчас играет", home_change: "Сменить", home_health: "Устройство", home_more: "Подробнее", h_power: "Питание", h_net: "Сеть",
+    h_power_ok: "В порядке", h_power_now: "Проблема", h_power_past: "Было", h_net_ap: "Режим настройки", h_net_none: "Нет сети", h_loading: "Загружается {bank}…",
+    w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (Piano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
+    w_setup_started: "Запускаю сеть настройки… подключитесь к ней с телефона: имя начинается с Piano-Setup.",
+    w_only_way: "используется, единственный путь к Pi: сначала добавьте другую сеть или подключите кабель",
+    q_title: "Настройка с телефона по QR-коду", q_hint: "Наведите камеру телефона: первый код подключает к сети настройки Pi, второй открывает эту страницу. Страницу можно распечатать как наклейку на устройство.",
+    q_join: "1. Подключиться к сети настройки", q_setup: "2. Открыть страницу настройки", q_page: "Открыть эту страницу на телефоне", q_print: "Печать",
+    w_title: "Wi-Fi", w_add: "Подключение к сети", w_network: "Сеть", w_name: "Имя сети", w_password: "Пароль", w_show: "Показать пароль",
     w_add_hint: "Выберите сеть и введите пароль. Pi пробует подключиться до минуты и при неудаче оставляет прежние настройки.",
     w_connect: "Подключить", w_scan: "Обновить список", w_saved: "Сохранённые сети", w_forget: "Забыть", w_other: "Другая сеть (ввести имя)…", w_none_saved: "Сохранённых сетей нет.",
     w_open: "открытая", w_secured: "с паролем", w_hidden: "скрытая", w_scanning: "Поиск сетей…", w_cached: "Радио занято сетью настройки, поэтому показан список, снятый до её запуска.",
@@ -261,7 +357,7 @@ const T = {
     w_ok: "Подключено к {ssid}.", w_failed: "Не удалось подключиться к {ssid}: {error}.", w_forgot: "Сеть {ssid} забыта.", w_ap_failed: "Сеть настройки не запустилась.",
     w_nm: "В этой системе сетью управляет NetworkManager. Подключайтесь командой sudo nmtui; отсюда сеть изменить нельзя.",
     w_off: "Служба Wi-Fi не запущена (systemctl status piano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
-    tab_main: "Настройки", tab_mon: "Монитор", m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
+    m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
     m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
     m_procs_hint: "Доля одного ядра; служба с несколькими потоками может превысить 100 %.", m_load: "нагрузка {a} · {b} · {c}", m_max: "из {n} МГц", m_of: "из {n} МБ",
     m_core: "Ядро {n}", m_synth: "Синтезатор", m_bridge: "Механика", m_web: "Веб-страница", m_na: "недоступно",
@@ -436,6 +532,7 @@ function renderBanks(force) {
   const cls = { switching: "warn", done: "ok", rolled_back: "err", failed: "err" }[sw.state] || "";
   st.className = cls;
   st.textContent = sw.state === "idle" ? "" : fmt(tr("sw_" + sw.state), { bank: sw.bank || "" });
+  renderHomeBank();
 }
 
 async function useBank(id) {
@@ -613,13 +710,71 @@ async function pollMon() {
     renderMon(r.now);
   } catch (e) { /* the next tick tries again */ } finally { mon.busy = false; }
 }
-const TABS = { main: ["tabMain", "paneMain"], mon: ["tabMon", "paneMon"], wifi: ["tabWifi", "paneWifi"] };
-function showTab(name) {
-  if (!TABS[name]) name = "main";
-  for (const [k, [btn, pane]] of Object.entries(TABS)) { $(pane).hidden = k !== name; $(btn).classList.toggle("on", k === name); }
-  try { localStorage.setItem("pianoTab", name); } catch (e) { /* private window: the tab is simply not remembered */ }
+// ---- pages and the menu: the address (#/wifi, #/bank ...) says which page is open, so Back, a bookmark and a link all work
+const PAGES = { home: "paneHome", bank: "paneBank", sound: "paneSound", audio: "paneAudio", mon: "paneMon", wifi: "paneWifi" };
+let currentPage = "home";
+function pageFromHash() { const m = /^#\/?([a-z]+)/.exec(location.hash); return m && PAGES[m[1]] ? m[1] : null; }
+function setDrawer(open) {
+  const was = $("drawer").classList.contains("open");
+  $("drawer").classList.toggle("open", open); $("backdrop").hidden = !open;
+  $("menuBtn").setAttribute("aria-expanded", String(open)); $("drawer").setAttribute("aria-hidden", String(!open));
+  if (open) { const cur = $("drawer").querySelector("a[aria-current=page]") || $("drawer").querySelector("a"); if (cur) cur.focus(); }
+  else if (was) $("menuBtn").focus();
+}
+function showPage(name) {
+  if (!PAGES[name]) name = "home";
+  currentPage = name;
+  for (const [k, id] of Object.entries(PAGES)) $(id).hidden = k !== name;
+  $("pageTitle").textContent = tr("nav_" + name);
+  document.querySelectorAll("#drawer a").forEach(a => { if (a.dataset.page === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  setDrawer(false);
+  window.scrollTo(0, 0);
+  if (name === "home") pollHome(true);
   if (name === "mon") pollMon();
   if (name === "wifi") pollWifi(true);
+  if (name === "sound") drawCurve(state.settings.velocity_curve);
+}
+function initMenu() {
+  $("menuBtn").setAttribute("aria-label", tr("menu"));
+  $("menuBtn").addEventListener("click", () => setDrawer(!$("drawer").classList.contains("open")));
+  $("backdrop").addEventListener("click", () => setDrawer(false));
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && $("drawer").classList.contains("open")) setDrawer(false); });
+  window.addEventListener("hashchange", () => showPage(pageFromHash() || "home"));
+  showPage(pageFromHash() || "home");
+}
+
+// ---- the home page: what matters at a glance
+const home = { busy: false };
+function renderHomeBank() {
+  const b = state && state.banks; if (!b) return;
+  const cur = b.banks.find(x => x.id === b.current);
+  $("nowBank").textContent = cur ? cur.name : (b.external ? b.external.name : "–");
+  const pr = (b.presets || []).find(p => p.bank === b.preset.bank && p.program === b.preset.program);
+  $("nowPreset").textContent = pr ? pr.name : "";
+  const sw = b.switch, st = $("nowStatus");
+  st.className = "hint";
+  st.textContent = sw.state === "idle" ? "" : fmt(tr("sw_" + sw.state), { bank: sw.bank || "" });
+  if (sw.state === "switching") st.classList.add("warn");
+}
+function renderHome(n, w) {
+  setTile("hCpu", pct1(n.cpu), level(n.cpu, 70, 90));
+  setTile("hTemp", n.temp == null ? "–" : n.temp.toFixed(1) + " °C", level(n.temp, 65, 80));
+  const t = n.throttle;
+  if (!t) { setTile("hPower", "–", ""); $("hPowerNote").textContent = ""; }
+  else if (t.now.length) { setTile("hPower", tr("h_power_now"), "bad"); $("hPowerNote").textContent = names(t.now); }
+  else if (t.past.length) { setTile("hPower", tr("h_power_past"), "warn"); $("hPowerNote").textContent = names(t.past); }
+  else { setTile("hPower", tr("h_power_ok"), "ok"); $("hPowerNote").textContent = ""; }
+  if (w && w.supported !== false && w.mode === "ap") { setTile("hNet", tr("h_net_ap"), "warn"); $("hNetNote").textContent = w.ap ? w.ap.ssid : ""; }
+  else if (w && w.link) { setTile("hNet", w.link.ssid, "ok"); $("hNetNote").textContent = w.link.ip || ""; }
+  else if (w) { setTile("hNet", tr("h_net_none"), "warn"); $("hNetNote").textContent = ""; }
+}
+async function pollHome(force) {
+  if (home.busy || currentPage !== "home" || (document.hidden && !force)) return;
+  home.busy = true;
+  try {
+    const [m, w] = await Promise.all([api("/api/monitor?since=99999999999999"), api("/api/wifi").catch(() => null)]);
+    renderHome(m.now, w);
+  } catch (e) { /* the next tick tries again */ } finally { home.busy = false; }
 }
 
 // ---- Wi-Fi: the link, the networks, connecting (the Pi's supervisor piano-wifi makes the changes)
@@ -646,6 +801,7 @@ function renderWifi() {
     else if (r.kind === "ap" && !r.ok) line("bad", tr("w_ap_failed"));
   }
   $("wAdd").hidden = !d.supported;
+  $("wSetupRow").hidden = !(d.supported && d.mode === "client" && !d.busy);
   renderSaved(d);
   if (d.supported && !wifi.scanned) { wifi.scanned = true; fillNetworks(d.networks); }
 }
@@ -659,6 +815,9 @@ function renderSaved(d) {
     const small = document.createElement("small"); small.textContent = [tr(n.secure ? "w_secured" : "w_open"), n.hidden ? tr("w_hidden") : ""].filter(Boolean).join(" · ");
     meta.append(name, small);
     const b = document.createElement("button"); b.className = "secondary"; b.textContent = tr("w_forget");
+    // the connection in use, the only saved network, no cable: forgetting it would leave no way to reach the Pi
+    const onlyWay = d.link && d.link.ssid === n.ssid && d.saved.length === 1 && !d.cable;
+    if (onlyWay) { b.disabled = true; small.textContent += (small.textContent ? " · " : "") + tr("w_only_way"); }
     b.addEventListener("click", () => forgetNetwork(n.ssid));
     row.append(meta, b); box.append(row);
   }
@@ -674,11 +833,28 @@ function fillNetworks(list) {
   netChosen();
 }
 function netChosen() { $("wNameRow").hidden = $("wNet").value !== "\u0000other"; }
+const qr = { loaded: "", busy: false };
+async function loadQr(d) {
+  const mode = d && d.mode === "ap" ? "ap" : "client";
+  if (qr.busy || qr.loaded === mode) return;
+  qr.busy = true;
+  try {
+    const put = async (kind, imgId, textId) => {
+      const r = await api("/api/qr?kind=" + kind);
+      $(imgId).src = "data:image/svg+xml;utf8," + encodeURIComponent(r.svg);
+      $(imgId).alt = r.text;
+      if (textId) $(textId).textContent = kind === "join" ? r.ssid + " · " + r.password : r.text;
+    };
+    await Promise.all([put("join", "qrJoin", "qrJoinText"), put("setup", "qrSetup", null), put("page", "qrPage", "qrPageText")]);
+    $("qrJoinBox").hidden = $("qrSetupBox").hidden = mode === "ap";      // a phone that is already on the setup network needs only the page
+    qr.loaded = mode;
+  } catch (e) { /* the codes are an extra: the page works without them */ } finally { qr.busy = false; }
+}
 async function pollWifi(force) {
   if ((wifi.busy && !force) || $("paneWifi").hidden) return;
   wifi.busy = true;
   try {
-    wifi.data = await api("/api/wifi"); wifi.waiting = false; renderWifi();
+    wifi.data = await api("/api/wifi"); wifi.waiting = false; renderWifi(); loadQr(wifi.data);
   } catch (e) { wifi.data = wifi.data && wifi.waiting ? wifi.data : null; renderWifi(); }
   finally { wifi.busy = false; }
 }
@@ -701,6 +877,12 @@ async function connectNetwork() {
     wifi.waiting = true; setTimeout(() => pollWifi(true), 1200);
   } catch (e) { wText(out, "bad", tr("err") + ": " + e.message); }
 }
+async function startSetup() {
+  const ssid = wifi.data && wifi.data.link ? wifi.data.link.ssid : "";
+  if (!window.confirm(fmt(tr("w_confirm_setup"), { ssid }))) return;
+  try { await api("/api/wifi", { action: "setup" }); wText($("wResult"), "warn", tr("w_setup_started")); setTimeout(() => pollWifi(true), 1500); }
+  catch (e) { wText($("wResult"), "bad", tr("err") + ": " + e.message); }
+}
 async function forgetNetwork(ssid) {
   if (!window.confirm(fmt(tr("w_confirm_forget"), { ssid }))) return;
   try { await api("/api/wifi", { action: "forget", ssid }); setTimeout(() => pollWifi(true), 800); }
@@ -711,15 +893,16 @@ async function initWifi() {
   $("wShow").addEventListener("change", () => { $("wPass").type = $("wShow").checked ? "text" : "password"; });
   $("wConnect").addEventListener("click", connectNetwork);
   $("wScan").addEventListener("click", scanNetworks);
+  $("wSetup").addEventListener("click", startSetup);
+  $("qrPrint").addEventListener("click", () => window.print());
   setInterval(() => pollWifi(false), wifi.waiting ? 1000 : 2500);
-  try { const d = await api("/api/wifi"); if (d.supported && d.mode === "ap") showTab("wifi"); } catch (e) { /* the page works without it */ }
+  // a phone that has just joined the setup network lands on the Wi-Fi page
+  try { const d = await api("/api/wifi"); if (d.supported && d.mode === "ap" && !pageFromHash()) location.hash = "#/wifi"; } catch (e) { /* the page works without it */ }
 }
 function initMon() {
-  for (const [k, [btn]] of Object.entries(TABS)) $(btn).addEventListener("click", () => showTab(k));
   setInterval(pollMon, 1000);
+  setInterval(() => pollHome(false), 3000);
   window.addEventListener("resize", () => { if (!$("paneMon").hidden && mon.points.length) renderMonCharts(); });
-  let saved = null; try { saved = localStorage.getItem("pianoTab"); } catch (e) { /* ignore */ }
-  if (saved && saved !== "main") showTab(saved);
 }
 function renderMonCharts() {
   drawChart($("chCpu"), mon.points.map(p => p.cpu), 0, 100, " %", "--accent");
@@ -755,6 +938,7 @@ async function start() {
   $("applyRestart").addEventListener("click", applyRestart);
   initMon();
   initWifi();
+  initMenu();
   setInterval(refresh, 3000);
 }
 $("tokenBtn").addEventListener("click", () => { token = $("token").value; sessionStorage.setItem("pianoToken", token); start(); });

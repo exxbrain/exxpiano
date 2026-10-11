@@ -107,6 +107,9 @@ class FakeActions:
     def network_manager_active(self):
         return self.nm
 
+    def wifi_mac(self):
+        return 'b8:27:eb:d2:81:de'
+
 
 class ServerCase(unittest.TestCase):
     def start(self, conf=CONF):
@@ -503,8 +506,30 @@ class WifiApiTests(ServerCase):
 
     def test_forget_only_works_for_a_saved_network(self):
         self.start()
+        self.actions.wifi_saved_list.append(dict(ssid='Spare', secure=True, hidden=False, priority=0))
+        self.assertEqual(self.post(dict(action='forget', ssid='Spare'))[0], 200)
+        self.assertEqual(self.actions.wifi_requests, [dict(action='forget', ssid='Spare')])
+
+    def test_the_setup_network_can_be_started_for_a_while(self):
+        self.start()
+        self.assertEqual(self.post(dict(action='setup'))[0], 200)
+        self.assertEqual(self.actions.wifi_requests, [dict(action='ap', seconds=300)])
+        self.actions.wifi_st['mode'] = 'ap'
+        self.assertEqual(self.post(dict(action='setup'))[0], 400)
+        self.actions.wifi_st.update(mode='client', busy='connect')
+        self.assertEqual(self.post(dict(action='setup'))[0], 409)
+
+    def test_the_only_way_in_is_not_forgotten_but_other_networks_are(self):
+        self.start()
+        code, r = self.post(dict(action='forget', ssid='Home'))                          # connected, the only saved one, no cable
+        self.assertEqual(code, 400)
+        self.assertIn('only way', r['error'])
+        self.assertEqual(self.actions.wifi_requests, [])
+        self.actions.wifi_st['cable'] = True
         self.assertEqual(self.post(dict(action='forget', ssid='Home'))[0], 200)
-        self.assertEqual(self.actions.wifi_requests, [dict(action='forget', ssid='Home')])
+        self.actions.wifi_st['cable'] = False
+        self.actions.wifi_saved_list.append(dict(ssid='Spare', secure=True, hidden=False, priority=0))
+        self.assertEqual(self.post(dict(action='forget', ssid='Home'))[0], 200)
 
     def test_a_busy_supervisor_is_not_given_a_second_job(self):
         self.start()
@@ -537,6 +562,46 @@ class WifiApiTests(ServerCase):
         a.wpa_conf = '/nonexistent/wpa.conf'
         self.assertIsNone(a.wifi_status())
         self.assertEqual(a.wifi_saved(), [])
+
+
+class QrApiTests(ServerCase):
+    def qr(self, query, host=None):
+        headers = {'Host': host} if host else {}
+        return self.jcall('/api/qr?' + query, headers=headers)
+
+    def test_join_code_carries_the_name_and_password_of_the_setup_network(self):
+        self.start()
+        code, r = self.qr('kind=join')
+        self.assertEqual(code, 200)
+        self.assertEqual((r['ssid'], r['password']), ('Piano-Setup-81DE', 'pianosetup'))
+        self.assertEqual(r['text'], 'WIFI:T:WPA;S:Piano-Setup-81DE;P:pianosetup;;')
+        self.assertTrue(r['svg'].startswith('<svg') and 'viewBox' in r['svg'])
+
+    def test_a_changed_name_and_password_and_a_bad_password(self):
+        self.start(CONF + 'WIFI_AP_SSID=My-Piano\nWIFI_AP_PASSWORD="much better; secret"\n')
+        self.assertEqual(self.qr('kind=join')[1]['text'], 'WIFI:T:WPA;S:My-Piano-81DE;P:much better\\; secret;;')
+        self.start(CONF + 'WIFI_AP_PASSWORD=short\n')
+        self.assertEqual(self.qr('kind=join')[1]['password'], 'pianosetup')                  # the same fallback the supervisor makes
+
+    def test_setup_page_code_uses_the_web_port(self):
+        self.start(CONF + 'WEB_PORT=9090\n')
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:9090/#/wifi')
+        self.start()
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:8080/#/wifi')
+
+    def test_page_code_is_the_address_the_browser_used_or_the_known_ip(self):
+        self.start()
+        self.assertEqual(self.qr('kind=page', 'pi-synth.local:8080')[1]['text'], 'http://pi-synth.local:8080/#/wifi')
+        self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/#/wifi')
+        r = self.qr('kind=page', 'evil.example/<script>')[1]                                  # an odd Host header is not copied into a code
+        self.assertEqual(r['text'], 'http://192.168.1.9:8080/#/wifi')
+
+    def test_unknown_kinds_and_the_token(self):
+        self.start(CONF + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/qr?kind=join')[0], 401)
+        self.assertEqual(self.call('/api/qr?kind=join', headers={'X-Token': 's3cret'})[0], 200)
+        self.assertEqual(self.call('/api/qr?kind=nonsense', headers={'X-Token': 's3cret'})[0], 400)
+        self.assertEqual(self.call('/api/qr', headers={'X-Token': 's3cret'})[0], 400)
 
 
 class MonitorEndpointTests(ServerCase):

@@ -49,6 +49,7 @@ install -m 644 "$HERE/banklib.py" "$PREFIX/banklib.py"
 install -m 644 "$HERE/profiles.py" "$PREFIX/profiles.py"
 install -m 644 "$HERE/sysmon.py" "$PREFIX/sysmon.py"
 install -m 644 "$HERE/wifilib.py" "$PREFIX/wifilib.py"
+install -m 644 "$HERE/qrlib.py" "$PREFIX/qrlib.py"
 install -m 755 "$HERE/piano-wifi.py" "$PREFIX/piano-wifi.py"
 install -d /var/lib/piano-synth
 install -m 755 "$HERE/piano-web.py" "$PREFIX/piano-web.py"

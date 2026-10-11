@@ -166,6 +166,7 @@ def main():
         ('opt/piano-synth/profiles.py', src('pi', 'profiles.py'), 0o644),
         ('opt/piano-synth/sysmon.py', src('pi', 'sysmon.py'), 0o644),
         ('opt/piano-synth/wifilib.py', src('pi', 'wifilib.py'), 0o644),
+        ('opt/piano-synth/qrlib.py', src('pi', 'qrlib.py'), 0o644),
         ('opt/piano-synth/piano-wifi.py', src('pi', 'piano-wifi.py'), 0o755),
         ('lib/systemd/system/piano-wifi.service', src('pi', 'piano-wifi.service'), 0o644),
         ('opt/piano-synth/piano-web.py', src('pi', 'piano-web.py'), 0o755),

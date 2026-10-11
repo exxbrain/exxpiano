@@ -8,6 +8,7 @@
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
   GET  /api/wifi           Wi-Fi: link, saved networks, scan results, access point (the setup mode), result of the last change
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
+  GET  /api/qr             ?kind=join|setup|page  - {text, svg}: a QR code to join the setup network, to open its page, to open this page
   GET  /api/monitor        ?since=<ms>  - CPU, temperature, frequency, memory, throttling, load of the piano services, chart points since <ms>
 
 Settings that can be changed are whitelisted with ranges in pianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
@@ -27,6 +28,7 @@ from urllib.parse import parse_qs, urlsplit
 import banklib
 import pianoconf
 import profiles
+import qrlib
 import sysmon
 import wifilib
 
@@ -158,6 +160,13 @@ class Actions:
 
     def wifi_request(self, request):
         return wifilib.post_request(self.wifi_run_dir, request)
+
+    def wifi_mac(self):
+        try:
+            with open('/sys/class/net/%s/address' % self.wifi_iface) as f:
+                return f.read().strip()
+        except OSError:
+            return ''
 
     def network_manager_active(self):
         return self._service_state('NetworkManager') == 'active'
@@ -365,7 +374,7 @@ class App:
                         link=None, mode=None, busy=None)
         return dict(supported=True, mode=st.get('mode'), busy=st.get('busy'), link=st.get('link'), hostname=st.get('hostname'), ap=st.get('ap'),
                     saved=saved, networks=st.get('scan') or [], scanned_at=st.get('scanned_at'), last_result=st.get('last_result'),
-                    now=st.get('updated'))
+                    now=st.get('updated'), cable=bool(st.get('cable')))
 
     def wifi_action(self, body):
         if not isinstance(body, dict):
@@ -383,6 +392,10 @@ class App:
             return dict(networks=found, scanned_at=int(time.time()), cached=False)
         if state['busy']:
             raise WifiBusy()
+        if action == 'setup':                                    # the setup network for a while, then back by itself (a test and a way out)
+            if state['mode'] == 'ap':
+                raise ValueError('the setup network is already running')
+            return dict(accepted=True, id=self.actions.wifi_request(dict(action='ap', seconds=300)))
         if action == 'connect':
             ssid = body.get('ssid')
             wifilib.validate_ssid(ssid)
@@ -396,8 +409,30 @@ class App:
             ssid = body.get('ssid')
             if not isinstance(ssid, str) or not any(n['ssid'] == ssid for n in state['saved']):
                 raise ValueError('that network is not saved')
+            link = state.get('link')
+            if link and link.get('ssid') == ssid and len(state['saved']) == 1 and not state.get('cable'):
+                raise ValueError('this is the only way to reach the Pi: connect to another network or plug in a cable first')
             return dict(accepted=True, id=self.actions.wifi_request(dict(action='forget', ssid=ssid)))
         raise ValueError('unknown action')
+
+    def qr(self, query, host=''):
+        """A QR code as text and SVG. join: the setup network (phones offer to join it); setup: the page on that network; page: this page as the
+        asking browser reached it (for a phone on the same network)."""
+        kind = (query.get('kind') or [''])[0]
+        conf = pianoconf.parse_conf(self.conf_path)
+        port = conf.get('WEB_PORT') or '8080'
+        if kind == 'join':
+            ssid, password = wifilib.setup_credentials(conf, self.actions.wifi_mac())
+            text, extra = qrlib.wifi_text(ssid, password), dict(ssid=ssid, password=password)
+        elif kind == 'setup':
+            text, extra = 'http://%s:%s/#/wifi' % (wifilib.AP_ADDRESS, port), {}
+        elif kind == 'page':
+            if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}(:\d{1,5})?', host or ''):
+                host = '%s:%s' % ((self.wifi().get('link') or {}).get('ip') or wifilib.AP_ADDRESS, port)
+            text, extra = 'http://%s/#/wifi' % host, {}
+        else:
+            raise ValueError('kind must be join, setup or page')
+        return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(qrlib.encode(text, 'M')))
 
     def monitor(self, query):
         try:
@@ -512,7 +547,7 @@ def make_handler(app):
 
         def log_request(self, code='-', size='-'):
             # the page polls the state and the monitor all the time: successful polls would only fill the journal with noise
-            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/wifi', '/api/ping'):
+            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/wifi', '/api/qr', '/api/ping'):
                 return
             super().log_request(code, size)
 
@@ -554,6 +589,13 @@ def make_handler(app):
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
                 return self._send(200, dict(app.state(), auth_required=bool(app.token)))
+            if url.path == '/api/qr':
+                if not self._authorised():
+                    return self._send(401, dict(error='token required'))
+                try:
+                    return self._send(200, app.qr(parse_qs(url.query), self.headers.get('Host', '')))
+                except (ValueError, qrlib.QrError) as exc:
+                    return self._send(400, dict(error=str(exc)))
             if url.path == '/api/wifi':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))

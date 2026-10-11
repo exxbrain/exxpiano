@@ -98,6 +98,9 @@ class FakeSystem:
                     self.connected = n['ssid']
                     break
 
+    def has_cable_route(self):
+        return self.cable
+
     def reload_wpa(self):
         self.calls.append('reload_wpa')
 
@@ -169,10 +172,10 @@ class WhenToStartTests(SupervisorCase):
         self.assertNotIn('ap_start', self.system.calls)
 
     def test_with_no_saved_network_the_access_point_starts_after_the_short_grace(self):
-        self.advance(20)
+        self.advance(6)
         self.assertEqual(self.sup.mode, 'client')
-        self.advance(20)
-        self.assertEqual(self.sup.mode, 'ap')
+        self.advance(10)
+        self.assertEqual(self.sup.mode, 'ap')                                          # 10 s of grace by default
         self.assertEqual(self.system.ap_args, ('Piano-Setup-81DE', 'pianosetup', 6, 'GB'))
         self.assertTrue(self.portal.running)
         st = self.status()
@@ -200,15 +203,19 @@ class WhenToStartTests(SupervisorCase):
 
     def test_a_failing_access_point_gives_the_normal_network_back_and_waits_before_trying_again(self):
         self.system.ap_fails = True
-        self.advance(40)
+        self.advance(20)
         self.assertEqual(self.sup.mode, 'client')
         self.assertEqual(self.system.calls.count('ap_start'), 1)
-        self.assertFalse(self.status()['last_result']['ok'])
+        r = self.status()['last_result']
+        self.assertFalse(r['ok'])
+        self.assertIn('hostapd stopped', r['error'])                                    # the reason reaches the page
         self.assertIn('client_up', self.system.calls)
-        self.advance(120)
-        self.assertEqual(self.system.calls.count('ap_start'), 1)                        # not hammering a broken radio
-        self.advance(200)
-        self.assertEqual(self.system.calls.count('ap_start'), 2)
+        self.advance(45)
+        self.assertEqual(self.system.calls.count('ap_start'), 1)
+        self.advance(40)
+        self.assertEqual(self.system.calls.count('ap_start'), 2)                        # soon at first ...
+        self.advance(700)
+        self.assertLessEqual(self.system.calls.count('ap_start'), 6)                    # ... then not hammering a broken radio
 
 
 class ConnectTests(SupervisorCase):
@@ -282,6 +289,41 @@ class ConnectTests(SupervisorCase):
                 self.assertEqual(self.system.read_wpa(), before)
                 self.assertEqual(self.sup.mode, 'ap')
 
+    def test_the_only_way_in_cannot_be_forgotten_without_a_cable_or_another_network(self):
+        self.with_home()
+        self.system.client_up()
+        before = self.system.read_wpa()
+        self.request(action='forget', ssid='Home')
+        self.advance(3)
+        self.assertEqual(self.system.read_wpa(), before)
+        self.assertEqual(self.system.connected, 'Home')
+        r = self.status()['last_result']
+        self.assertEqual((r['ok'], r['kind']), (False, 'forget'))
+        self.assertIn('only way', r['error'])
+        self.system.cable = True                                                           # with a cable it is safe
+        self.request(action='forget', ssid='Home')
+        self.advance(3)
+        self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
+
+    def test_with_a_cable_forgetting_the_last_network_needs_no_setup_network(self):
+        self.with_home()
+        self.system.client_up()
+        self.system.cable = True
+        self.request(action='forget', ssid='Home')
+        self.advance(3)
+        self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
+        self.assertEqual(self.sup.mode, 'client')
+        self.assertNotIn('ap_start', self.system.calls)
+
+    def test_with_no_cable_and_nothing_left_the_setup_network_starts_at_once(self):
+        self.write_wpa(wifilib.add_network(WPA_EMPTY, 'Gone', OTHER_PSK))                 # saved, but not in reach: no link
+        self.request(action='forget', ssid='Gone')
+        self.sup.step()                                                                    # the very step that handles the request
+        self.assertEqual(self.sup.mode, 'ap')
+        self.assertTrue(self.portal.running)
+        self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
+        self.assertEqual(self.status()['last_result']['kind'], 'forget')
+
     def test_forgetting_a_network(self):
         self.with_home()
         self.system.client_up()
@@ -292,9 +334,10 @@ class ConnectTests(SupervisorCase):
         self.assertIn('reload_wpa', self.system.calls)
         self.assertEqual(self.system.connected, 'Home')
         calls = len(self.system.calls)
-        self.request(action='forget', ssid='Home')                                       # the one in use: the Pi leaves it
+        self.write_wpa(wifilib.add_network(self.system.read_wpa(), 'Spare', OTHER_PSK))   # another network exists: the one in use may go
+        self.request(action='forget', ssid='Home')
         self.advance(3)
-        self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
+        self.assertEqual([n['ssid'] for n in wifilib.networks(self.system.read_wpa())], ['Spare'])
         self.assertIn('client_up', self.system.calls[calls:])
         self.assertIsNone(self.system.connected)
 
@@ -455,7 +498,7 @@ class ConfigTests(unittest.TestCase):
     def test_defaults(self):
         c = pw.config_from_env({})
         self.assertEqual((c['ap_prefix'], c['ap_password'], c['channel'], c['grace_new'], c['grace_known'], c['enabled']),
-                         ('Piano-Setup', 'pianosetup', 6, 30, 150, True))
+                         ('Piano-Setup', 'pianosetup', 6, 10, 150, True))
 
     def test_values_are_read_clamped_and_checked(self):
         c = pw.config_from_env({'WIFI_AP_SSID': 'My-Piano', 'WIFI_AP_PASSWORD': 'much-better-secret', 'WIFI_AP_CHANNEL': '11', 'WIFI_GRACE_NEW': '1',

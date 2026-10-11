@@ -13,7 +13,7 @@ NetworkManager instead: there the feature stays off and says so (`nmtui` does th
 
 | Question | Decision | Why |
 |---|---|---|
-| When does the access point start? | When there is no default route (no Ethernet, no Wi-Fi with an address) for longer than a grace time: 30 s if no network is saved, 150 s if some are | after a power cut the Pi boots faster than the router: it must not give up on a known network too early |
+| When does the access point start? | When there is no default route (no Ethernet, no Wi-Fi with an address) for longer than a grace time: 10 s if no network is saved, 150 s if some are | after a power cut the Pi boots faster than the router: it must not give up on a known network too early |
 | Does it stay in AP mode for ever? | With saved networks it leaves the AP every 2 minutes without a client and tries them again for 45 s | a router that comes back later is found again without anyone touching the Pi |
 | AP security | WPA2, default password `pianosetup`, SSID `Piano-Setup-XXXX` (XXXX = last digits of the MAC); both settable in `/etc/piano-synth.conf` | the home Wi-Fi password travels over this radio link: it must be encrypted; a sticker with the password is enough for a device sold to a buyer |
 | How does the phone find the page? | dnsmasq answers every name with the Pi's address and port 80 redirects to the page: the phone shows its "sign in to network" window; `http://10.42.0.1:8080/` works by hand | captive-portal detection of Android and iOS |

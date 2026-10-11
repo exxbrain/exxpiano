@@ -11,6 +11,8 @@ import tempfile
 SSID_MAX_BYTES = 32
 CHANNELS_2G = (1, 6, 11)
 AP_ADDRESS = '10.42.0.1'
+AP_DEFAULT_PASSWORD = 'pianosetup'
+AP_DEFAULT_PREFIX = 'Piano-Setup'
 AP_NETWORK = '10.42.0.0/24'
 
 
@@ -194,6 +196,16 @@ def ap_ssid(prefix, mac):
     """`Piano-Setup-AB12`: the prefix and the last four hex digits of the adapter's address."""
     tail = re.sub(r'[^0-9A-Fa-f]', '', mac or '')[-4:].upper() or '0000'
     return ('%s-%s' % (prefix or 'Piano-Setup', tail))[:SSID_MAX_BYTES]
+
+
+def setup_credentials(conf, mac):
+    """(name, password) of the setup network from the configuration values (a dict) and the Wi-Fi address; bad values fall back to the defaults."""
+    password = conf.get('WIFI_AP_PASSWORD') or AP_DEFAULT_PASSWORD
+    try:
+        validate_passphrase(password)
+    except ValueError:
+        password = AP_DEFAULT_PASSWORD
+    return ap_ssid(conf.get('WIFI_AP_SSID') or AP_DEFAULT_PREFIX, mac), password
 
 
 def hostapd_conf(interface, ssid, passphrase, channel=6, country_code=None, ctrl_dir=None):

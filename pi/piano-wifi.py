@@ -41,15 +41,15 @@ def config_from_env(env=None):
             return max(lo, min(hi, int(env.get(key, default))))
         except ValueError:
             return default
-    password = env.get('WIFI_AP_PASSWORD') or 'pianosetup'
+    password = env.get('WIFI_AP_PASSWORD') or wifilib.AP_DEFAULT_PASSWORD
     try:
         wifilib.validate_passphrase(password)
     except ValueError:
         log('WIFI_AP_PASSWORD is not 8 to 63 ordinary characters: using the default')
-        password = 'pianosetup'
+        password = wifilib.AP_DEFAULT_PASSWORD
     channel = num('WIFI_AP_CHANNEL', 6, 1, 11)
     return dict(ap_prefix=env.get('WIFI_AP_SSID') or 'Piano-Setup', ap_password=password, channel=channel if channel in wifilib.CHANNELS_2G else 6,
-                grace_new=num('WIFI_GRACE_NEW', 30, 5, 3600), grace_known=num('WIFI_GRACE_KNOWN', 150, 5, 3600),
+                grace_new=num('WIFI_GRACE_NEW', 10, 5, 3600), grace_known=num('WIFI_GRACE_KNOWN', 150, 5, 3600),
                 retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600), retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
                 connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300), web_port=num('WEB_PORT', 8080, 1, 65535),
                 enabled=env.get('WIFI_SETUP', '1') != '0')
@@ -97,6 +97,11 @@ class System:
     def has_default_route(self):
         rc, out = self.run(['ip', '-4', 'route', 'show', 'default'], 5)
         return rc == 0 and bool(out.strip())
+
+    def has_cable_route(self):
+        """A default route that does not go through the Wi-Fi: Ethernet is another way in."""
+        rc, out = self.run(['ip', '-4', 'route', 'show', 'default'], 5)
+        return rc == 0 and any(m.group(1) != self.iface for m in re.finditer(r'\bdev (\S+)', out))
 
     def link(self):
         """{ssid, ip, signal} of the Wi-Fi connection, or None."""
@@ -165,7 +170,7 @@ class System:
         dnsmasq = subprocess.Popen(['dnsmasq', '--conf-file=' + dnsmasq_conf, '--keep-in-foreground'], stdout=subprocess.DEVNULL,
                                    stderr=subprocess.PIPE, text=True)
         self.procs.append(dnsmasq)
-        time.sleep(1)
+        time.sleep(0.4)
         if dnsmasq.poll() is not None:
             raise RuntimeError('dnsmasq stopped: ' + (dnsmasq.stderr.read() or '')[-300:])
 
@@ -242,6 +247,7 @@ class Supervisor:
         self.last_result = None
         self.busy = None
         self.next_ap_attempt = 0.0
+        self.ap_failures = 0
         self._last_status = 0.0
 
     # -- files
@@ -261,7 +267,7 @@ class Supervisor:
     def publish(self, link=None):
         link = link if link is not None else (self.sys.link() if self.mode == 'client' else None)
         wifilib.write_status(self.run_dir, dict(
-            pid=os.getpid(), mode=self.mode, busy=self.busy, link=link, hostname=self.sys.hostname(), ap=dict(ssid=self.ap_ssid) if self.mode == 'ap' else None,
+            pid=os.getpid(), mode=self.mode, busy=self.busy, link=link, cable=self.sys.has_cable_route(), hostname=self.sys.hostname(), ap=dict(ssid=self.ap_ssid) if self.mode == 'ap' else None,
             scan=self.scan_result, scanned_at=self.scanned_at, last_result=self.last_result, updated=int(self.wall())))
         self._last_status = self.clock()
 
@@ -284,13 +290,15 @@ class Supervisor:
             self.sys.ap_stop()
             self.sys.client_up()
             self.mode, self.busy = 'client', None
-            self.next_ap_attempt = self.clock() + 300
-            self._result(False, 'ap', error='the access point did not start')
+            self.ap_failures += 1
+            self.next_ap_attempt = self.clock() + (60 if self.ap_failures <= 3 else 300)    # soon at first: it may be a passing problem
+            self._result(False, 'ap', error='the access point did not start: %s' % str(exc)[-120:])
             self.publish()
             return False
         if self.portal:
             self.portal.start()
         self.mode, self.busy = 'ap', None
+        self.ap_failures = 0
         self.idle_since = None
         self.ap_until = self.clock() + seconds if seconds else None
         log('access point %s is up' % self.ap_ssid)
@@ -372,16 +380,29 @@ class Supervisor:
             self.sys.client_up()
             self.publish()
 
+    def only_way_in(self, ssid):
+        """True when forgetting `ssid` would cut the connection in use with nothing else to fall back on."""
+        link = self.sys.link() if self.mode == 'client' else None
+        others = [n for n in self._known() if n['ssid'] != ssid]
+        return bool(link and link.get('ssid') == ssid and not others and not self.sys.has_cable_route())
+
     def forget(self, req):
         ssid = req.get('ssid')
+        if self.only_way_in(ssid):
+            self._result(False, 'forget', ssid, 'this is the only way to reach the Pi: connect to another network or plug in a cable first')
+            self.publish()
+            return
         link = self.sys.link() if self.mode == 'client' else None
         self._write_wpa(wifilib.remove_network(self._read_wpa(), ssid))
-        if link and link.get('ssid') == ssid:
+        self._result(True, 'forget', ssid)
+        if self.mode == 'client' and not self._known() and not self.sys.has_cable_route():
+            self.enter_ap()                                         # nothing is left to connect to: no waiting, the setup network starts at once
+        elif link and link.get('ssid') == ssid:
             self.sys.client_up()                                    # leave the network that was just forgotten
+            self.publish()
         else:
             self.sys.reload_wpa()
-        self._result(True, 'forget', ssid)
-        self.publish()
+            self.publish()
 
     # -- one round of the loop
     def step(self):
