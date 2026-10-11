@@ -97,9 +97,13 @@ scripts/make-soundfonts.sh -p standard -v 48k24 -o build     # взять пак
 
 ```bash
 # один раз: скачайте DietPi_RPi234-ARMv8-Trixie.img.xz с dietpi.com (или добавьте --download, и скрипт скачает сам)
+printf 'Пароль DietPi: '; read -r -s SD_PASSWORD; printf '\n'
+printf 'Пароль сети настройки: '; read -r -s SD_AP_PASSWORD; printf '\n'
+export SD_PASSWORD SD_AP_PASSWORD
 python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
     --serial 00000000d2f2f1de --number auto \
-    --password 'пароль root' --ap-password 'пароль с наклейки' --country RU --timezone Europe/Moscow --note 'для Ивана'
+    --country RU --timezone Europe/Moscow --note 'для Ивана'
+unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
 Получится `dist/sd/<номер>/`: версионированный образ карты `exxpiano-rpi234-...-sd.zip`, `sticker/`, `manifest-<номер>.json` и `README-<номер>.txt`. Запишите ZIP через **Raspberry Pi Imager**

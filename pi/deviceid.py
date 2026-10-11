@@ -2,13 +2,13 @@
 """The serial number of the Raspberry Pi board, and the binding of a card (an image) to one board.
 
   deviceid.py            print the serial of this board (16 hex digits, as /proc/cpuinfo shows it)
-  deviceid.py check      exit 0 when the card may run here, 78 when it was made for another board and DEVICE_LOCK=1 (exxpiano-run uses it)
+  deviceid.py check      exit 0 when the card may run here, 78 when a locked card cannot verify this board (exxpiano-run uses it)
 
 An image can be built for one board (build-sd-image.py --serial ...). The serial is then in /etc/exxpiano.conf as DEVICE_SERIAL:
   * always: the web page warns in red when the card is in another board, the register of the images knows which board each card was made for;
-  * with DEVICE_LOCK=1 (build option --lock): the synthesizer does not start on another board.
+  * with DEVICE_LOCK=1: the synthesizer does not start on another board or when the board serial cannot be read.
 This is bookkeeping and a lock against copying a card to a board it was not made for, not copy protection: whoever has root on the device can edit
-the configuration. If the serial cannot be read (not a Raspberry Pi), the check lets the card run: it never locks a card it cannot judge.
+the configuration. Production images always set DEVICE_LOCK=1.
 """
 import os
 import re
@@ -65,7 +65,7 @@ def status(configured, actual):
 
 
 def check(env=None, actual='unread'):
-    """(exit code, message). 0 = may run, 78 = locked to another board."""
+    """(exit code, message). 0 = may run, 78 = a locked image cannot verify its board."""
     env = os.environ if env is None else env
     actual = read_serial() if actual == 'unread' else actual
     st = status(env.get('DEVICE_SERIAL'), actual)
@@ -73,7 +73,7 @@ def check(env=None, actual='unread'):
     if not locked or not st['bound']:
         return 0, 'not locked'
     if st['ok'] is None:
-        return 0, 'the serial of this board cannot be read: the card is allowed to run'
+        return EX_CONFIG, 'the serial of this board cannot be read: the synthesizer does not start'
     if st['ok']:
         return 0, 'this card belongs to this board'
     return EX_CONFIG, 'this card was made for the Raspberry Pi with serial %s, this one is %s: the synthesizer does not start' % (st['bound_serial'], actual)

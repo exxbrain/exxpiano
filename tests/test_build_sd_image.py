@@ -68,6 +68,8 @@ class Case(unittest.TestCase):
         self.mech = self.touch('banks/mech.sf2', b'm' * 10)
         self.serial_counter = 0
         self.env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ['PATH'], FAKE_DOCKER_LOG=self.log, EXXPIANO_SD_WORK=os.path.join(t, 'work'))
+        self.env.pop('SD_PASSWORD', None)
+        self.env.pop('SD_AP_PASSWORD', None)
 
     def touch(self, rel, data):
         path = os.path.join(self.tmp.name, rel)
@@ -165,6 +167,22 @@ class PlanTests(Case):
 
 
 class BuildTests(Case):
+    def test_passwords_default_to_environment_and_arguments_override_them(self):
+        r = self.run_build('--number', '6', env={'SD_PASSWORD': 'environment root password',
+                                                 'SD_AP_PASSWORD': 'environment setup password'})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        builds = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])]
+        self.assertEqual(builds[-1]['env'], {'SD_PASSWORD': 'environment root password',
+                                             'SD_AP_PASSWORD': 'environment setup password'})
+
+        r = self.run_build('--number', '7', '--password', 'argument root password',
+                           '--ap-password', 'argument setup password',
+                           env={'SD_PASSWORD': 'ignored root password', 'SD_AP_PASSWORD': 'ignored setup password'})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        builds = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])]
+        self.assertEqual(builds[-1]['env'], {'SD_PASSWORD': 'argument root password',
+                                             'SD_AP_PASSWORD': 'argument setup password'})
+
     def test_a_build_makes_the_zip_the_sticker_the_readme_and_the_register_entry(self):
         r = self.run_build('--number', 'auto', '--password', 'root password 1', '--ap-password', 'sticker pw 1', '--note', 'for Ivan', '--country', 'RU')
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

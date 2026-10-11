@@ -99,9 +99,13 @@ with it, and the device is entered in the **register** (`registry/devices.csv`: 
 
 ```bash
 # once: download DietPi_RPi234-ARMv8-Trixie.img.xz from dietpi.com (or add --download to let the script fetch it)
+printf 'DietPi password: '; read -r -s SD_PASSWORD; printf '\n'
+printf 'Setup network password: '; read -r -s SD_AP_PASSWORD; printf '\n'
+export SD_PASSWORD SD_AP_PASSWORD
 python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
     --serial 00000000d2f2f1de --number auto \
-    --password 'root password' --ap-password 'sticker password' --country RU --timezone Europe/Moscow --note 'for Ivan'
+    --country RU --timezone Europe/Moscow --note 'for Ivan'
+unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
 It makes `dist/sd/<number>/`: a versioned `exxpiano-rpi234-...-sd.zip` card image, `sticker/`, `manifest-<number>.json`, and `README-<number>.txt`. Write the zip with **Raspberry Pi

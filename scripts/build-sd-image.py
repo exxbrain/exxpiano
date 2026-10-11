@@ -2,7 +2,7 @@
 """Makes the SD card image of one exxpiano device: DietPi + the software + the banks + the number and the name of the device. One zip per device.
 
   python3 scripts/build-sd-image.py --dietpi DietPi_RPi234-ARMv8-Trixie.img.xz --serial 00000000d2f2f1de --number auto \\
-      --password 'root password' --ap-password 'sticker password' --note 'for Ivan'
+      --note 'for Ivan'  # passwords default to SD_PASSWORD and SD_AP_PASSWORD
 
 Result in dist/sd/<number>/: a versioned, board-bound exxpiano-rpi234-...-sd.zip (flash it with Raspberry Pi Imager "Use custom" or balenaEtcher: both take the zip as it is),
 a sticker (the QR codes of this very device, ready to print) and a README with what the device is called. The device is entered in the register
@@ -255,8 +255,10 @@ def parse_args(argv):
     ap.add_argument('--name', help='the host name (default exxpiano-<number>)')
     ap.add_argument('--note', default='', help='a note for the register (a customer, a date)')
     ap.add_argument('--force', action='store_true', help='replace a number or a serial that is already in the register')
-    ap.add_argument('--password', default='', help="DietPi's global password (root and dietpi users); without it the DietPi default stays: change it")
-    ap.add_argument('--ap-password', default='', help='the password of the setup network (default exxpianosetup)')
+    ap.add_argument('--password', default=os.environ.get('SD_PASSWORD', ''),
+                    help="DietPi's global password (root and dietpi users); default: SD_PASSWORD; without either the DietPi default stays: change it")
+    ap.add_argument('--ap-password', default=os.environ.get('SD_AP_PASSWORD', ''),
+                    help='the password of the setup network; default: SD_AP_PASSWORD, then exxpianosetup')
     ap.add_argument('--country', default='GB', help='Wi-Fi country code (RU, GB ...)')
     ap.add_argument('--timezone', default='UTC')
     ap.add_argument('--locale', default='en_GB.UTF-8')

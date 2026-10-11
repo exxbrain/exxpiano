@@ -71,8 +71,10 @@ class StatusAndCheckTests(unittest.TestCase):
         self.assertEqual(deviceid.check(dict(DEVICE_LOCK='1'), self.OTHER)[0], 0)                   # locked to nothing
         self.assertEqual(deviceid.check({}, self.OTHER)[0], 0)
 
-    def test_a_board_whose_serial_cannot_be_read_is_never_locked_out(self):
-        self.assertEqual(deviceid.check(dict(DEVICE_SERIAL=self.ME, DEVICE_LOCK='1'), None)[0], 0)
+    def test_a_locked_image_refuses_a_board_whose_serial_cannot_be_read(self):
+        code, message = deviceid.check(dict(DEVICE_SERIAL=self.ME, DEVICE_LOCK='1'), None)
+        self.assertEqual(code, 78)
+        self.assertIn('cannot be read', message)
 
     def test_the_command_line(self):
         import contextlib

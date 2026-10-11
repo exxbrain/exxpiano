@@ -55,11 +55,14 @@ chroot "$W/mnt" python3 /opt/exxpiano/exxpiano-wifi.py status >/dev/null 2>&1; o
 SERIAL="$(sed -n 's/^DEVICE_SERIAL=//p' "$W/mnt/etc/exxpiano.conf" | head -1)"; LOCK="$(sed -n 's/^DEVICE_LOCK=//p' "$W/mnt/etc/exxpiano.conf" | head -1)"
 if [ -n "$SERIAL" ]; then
   mount -t tmpfs tmpfs "$W/mnt/tmp"
-  printf 'Serial\t\t: %s\n' "$SERIAL" > "$W/mnt/tmp/cpuinfo-same"; printf 'Serial\t\t: 00000000deadbeef\n' > "$W/mnt/tmp/cpuinfo-other"
+  printf 'Serial\t\t: %s\n' "$SERIAL" > "$W/mnt/tmp/cpuinfo-same"; printf 'Serial\t\t: 00000000deadbeef\n' > "$W/mnt/tmp/cpuinfo-other"; printf 'Model\t\t: Raspberry Pi\n' > "$W/mnt/tmp/cpuinfo-missing"
   chroot "$W/mnt" env DEVICE_SERIAL="$SERIAL" DEVICE_LOCK="$LOCK" EXXPIANO_CPUINFO=/tmp/cpuinfo-same python3 /opt/exxpiano/deviceid.py check >/dev/null 2>&1 && ok "the card runs on its own board" || bad "the card does not accept its own board"
   rc=0
   chroot "$W/mnt" env DEVICE_SERIAL="$SERIAL" DEVICE_LOCK="$LOCK" EXXPIANO_CPUINFO=/tmp/cpuinfo-other python3 /opt/exxpiano/deviceid.py check >/dev/null 2>&1 || rc=$?
   if [ "$LOCK" = 1 ]; then [ "$rc" = 78 ] && ok "a locked card refuses another board" || bad "a locked card accepts another board (exit $rc)"; else [ "$rc" = 0 ] && ok "an unlocked card still runs on another board" || bad "an unlocked card refuses another board"; fi
+  rc=0
+  chroot "$W/mnt" env DEVICE_SERIAL="$SERIAL" DEVICE_LOCK="$LOCK" EXXPIANO_CPUINFO=/tmp/cpuinfo-missing python3 /opt/exxpiano/deviceid.py check >/dev/null 2>&1 || rc=$?
+  if [ "$LOCK" = 1 ]; then [ "$rc" = 78 ] && ok "a locked card refuses an unreadable board serial" || bad "a locked card runs without a readable board serial (exit $rc)"; else [ "$rc" = 0 ] && ok "an unlocked card runs without a readable board serial" || bad "an unlocked card refuses an unreadable board serial"; fi
   umount "$W/mnt/tmp"
 fi
 echo "number in the image: $(sed -n 's/^DEVICE_NUMBER=//p' "$W/mnt/etc/exxpiano.conf"), name: $(cat "$W/mnt/etc/hostname")"

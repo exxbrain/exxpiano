@@ -114,11 +114,11 @@ class AudioSelectTests(unittest.TestCase):
 class DeviceLockTests(unittest.TestCase):
     """A card made for one board does not start the synthesizer on another (exit 78: systemd must not retry)."""
 
-    def run_script(self, env_extra):
+    def run_script(self, env_extra, cpuinfo_text='Serial\t\t: 00000000d2f2f1de\n'):
         with tempfile.TemporaryDirectory() as d:
             cpuinfo = os.path.join(d, 'cpuinfo')
             with open(cpuinfo, 'w') as f:
-                f.write('Serial\t\t: 00000000d2f2f1de\n')
+                f.write(cpuinfo_text)
             env = dict(os.environ, EXXPIANO_CPUINFO=cpuinfo, DRY_RUN='1', ASOUND_DIR=d, PIANO_SF2='/x/p.sf2', MECH_SF2='/x/m.sf2', **env_extra)
             return subprocess.run(['bash', RUN], capture_output=True, text=True, env=env)
 
@@ -126,6 +126,11 @@ class DeviceLockTests(unittest.TestCase):
         r = self.run_script(dict(DEVICE_SERIAL='000000001234abcd', DEVICE_LOCK='1'))
         self.assertEqual(r.returncode, 78)
         self.assertIn('000000001234abcd', r.stderr)
+
+    def test_an_unreadable_serial_is_refused_with_78(self):
+        r = self.run_script(dict(DEVICE_SERIAL='00000000d2f2f1de', DEVICE_LOCK='1'), 'processor\t: 0\n')
+        self.assertEqual(r.returncode, 78)
+        self.assertIn('cannot be read', r.stderr)
 
     def test_this_board_and_unlocked_cards_run(self):
         for extra in (dict(DEVICE_SERIAL='d2f2f1de', DEVICE_LOCK='1'), dict(DEVICE_SERIAL='000000001234abcd'), dict()):

@@ -14,18 +14,28 @@ docker run --rm --privileged -v "$ROOT:/repo:ro" -v "$WORK:/out" exxpiano-sd-bui
 
 printf 'stand-in piano bank\n' > "$WORK/piano.sf2"
 printf 'stand-in mechanics bank\n' > "$WORK/mech.sf2"
+cat > "$WORK/boards.csv" <<'EOF'
+serial,number,name,note
+00000000d2f2f1de,0001,,stand-in one
+00000000aaaabbbb,0002,,stand-in two
+EOF
 EXXPIANO_SD_WORK="$WORK/build-work" python3 "$ROOT/scripts/build-sd-image.py" \
   --dietpi "$WORK/DietPi_RPi234-ARMv8-test.img" \
   --piano "$WORK/piano.sf2" --mech "$WORK/mech.sf2" \
-  --serial 00000000d2f2f1de --number 1 \
+  --serials "$WORK/boards.csv" \
   --registry "$WORK/registry.csv" --out "$WORK/out"
 
 VERSION="$(tr -d '\n' < "$ROOT/VERSION")"
-OUT="$WORK/out/0001"
-ZIP="$OUT/exxpiano-rpi234-v${VERSION}-dietpi-10.7.0-0001-sn-00000000d2f2f1de-sd.zip"
-test -s "$ZIP"
-test -s "$OUT/manifest-0001.json"
-test -s "$OUT/README-0001.txt"
-python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); assert m["dietpi_version"]=="10.7.0"; assert m["serial"]=="00000000d2f2f1de"; assert m["image"]==sys.argv[2]' \
-  "$OUT/manifest-0001.json" "$(basename "$ZIP")"
-echo "full SD-image pipeline passed: $(basename "$ZIP")"
+for IDENTITY in "0001:00000000d2f2f1de" "0002:00000000aaaabbbb"; do
+  NUMBER="${IDENTITY%%:*}"
+  SERIAL="${IDENTITY#*:}"
+  OUT="$WORK/out/$NUMBER"
+  ZIP="$OUT/exxpiano-rpi234-v${VERSION}-dietpi-10.7.0-${NUMBER}-sn-${SERIAL}-sd.zip"
+  test -s "$ZIP"
+  test -s "$OUT/manifest-${NUMBER}.json"
+  test -s "$OUT/README-${NUMBER}.txt"
+  python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); assert m["dietpi_version"]=="10.7.0"; assert m["device_number"]==sys.argv[2]; assert m["serial"]==sys.argv[3]; assert m["image"]==sys.argv[4]' \
+    "$OUT/manifest-${NUMBER}.json" "$NUMBER" "$SERIAL" "$(basename "$ZIP")"
+done
+test "$(($(wc -l < "$WORK/registry.csv") - 1))" -eq 2
+echo "full two-device SD-image pipeline passed with exact versioned filenames"
