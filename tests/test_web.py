@@ -590,6 +590,12 @@ class DeviceNameTests(ServerCase):
         self.assertEqual(r['hostname'], 'pi-synth')
         self.assertEqual(r['device'], dict(number='81DE'))
 
+    def test_a_configured_number_is_used_everywhere(self):
+        self.start(CONF + 'DEVICE_NUMBER=0007\n')
+        self.assertEqual(self.jcall('/api/state')[1]['device'], dict(number='0007'))
+        self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'Piano-Setup-0007')
+        self.assertEqual(self.jcall('/api/qr?kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0007#/wifi')
+
     def test_rename_stores_a_clean_name_and_the_state_follows(self):
         self.start()
         code, r = self.jcall('/api/device', {'name': '  Piano-Kitchen '})

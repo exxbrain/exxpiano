@@ -127,11 +127,11 @@ cd /root/pi
 Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
 
 ```bash
-python3 scripts/build-deb.py --version 1.8.1                                # -> dist/piano-synth_1.8.1_all.deb
-python3 scripts/build-deb.py --version 1.8.1 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.8.1_all.deb
+python3 scripts/build-deb.py --version 1.9.0                                # -> dist/piano-synth_1.9.0_all.deb
+python3 scripts/build-deb.py --version 1.9.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.9.0_all.deb
 scp -O dist/*.deb root@<IP-Pi>:/root/
-ssh root@<IP-Pi> "apt install -y ./piano-synth_1.8.1_all.deb ./piano-synth-soundfonts_1.8.1_all.deb"
+ssh root@<IP-Pi> "apt install -y ./piano-synth_1.9.0_all.deb ./piano-synth-soundfonts_1.9.0_all.deb"
 ```
 
 - `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
@@ -143,7 +143,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.8.1_all.deb ./piano-synth-sound
 
 Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
 (`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
-На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.8.1_all.deb && dpkg-deb --contents piano-synth_1.8.1_all.deb`.
+На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.9.0_all.deb && dpkg-deb --contents piano-synth_1.9.0_all.deb`.
 
 ## Установщик для DietPi (собирается при каждом коммите)
 
@@ -158,12 +158,40 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.8.1_all.deb ./piano-synth-sound
 
 **Откуда берётся установщик.** Локально `scripts/install-hooks.sh` (один раз) включает git-хук: каждый `git commit` прогоняет тесты и собирает `dist/`
 (`.deb` и установщик для DietPi). На GitHub то же самое делает `.github/workflows/build.yml` для каждого пуша и pull request и сохраняет файлы как
-скачиваемый артефакт; тег вида `v1.8.1` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
+скачиваемый артефакт; тег вида `v1.9.0` (он должен совпадать с файлом `VERSION`) публикует их как релиз. Версию меняйте только в файле `VERSION`:
 пакет, установщик и веб-страница берут её оттуда.
 
 Что проверено, а что нет: скрипт установщика проверен запуском с подставными `apt-get` и прочим, структура архива проверена тестами. Хук первой загрузки
 (`AUTO_SETUP_CUSTOM_SCRIPT_EXEC`) написан по документации DietPi и на настоящей первой загрузке не пробовался. Рабочий процесс GitHub ещё не запускался:
 первый пуш покажет, работает ли он (вкладка Actions).
+
+## Образ SD-карты для нового устройства (один zip на устройство)
+
+Для устройства, которое вы собираете для другого человека: один zip, записываемый на карту за один шаг. Внутри DietPi со всем установленным, банки звуков, а также
+**номер и имя именно этого устройства** (`0007` -> имя `piano-0007`, сеть настройки `Piano-Setup-0007`); рядом готовится наклейка с его QR-кодами, а устройство
+вносится в **реестр** (`registry/devices.csv`: номер, имя, версия, дата, контрольная сумма образа, банки, примечание).
+
+```bash
+# один раз: скачайте DietPi_RPi234-ARMv8-Trixie.img.xz с dietpi.com (или добавьте --download, и скрипт скачает сам)
+python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
+    --piano build/archive/Salamander-stereo-6L-9s-v3.sf2 --number auto \
+    --password 'пароль root' --ap-password 'пароль с наклейки' --country RU --timezone Europe/Moscow --note 'для Ивана'
+```
+
+Получится `dist/sd/<номер>/`: `piano-synth-<номер>-sd.zip` (образ карты), `sticker/` (печатайте `setup-codes-....html`) и `README-<номер>.txt`. Запишите zip через **Raspberry Pi Imager**
+(«Choose OS» -> «Use custom») или **balenaEtcher** (оба берут zip как есть); вручную «раззиповать» на карту нечего, потому что карте Raspberry Pi нужны разделы, а их несёт только образ.
+Включайте Pi с подключённым кабелем Ethernet (первая настройка самого DietPi один раз требует интернет); потом устройство открывается по `http://piano-<номер>.local:8080/`,
+а без сети включает свою сеть настройки (см. «Подключение к новой Wi-Fi»).
+
+- **Номера.** `--number auto` берёт следующий свободный; номер, который есть в реестре, отклоняется (`--force` заменяет, старая строка остаётся с пометкой). Смотреть:
+  `python3 scripts/sd-registry.py list | show 0007 | find иван | note 0007 "продано 12.10"`. Реестр это обычный CSV (открывается в таблице); он не попадает в git, потому что
+  в примечаниях могут быть имена покупателей: делайте копию.
+- **Как собирается.** В Linux-контейнере (Docker Desktop должен быть запущен; на Linux с root есть `--no-docker`): образ открывается, в него ставятся пакет и его зависимости
+  (`apt`, без рекомендуемых пакетов), копируются банки, настраивается `dietpi.txt` (автоматический первый запуск, имя, страна Wi-Fi, **без ожидания сети при загрузке**),
+  готовый образ перечитывается, а его веб-служба запускается в контейнере как проверка. Пароли передаются через окружение, не через аргументы.
+- **Честный статус.** Вся сборка проверена на образе-заменителе с раскладкой DietPi, и программы внутри готового образа запускаются; **на Raspberry Pi образ не запускался**:
+  запишите первую карту, понаблюдайте за запуском и прочитайте `/var/log/piano-synth-firstboot.log`. `--download` с dietpi.com тоже не пробовалось: если адрес изменился, скачайте
+  образ сами и укажите `--dietpi`. Образ-заменитель (`scripts/sd-fake-dietpi.sh`) и `scripts/sd-smoke-test.sh` нужны, чтобы проверять изменения сборщика без Pi.
 
 ## Обновление работающей Pi
 

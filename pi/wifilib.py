@@ -195,18 +195,24 @@ def parse_scan(text):
 GENERIC_HOSTNAMES = ('dietpi', 'raspberrypi', 'raspberry', 'piano', 'debian', 'localhost', 'pi')
 
 
-def device_number(mac):
-    """The number of the device: the last four hex digits of its Wi-Fi address (also the end of the setup network's name)."""
+NUMBER_RE = re.compile(r'^[0-9A-Za-z]{1,8}$')
+
+
+def device_number(mac, configured=None):
+    """The number of the device. A number given when the image was built (DEVICE_NUMBER, for example 0007) wins; otherwise it is the last four
+    hex digits of the Wi-Fi address. It ends the setup network's name and the default host name, and is printed on the sticker."""
+    if configured and NUMBER_RE.match(configured):
+        return configured.upper()
     return re.sub(r'[^0-9A-Fa-f]', '', mac or '')[-4:].upper() or '0000'
 
 
-def suggested_hostname(mac):
-    return 'piano-' + device_number(mac).lower()
+def suggested_hostname(mac, configured=None):
+    return 'piano-' + device_number(mac, configured).lower()
 
 
-def ap_ssid(prefix, mac):
-    """`Piano-Setup-AB12`: the prefix and the last four hex digits of the adapter's address."""
-    return ('%s-%s' % (prefix or 'Piano-Setup', device_number(mac)))[:SSID_MAX_BYTES]
+def ap_ssid(prefix, mac, configured=None):
+    """`Piano-Setup-AB12`: the prefix and the number of the device."""
+    return ('%s-%s' % (prefix or 'Piano-Setup', device_number(mac, configured)))[:SSID_MAX_BYTES]
 
 
 def setup_credentials(conf, mac):
@@ -216,7 +222,7 @@ def setup_credentials(conf, mac):
         validate_passphrase(password)
     except ValueError:
         password = AP_DEFAULT_PASSWORD
-    return ap_ssid(conf.get('WIFI_AP_SSID') or AP_DEFAULT_PREFIX, mac), password
+    return ap_ssid(conf.get('WIFI_AP_SSID') or AP_DEFAULT_PREFIX, mac, conf.get('DEVICE_NUMBER')), password
 
 
 def hostapd_conf(interface, ssid, passphrase, channel=6, country_code=None, ctrl_dir=None):

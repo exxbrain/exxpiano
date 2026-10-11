@@ -541,6 +541,20 @@ class EnsureNameTests(unittest.TestCase):
             self.assertIn(['hostnamectl', 'set-hostname', 'piano-81de'], calls)
             self.assertIn('piano-81de', out)
 
+    def test_a_number_from_the_build_names_the_device_even_without_an_adapter(self):
+        old = os.environ.get('DEVICE_NUMBER')
+        os.environ['DEVICE_NUMBER'] = '0007'
+        try:
+            code, out, calls = self.run_cli('dietpi', mac='')
+        finally:
+            os.environ.pop('DEVICE_NUMBER') if old is None else os.environ.__setitem__('DEVICE_NUMBER', old)
+        self.assertIn(['hostnamectl', 'set-hostname', 'piano-0007'], calls)
+
+    def test_the_setup_network_carries_the_configured_number(self):
+        cfg = pw.config_from_env({'DEVICE_NUMBER': '0007'})
+        self.assertEqual(cfg['number'], '0007')
+        self.assertIsNone(pw.config_from_env({'DEVICE_NUMBER': 'bad number'})['number'])
+
     def test_a_chosen_name_is_kept(self):
         for chosen in ('pi-synth', 'kitchen-piano', 'piano-81de'):
             code, out, calls = self.run_cli(chosen)

@@ -52,6 +52,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--ssid', help='the setup network name (default: Piano-Setup-<last 4 digits of --mac>)')
     ap.add_argument('--mac', default='', help='the Wi-Fi address of the Pi, to build the name')
+    ap.add_argument('--number', default='', help='the number given to the device when its image was built (instead of --mac)')
     ap.add_argument('--password', default='pianosetup', help='WIFI_AP_PASSWORD of the device (default pianosetup)')
     ap.add_argument('--prefix', default='Piano-Setup')
     ap.add_argument('--address', default=wifilib.AP_ADDRESS)
@@ -59,10 +60,10 @@ def main():
     ap.add_argument('--out', default=os.path.join(ROOT, 'build', 'qr'))
     args = ap.parse_args()
 
-    ssid = args.ssid or wifilib.ap_ssid(args.prefix, args.mac)
+    ssid = args.ssid or wifilib.ap_ssid(args.prefix, args.mac, args.number)
     wifilib.validate_ssid(ssid)
     wifilib.validate_passphrase(args.password)
-    number = wifilib.device_number(args.mac) if args.mac else (ssid.rsplit('-', 1)[-1] if ssid.rsplit('-', 1)[-1].isalnum() else '')
+    number = wifilib.device_number(args.mac, args.number) if (args.mac or args.number) else (ssid.rsplit('-', 1)[-1] if ssid.rsplit('-', 1)[-1].isalnum() else '')
     # the code names its device: the page warns when it is opened on another one
     page_url = 'http://%s:%d/%s#/wifi' % (args.address, args.port, '?d=%s' % number.upper() if number else '')
     codes = {'join-wifi': qrlib.wifi_text(ssid, args.password), 'open-page': page_url}

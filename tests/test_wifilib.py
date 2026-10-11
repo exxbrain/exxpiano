@@ -172,6 +172,15 @@ class HostnameTests(unittest.TestCase):
         self.assertEqual(wifilib.ap_ssid('Piano-Setup', 'b8:27:eb:d2:81:de'), 'Piano-Setup-81DE')   # the same number in the setup network
         self.assertTrue(wifilib.HOSTNAME_RE.match(wifilib.suggested_hostname('b8:27:eb:d2:81:de')))
 
+    def test_a_number_given_at_build_time_wins_over_the_address(self):
+        self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', '0007'), '0007')
+        self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', 'ab12'), 'AB12')
+        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de', '0007'), 'piano-0007')
+        self.assertEqual(wifilib.ap_ssid('Piano-Setup', '', '0007'), 'Piano-Setup-0007')                 # no address needed
+        for bad in ('', 'x y', '12345678901', '../1', None):                                          # an unusable value falls back to the address
+            self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', bad), '81DE')
+        self.assertEqual(wifilib.setup_credentials({'DEVICE_NUMBER': '0007'}, 'b8:27:eb:d2:81:de'), ('Piano-Setup-0007', 'pianosetup'))
+
     def test_apply_hostname_sets_it_fixes_the_hosts_file_and_restarts_avahi(self):
         calls = []
         with tempfile.TemporaryDirectory() as d:

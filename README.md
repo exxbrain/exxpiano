@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.8.1                                # -> dist/piano-synth_1.8.1_all.deb
-python3 scripts/build-deb.py --version 1.8.1 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.8.1_all.deb
+python3 scripts/build-deb.py --version 1.9.0                                # -> dist/piano-synth_1.9.0_all.deb
+python3 scripts/build-deb.py --version 1.9.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.9.0_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.8.1_all.deb ./piano-synth-soundfonts_1.8.1_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.9.0_all.deb ./piano-synth-soundfonts_1.9.0_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.8.1_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.8.1_all.deb && dpkg-deb --contents piano-synth_1.8.1_all.deb`.
+`dpkg-deb --info piano-synth_1.9.0_all.deb && dpkg-deb --contents piano-synth_1.9.0_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -163,12 +163,41 @@ On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bas
 
 **Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
 builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
-and keeps the files as a downloadable artifact; a tag such as `v1.8.1` (it must equal the `VERSION` file) publishes them as a release.
+and keeps the files as a downloadable artifact; a tag such as `v1.9.0` (it must equal the `VERSION` file) publishes them as a release.
 Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
 
 What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
 tested. The first-boot hook (`AUTO_SETUP_CUSTOM_SCRIPT_EXEC`) is written from DietPi's documentation and has not been tried on a real first
 boot. The GitHub workflow has not run yet: the first push shows whether it works (Actions tab).
+
+## SD card image for a new device (one zip per device)
+
+For a device that you build for somebody else: one zip, written to the card in one step. Inside is DietPi with everything installed, the sound banks, and the
+**number and the name of this very device** (`0007` -> host name `piano-0007`, setup network `Piano-Setup-0007`); a sticker with its QR codes is made
+with it, and the device is entered in the **register** (`registry/devices.csv`: number, name, version, date, checksum of the image, banks, a note).
+
+```bash
+# once: download DietPi_RPi234-ARMv8-Trixie.img.xz from dietpi.com (or add --download to let the script fetch it)
+python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
+    --piano build/archive/Salamander-stereo-6L-9s-v3.sf2 --number auto \
+    --password 'root password' --ap-password 'sticker password' --country RU --timezone Europe/Moscow --note 'for Ivan'
+```
+
+It makes `dist/sd/<number>/`: `piano-synth-<number>-sd.zip` (the card image), `sticker/` (print `setup-codes-....html`), `README-<number>.txt`. Write the zip with **Raspberry Pi
+Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as it is); there is nothing to unzip onto the card by hand, because a Raspberry Pi card needs
+its partitions, which only an image carries. Switch the Pi on with an Ethernet cable plugged in (DietPi's own first-run setup needs the internet once); after that the
+device is `http://piano-<number>.local:8080/` and, with no network, it starts its setup network (see "Connecting to a new Wi-Fi").
+
+- **Numbers.** `--number auto` takes the next free one; a number that is in the register is refused (`--force` replaces it, the old line stays marked). Look things up with
+  `python3 scripts/sd-registry.py list | show 0007 | find ivan | note 0007 "sold 12 Oct"`. The register is a plain CSV (a spreadsheet opens it); it is kept out of git because
+  the notes may name customers: back it up.
+- **How it is made.** In a Linux container (Docker Desktop must be running; on Linux with root use `--no-docker`): the image is opened, the package and its dependencies are
+  installed into it (`apt`, no recommended packages), the banks are copied, `dietpi.txt` is set (automated first run, host name, Wi-Fi country, **no waiting for the network at
+  boot**), the finished image is read back and its web service is started in a container as a test. The passwords go in through the environment, never through arguments.
+- **Honest status.** The whole build is tested on a stand-in image with DietPi's layout, and the programs inside the finished image run; **it has not been started on a
+  Raspberry Pi**: write the first card, watch it start, and read `/var/log/piano-synth-firstboot.log`. `--download` has not been tried against dietpi.com either: if the address
+  has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
+  test changes to the builder without a Pi.
 
 ## Upgrading a running Pi
 

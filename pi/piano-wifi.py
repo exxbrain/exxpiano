@@ -49,7 +49,8 @@ def config_from_env(env=None):
         log('WIFI_AP_PASSWORD is not 8 to 63 ordinary characters: using the default')
         password = wifilib.AP_DEFAULT_PASSWORD
     channel = num('WIFI_AP_CHANNEL', 6, 1, 11)
-    return dict(ap_prefix=env.get('WIFI_AP_SSID') or 'Piano-Setup', ap_password=password, channel=channel if channel in wifilib.CHANNELS_2G else 6,
+    number = env.get('DEVICE_NUMBER') if wifilib.NUMBER_RE.match(env.get('DEVICE_NUMBER') or '') else None
+    return dict(number=number, ap_prefix=env.get('WIFI_AP_SSID') or 'Piano-Setup', ap_password=password, channel=channel if channel in wifilib.CHANNELS_2G else 6,
                 grace_new=num('WIFI_GRACE_NEW', 10, 5, 3600), grace_known=num('WIFI_GRACE_KNOWN', 150, 5, 3600),
                 retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600), retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
                 connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300), web_port=num('WEB_PORT', 8080, 1, 65535),
@@ -283,7 +284,7 @@ class Supervisor:
         if self.mode == 'client' and self.sys.exists():
             self.scan_result, self.scanned_at = self.sys.scan(), int(self.wall())
         wpa = self._read_wpa()
-        self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.sys.mac())
+        self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.sys.mac(), self.cfg.get('number'))
         try:
             self.sys.ap_start(self.ap_ssid, self.cfg['ap_password'], self.cfg['channel'], wifilib.country(wpa))
         except Exception as exc:                                    # noqa: BLE001 - any failure must end with the normal network back
@@ -466,8 +467,9 @@ def main(argv=None):
         system = System()
         current = system.hostname().lower()
         mac = system.mac()
-        if current in wifilib.GENERIC_HOSTNAMES and mac:
-            name = wifilib.suggested_hostname(mac)
+        number = config_from_env()['number']
+        if current in wifilib.GENERIC_HOSTNAMES and (mac or number):
+            name = wifilib.suggested_hostname(mac, number)
             wifilib.apply_hostname(name, system.run)
             print('The device is now called %s (it was %s)' % (name, current))
         else:

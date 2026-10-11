@@ -438,7 +438,7 @@ class App:
         asking browser reached it (for a phone on the same network)."""
         kind = (query.get('kind') or [''])[0]
         conf = pianoconf.parse_conf(self.conf_path)
-        number = wifilib.device_number(self.actions.wifi_mac())     # the codes name the device they belong to: the page checks it
+        number = self.device_info()['number']                        # the codes name the device they belong to: the page checks it
         port = conf.get('WEB_PORT') or '8080'
         if kind == 'join':
             ssid, password = wifilib.setup_credentials(conf, self.actions.wifi_mac())
@@ -454,8 +454,7 @@ class App:
         return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(qrlib.encode(text, 'M')))
 
     def device_info(self):
-        mac = self.actions.wifi_mac()
-        return dict(number=wifilib.device_number(mac))
+        return dict(number=wifilib.device_number(self.actions.wifi_mac(), pianoconf.parse_conf(self.conf_path).get('DEVICE_NUMBER')))
 
     def rename(self, body):
         name = body.get('name') if isinstance(body, dict) else None
