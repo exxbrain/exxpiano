@@ -39,9 +39,9 @@
   @media (prefers-reduced-motion: reduce) { #drawer, #drawer.open { transition: none; } }
   a { color: var(--accent); }
   .linkbtn { display: inline-block; padding: 8px 14px; border: 1px solid var(--accent); border-radius: 8px; text-decoration: none; white-space: nowrap; }
-  .now { display: flex; gap: 12px; align-items: center; }
-  .now .meta { flex: 1; min-width: 0; }
-  .now .meta b { display: block; font-size: 1.1rem; overflow-wrap: anywhere; }
+  .now { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; }
+  .now .meta { flex: 1 1 150px; min-width: 0; }
+  .now .meta b { display: block; font-size: 1.1rem; overflow-wrap: break-word; }
   .now .meta small { color: var(--muted); display: block; overflow-wrap: anywhere; }
   .tile b.wrap { font-size: 1rem; white-space: normal; overflow-wrap: anywhere; }
   .hint.warn { color: var(--warn); }

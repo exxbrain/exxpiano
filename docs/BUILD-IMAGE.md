@@ -15,6 +15,8 @@ For whoever prepares the devices. The result is one zip per Raspberry Pi 3 board
 
 Downloading by hand is simpler and safer. There is also `--download` (it fetches into `build/cache/` and checks the checksum) but it has not been tried against the real site.
 
+> To see what the page looks like you do not need an image: `python3 scripts/demo-web.py --open` (a simulated device on your computer).
+
 ## Step 1. Find the serial number of the board
 
 Every Raspberry Pi has a serial number burnt into the processor. You only need it when you bind the image to a board (otherwise skip this step and `--serial` below).
