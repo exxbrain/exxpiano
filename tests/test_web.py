@@ -42,6 +42,8 @@ class FakeActions:
         self.waits = 0
         self.gate = None                     # an Event: wait_synth_ready blocks until it is set
         self.pid = 100
+        self.log_calls = []
+        self.log_answer = ([dict(t=1, u='synth', p=6, m='hello')], 'c1')
 
     def mem_total(self):
         return self.mem
@@ -77,6 +79,10 @@ class FakeActions:
 
     def audio_output(self):
         return dict(device='plughw:CARD=U24', kind='usb', period=64, periods=3)
+
+    def logs(self, units, cursor=None, limit=200):
+        self.log_calls.append((list(units), cursor, limit))
+        return self.log_answer
 
 
 class ServerCase(unittest.TestCase):
@@ -355,6 +361,100 @@ class BankWebTests(ServerCase):
         self.start(self.conf_text_base + 'WEB_TOKEN=s3cret\n')
         self.assertEqual(self.call('/api/bank', {'id': 'new.sf2'})[0], 401)
         self.assertEqual(self.actions.restarts, 0)
+
+
+class LogTests(ServerCase):
+    def test_the_log_endpoint_returns_entries_and_a_cursor(self):
+        self.start()
+        code, r = self.jcall('/api/logs')
+        self.assertEqual(code, 200)
+        self.assertEqual(r, dict(entries=[dict(t=1, u='synth', p=6, m='hello')], cursor='c1'))
+        self.assertEqual(self.actions.log_calls[-1], (['synth', 'bridge', 'web'], None, 200))
+
+    def test_only_known_units_a_plain_cursor_and_a_bounded_limit_get_through(self):
+        self.start()
+        self.jcall('/api/logs?units=web,ssh,../x&cursor=s%3Dabc%3Bi%3D1&limit=99999')
+        self.assertEqual(self.actions.log_calls[-1], (['web'], 's=abc;i=1', 500))
+        self.jcall('/api/logs?units=nonsense&limit=0')
+        self.assertEqual(self.actions.log_calls[-1], (['synth', 'bridge', 'web'], None, 1))
+        for bad in ('cursor=--output%3Dx%20y', 'cursor=a%0Ab', 'limit=abc', 'cursor=' + 'x' * 400):
+            with self.subTest(bad):
+                before = len(self.actions.log_calls)
+                self.assertEqual(self.jcall('/api/logs?' + bad)[0], 400)
+                self.assertEqual(len(self.actions.log_calls), before)
+
+    def test_an_unreadable_journal_is_an_answer_not_a_crash(self):
+        self.start()
+        self.actions.log_answer = None
+        code, r = self.jcall('/api/logs?cursor=abc')
+        self.assertEqual((code, r['entries'], r['cursor']), (200, [], 'abc'))
+        self.assertIn('journal', r['error'])
+
+    def test_the_token_protects_the_log(self):
+        self.start(CONF + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/logs')[0], 401)
+        self.assertEqual(self.call('/api/logs', headers={'X-Token': 's3cret'})[0], 200)
+        self.assertEqual(self.actions.log_calls.__len__(), 1)
+
+    def test_parse_journal_cleans_what_the_page_will_show(self):
+        lines = '\n'.join([
+            '{"__REALTIME_TIMESTAMP":"1760000000123456","__CURSOR":"c1","PRIORITY":"3","_SYSTEMD_UNIT":"piano-synth.service","MESSAGE":"boom\\u001b[31m\\u0000"}',
+            '{"__REALTIME_TIMESTAMP":"1760000001000000","__CURSOR":"c2","PRIORITY":"9","_SYSTEMD_UNIT":"piano-fx.service","MESSAGE":[104,105,255]}',
+            'not json at all',
+            '{"__REALTIME_TIMESTAMP":"x","MESSAGE":"no time"}',
+            '{"__REALTIME_TIMESTAMP":"1760000002000000","__CURSOR":"c3","_SYSTEMD_UNIT":"other.service","MESSAGE":"' + 'y' * 5000 + '"}',
+        ])
+        entries, cursor = web.parse_journal(lines)
+        self.assertEqual(cursor, 'c3')
+        self.assertEqual([e['u'] for e in entries], ['synth', 'bridge', ''])
+        self.assertEqual(entries[0], dict(t=1760000000123, u='synth', p=3, m='boom[31m'))      # control characters are gone
+        self.assertEqual((entries[1]['p'], entries[1]['m']), (7, 'hi\ufffd'))                  # priority is clamped, bytes decoded
+        self.assertEqual((entries[2]['p'], len(entries[2]['m'])), (6, web.MAX_LOG_LINE))
+
+    def test_journalctl_gets_only_whitelisted_arguments(self):
+        fake_bin = os.path.join(self.tmp_dir(), 'bin')
+        os.makedirs(fake_bin)
+        out = os.path.join(self.tmp_dir(), 'args.txt')
+        script = os.path.join(fake_bin, 'journalctl')
+        with open(script, 'w') as f:
+            f.write('#!/bin/sh\nprintf "%%s\\n" "$@" > %s\n'
+                    'echo \'{"__REALTIME_TIMESTAMP":"1000","__CURSOR":"cc","PRIORITY":"6","_SYSTEMD_UNIT":"piano-web.service","MESSAGE":"ok"}\'\n' % out)
+        os.chmod(script, 0o755)
+        old = os.environ['PATH']
+        os.environ['PATH'] = fake_bin + os.pathsep + old
+        self.addCleanup(os.environ.__setitem__, 'PATH', old)
+        entries, cursor = web.Actions().logs(['web', 'synth'], 's=1;i=2', 50)
+        self.assertEqual((entries[0]['m'], cursor), ('ok', 'cc'))
+        with open(out) as f:
+            args = f.read().split()
+        self.assertEqual(args, ['--no-pager', '-o', 'json', '-n', '50', '-u', 'piano-web', '-u', 'piano-synth', '--after-cursor=s=1;i=2'])
+
+    def test_nothing_new_is_not_a_failure_but_a_broken_cursor_is(self):
+        fake_bin = os.path.join(self.tmp_dir(), 'bin2')
+        os.makedirs(fake_bin)
+        script = os.path.join(fake_bin, 'journalctl')
+        old_path = os.environ['PATH']
+        os.environ['PATH'] = fake_bin + os.pathsep + old_path
+        self.addCleanup(os.environ.__setitem__, 'PATH', old_path)
+        with open(script, 'w') as f:
+            f.write('#!/bin/sh\necho "-- No entries --" >&2\nexit 1\n')
+        os.chmod(script, 0o755)
+        self.assertEqual(web.Actions().logs(['synth'], 'c9'), ([], 'c9'))
+        with open(script, 'w') as f:
+            f.write('#!/bin/sh\necho "Failed to seek to cursor" >&2\nexit 1\n')
+        self.assertIsNone(web.Actions().logs(['synth'], 'c9'))
+
+    def test_a_missing_journalctl_gives_none(self):
+        old = os.environ['PATH']
+        os.environ['PATH'] = self.tmp_dir()
+        self.addCleanup(os.environ.__setitem__, 'PATH', old)
+        self.assertIsNone(web.Actions().logs(['synth']))
+
+    def tmp_dir(self):
+        if not hasattr(self, '_td'):
+            self._td = tempfile.TemporaryDirectory()
+            self.addCleanup(self._td.cleanup)
+        return self._td.name
 
 
 class DeviceProfileTests(ServerCase):

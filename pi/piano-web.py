@@ -6,6 +6,7 @@
   POST /api/settings       {"velocity_curve": 0.8, ...}  - validated, stored in /etc/piano-synth.conf, applied
   POST /api/restart        restart piano-synth (needed after changing audio output / buffer / reverb / polyphony)
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
+  GET  /api/logs           ?units=synth,bridge,web&cursor=<from the last answer>&limit=200  - the journal of the three services, newest last
 
 Settings that can be changed are whitelisted with ranges in pianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
 come from /etc/piano-synth.conf. Without WEB_TOKEN anybody on your network can change the settings (nothing else).
@@ -19,6 +20,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 import banklib
 import pianoconf
@@ -27,6 +29,31 @@ import profiles
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 MAX_BODY = 4096
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
+# the journal the page may read: short name -> systemd unit (nothing else is ever passed to journalctl)
+LOG_UNITS = {'synth': 'piano-synth', 'bridge': 'piano-fx', 'web': 'piano-web'}
+CURSOR_RE = re.compile(r'^[A-Za-z0-9=;_.:-]{1,300}$')
+CONTROL_RE = re.compile(r'[\x00-\x08\x0b-\x1f\x7f]')
+MAX_LOG_LINE = 1000
+
+
+def parse_journal(text):
+    """`journalctl -o json` output -> ([{t: ms, u: short unit, p: priority 0..7, m: text}], cursor of the last entry or None)."""
+    by_unit = {v + '.service': k for k, v in LOG_UNITS.items()}
+    entries, cursor = [], None
+    for line in text.splitlines():
+        try:
+            j = json.loads(line)
+            msg = j.get('MESSAGE', '')
+            if isinstance(msg, list):                                  # journald stores text with odd bytes as an array of numbers
+                msg = bytes(b & 255 for b in msg).decode('utf-8', 'replace')
+            entries.append(dict(t=int(j['__REALTIME_TIMESTAMP']) // 1000,
+                                u=by_unit.get(j.get('_SYSTEMD_UNIT', ''), ''),
+                                p=min(7, max(0, int(j.get('PRIORITY', 6)))),
+                                m=CONTROL_RE.sub('', str(msg))[:MAX_LOG_LINE]))
+            cursor = j.get('__CURSOR') or cursor
+        except (ValueError, TypeError, KeyError, AttributeError):
+            continue
+    return entries, cursor
 
 
 class Actions:
@@ -99,6 +126,22 @@ class Actions:
             return r.stdout.strip() or 'unknown'
         except (OSError, subprocess.SubprocessError):
             return 'unknown'
+
+    def logs(self, units, cursor=None, limit=200):
+        """(entries, cursor) of the given services; None when the journal cannot be read."""
+        cmd = ['journalctl', '--no-pager', '-o', 'json', '-n', str(limit)]
+        for u in units:
+            cmd += ['-u', LOG_UNITS[u]]
+        if cursor:
+            cmd.append('--after-cursor=' + cursor)
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=6)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if r.returncode != 0 and not r.stdout.strip():
+            return ([], cursor) if 'No entries' in r.stderr else None      # nothing new is not a failure
+        entries, last = parse_journal(r.stdout)
+        return entries, last or cursor
 
     def restart_synth(self):
         subprocess.Popen(['systemctl', '--no-block', 'restart', 'piano-synth.service'])
@@ -285,6 +328,22 @@ class App:
             print('could not remember the buffers of %s: %s' % (device, exc), file=sys.stderr)
 
     # ---- the piano banks
+    def logs(self, query):
+        """Query is parse_qs output. Only whitelisted unit names, a plain cursor and a bounded number of lines are accepted."""
+        wanted = (query.get('units') or [','.join(LOG_UNITS)])[0].split(',')
+        units = [u for u in LOG_UNITS if u in wanted] or list(LOG_UNITS)
+        cursor = (query.get('cursor') or [''])[0] or None
+        if cursor is not None and not CURSOR_RE.match(cursor):
+            raise ValueError('bad cursor')
+        try:
+            limit = int((query.get('limit') or ['200'])[0])
+        except ValueError:
+            raise ValueError('bad limit')
+        got = self.actions.logs(units, cursor, max(1, min(500, limit)))
+        if got is None:
+            return dict(entries=[], cursor=cursor, error='the journal cannot be read here')
+        return dict(entries=got[0], cursor=got[1])
+
     def _bank_context(self):
         conf = pianoconf.parse_conf(self.conf_path)
         bank_dir = conf.get('BANK_DIR') or banklib.DEFAULT_DIR
@@ -387,6 +446,12 @@ def make_handler(app):
         def log_message(self, fmt, *args):
             sys.stderr.write('%s - %s\n' % (self.address_string(), fmt % args))
 
+        def log_request(self, code='-', size='-'):
+            # the page polls the state and the log all the time: successful polls would fill the very log it shows
+            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/logs', '/api/ping'):
+                return
+            super().log_request(code, size)
+
         def _send(self, code, payload, ctype='application/json'):
             body = payload if isinstance(payload, bytes) else json.dumps(payload).encode('utf-8')
             self.send_response(code)
@@ -420,11 +485,19 @@ def make_handler(app):
                         return self._send(200, f.read(), 'text/html')
                 except OSError:
                     return self._send(500, dict(error='index.html is missing'))
-            if self.path == '/api/state':
+            url = urlsplit(self.path)
+            if url.path == '/api/state':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
                 return self._send(200, dict(app.state(), auth_required=bool(app.token)))
-            if self.path == '/api/ping':
+            if url.path == '/api/logs':
+                if not self._authorised():
+                    return self._send(401, dict(error='token required'))
+                try:
+                    return self._send(200, app.logs(parse_qs(url.query)))
+                except ValueError as exc:
+                    return self._send(400, dict(error=str(exc)))
+            if url.path == '/api/ping':
                 return self._send(200, dict(ok=True, auth_required=bool(app.token)))
             self._send(404, dict(error='not found'))
 

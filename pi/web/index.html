@@ -57,6 +57,19 @@
   .bank .meta small { color: var(--muted); display: block; overflow-wrap: anywhere; }
   .bank .why { color: var(--warn); font-size: .82rem; }
   .badge { background: var(--ok); color: #fff; padding: 2px 10px; border-radius: 999px; font-size: .78rem; white-space: nowrap; }
+  .tabs { display: flex; gap: 8px; margin: 0 0 14px; }
+  .tabs button { flex: 1; background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  [hidden] { display: none !important; }
+  .logbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 10px; font-size: .92rem; }
+  .logbar label { display: inline-flex; gap: 6px; align-items: center; }
+  .logbar select { width: auto; padding: 6px 8px; font-size: .92rem; }
+  .logbar button { padding: 6px 12px; font-size: .9rem; }
+  #logBox { height: 58vh; min-height: 260px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+            padding: 6px 8px; font: .76rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  #logBox div { white-space: pre-wrap; overflow-wrap: anywhere; }
+  #logBox .t, #logBox .u { color: var(--muted); }
+  #logBox .p3 { color: var(--bad); } #logBox .p4 { color: var(--warn); } #logBox .p7 { color: var(--muted); }
   #bankStatus { min-height: 2.9em; font-size: .9rem; margin: 6px 0 0; }
   #bankStatus.warn { color: var(--warn); } #bankStatus.err { color: var(--bad); } #bankStatus.ok { color: var(--ok); }
 </style>
@@ -76,6 +89,12 @@
     <div class="status" id="status"></div>
   </div>
 
+  <div class="tabs" role="tablist">
+    <button id="tabMain" class="on" role="tab" data-t="tab_main">Settings</button>
+    <button id="tabLog" role="tab" data-t="tab_log">Log</button>
+  </div>
+
+  <div id="paneMain">
   <div class="card">
     <h2 data-t="bank_title">Piano bank</h2>
     <p class="hint" id="bankHint"></p>
@@ -116,6 +135,22 @@
     <div class="row"><label data-t="polyphony">Polyphony (voices)</label><input type="number" id="polyphony" min="16" max="256" step="16" style="grid-column:1/3"></div>
     <p><button id="applyRestart" data-t="apply_restart" disabled>Apply and restart synthesizer</button></p>
   </div>
+  </div>
+
+  <div id="paneLog" hidden>
+    <div class="card">
+      <div class="logbar">
+        <label><input type="checkbox" id="lu_synth" checked><span data-t="log_synth">Synthesizer</span></label>
+        <label><input type="checkbox" id="lu_bridge" checked><span data-t="log_bridge">Mechanics</span></label>
+        <label><input type="checkbox" id="lu_web" checked><span data-t="log_web">Web</span></label>
+        <select id="logLevel" aria-label="level"><option value="7" data-t="lvl_all">Everything</option><option value="4" data-t="lvl_warn">Warnings and errors</option><option value="3" data-t="lvl_err">Errors only</option></select>
+        <button class="secondary" id="logPause" data-t="log_pause">Pause</button>
+        <button class="secondary" id="logClear" data-t="log_clear">Clear</button>
+      </div>
+      <div id="logBox" role="log" aria-live="off"></div>
+      <p class="hint" id="logInfo"></p>
+    </div>
+  </div>
 </main>
 <div id="msg" role="status" aria-live="polite"></div>
 
@@ -123,6 +158,9 @@
 "use strict";
 const T = {
   en: {
+    tab_main: "Settings", tab_log: "Log", log_synth: "Synthesizer", log_bridge: "Mechanics", log_web: "Web", lvl_all: "Everything", lvl_warn: "Warnings and errors",
+    lvl_err: "Errors only", log_pause: "Pause", log_resume: "Resume", log_clear: "Clear", log_live: "Live: updates every 1.5 s, newest at the bottom.",
+    log_paused: "Paused.", log_empty: "No entries yet.", log_unavailable: "The log cannot be read on this device.",
     bank_title: "Piano bank", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
     bank_profile: "Touch, volume and mechanics settings are remembered for each instrument.",
     bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", preset: "Preset",
@@ -147,6 +185,9 @@ const T = {
     s_pedal_boost: ["Pedal noise level", "dB relative to the original.", " dB"],
   },
   ru: {
+    tab_main: "Настройки", tab_log: "Журнал", log_synth: "Синтезатор", log_bridge: "Механика", log_web: "Веб", lvl_all: "Всё", lvl_warn: "Предупреждения и ошибки",
+    lvl_err: "Только ошибки", log_pause: "Пауза", log_resume: "Продолжить", log_clear: "Очистить", log_live: "Онлайн: обновляется каждые 1,5 с, новое внизу.",
+    log_paused: "На паузе.", log_empty: "Записей пока нет.", log_unavailable: "На этом устройстве журнал недоступен.",
     bank_title: "Банк рояля", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
     bank_profile: "Чувствительность, громкость и механика запоминаются для каждого инструмента.",
     bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", preset: "Пресет",
@@ -378,6 +419,74 @@ async function applyRestart() {
   } catch (e) { say(tr("err") + ": " + e.message, "err"); }
 }
 
+// ---- live log (the journal of the three services), a separate tab
+const LOG_UNITS = ["synth", "bridge", "web"], LOG_KEEP = 1000;
+const logs = { cursor: null, items: [], paused: false, busy: false, gen: 0, reset: false };
+
+function logTime(ms) { const d = new Date(ms); return d.toTimeString().slice(0, 8) + "." + String(d.getMilliseconds()).padStart(3, "0"); }
+function logNode(e) {
+  const row = document.createElement("div"); row.className = "p" + (e.p <= 3 ? 3 : e.p);
+  const t = document.createElement("span"); t.className = "t"; t.textContent = logTime(e.t) + " ";
+  const u = document.createElement("span"); u.className = "u"; u.textContent = (e.u ? e.u : "?").padEnd(6) + " ";
+  row.append(t, u, document.createTextNode(e.m));        // text only: nothing from the journal is ever read as markup
+  return row;
+}
+function logVisible(e) { return e.p <= +$("logLevel").value; }
+function logInfo() { $("logInfo").textContent = logs.paused ? tr("log_paused") : (logs.items.length ? tr("log_live") : tr("log_empty")); }
+function renderLog() {
+  const box = $("logBox"); box.textContent = "";
+  const frag = document.createDocumentFragment();
+  for (const e of logs.items) if (logVisible(e)) frag.append(logNode(e));
+  box.append(frag); box.scrollTop = box.scrollHeight; logInfo();
+}
+function addLog(entries) {
+  if (!entries.length) return;
+  const box = $("logBox"), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
+  logs.items.push(...entries);
+  if (logs.items.length > LOG_KEEP) logs.items.splice(0, logs.items.length - LOG_KEEP);
+  const frag = document.createDocumentFragment();
+  for (const e of entries) if (logVisible(e)) frag.append(logNode(e));
+  box.append(frag);
+  while (box.childElementCount > LOG_KEEP) box.firstChild.remove();
+  if (atEnd) box.scrollTop = box.scrollHeight;
+  logInfo();
+}
+function logUnits() { return LOG_UNITS.filter(u => $("lu_" + u).checked); }
+function restartLog() { logs.gen++; logs.cursor = null; logs.items = []; logs.reset = false; renderLog(); pollLog(); }
+async function pollLog() {
+  if (logs.busy || logs.paused || $("paneLog").hidden || document.hidden || !logUnits().length) return;
+  logs.busy = true; const gen = logs.gen;
+  try {
+    const q = new URLSearchParams({ units: logUnits().join(","), limit: logs.cursor ? "300" : "200" });
+    if (logs.cursor) q.set("cursor", logs.cursor);
+    const r = await api("/api/logs?" + q.toString());
+    if (gen !== logs.gen) return;                           // the selection changed while this answer was on its way
+    if (r.error) { logs.cursor = null; logs.reset = true; $("logInfo").textContent = tr("log_unavailable"); return; }
+    if (logs.reset) { logs.items = []; renderLog(); logs.reset = false; }
+    logs.cursor = r.cursor; addLog(r.entries);
+  } catch (e) { /* the next tick tries again */ } finally { logs.busy = false; }
+}
+function showTab(name) {
+  const log = name === "log";
+  $("paneMain").hidden = log; $("paneLog").hidden = !log;
+  $("tabMain").classList.toggle("on", !log); $("tabLog").classList.toggle("on", log);
+  try { localStorage.setItem("pianoTab", name); } catch (e) { /* private window: the tab is simply not remembered */ }
+  if (log) { logInfo(); pollLog(); }
+}
+function initLog() {
+  $("tabMain").addEventListener("click", () => showTab("main"));
+  $("tabLog").addEventListener("click", () => showTab("log"));
+  for (const u of LOG_UNITS) $("lu_" + u).addEventListener("change", restartLog);
+  $("logLevel").addEventListener("change", renderLog);
+  $("logPause").addEventListener("click", () => {
+    logs.paused = !logs.paused; $("logPause").textContent = tr(logs.paused ? "log_resume" : "log_pause"); logInfo(); if (!logs.paused) pollLog();
+  });
+  $("logClear").addEventListener("click", () => { logs.items = []; renderLog(); });
+  setInterval(pollLog, 1500);
+  let saved = null; try { saved = localStorage.getItem("pianoTab"); } catch (e) { /* ignore */ }
+  if (saved === "log") showTab("log");
+}
+
 async function refresh() {
   try {
     const s = await api("/api/state");
@@ -405,6 +514,7 @@ async function start() {
   }
   $("device").addEventListener("change", deviceChosen);
   $("applyRestart").addEventListener("click", applyRestart);
+  initLog();
   setInterval(refresh, 3000);
 }
 $("tokenBtn").addEventListener("click", () => { token = $("token").value; sessionStorage.setItem("pianoToken", token); start(); });

@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.3.3                                # -> dist/piano-synth_1.3.3_all.deb
-python3 scripts/build-deb.py --version 1.3.3 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.3.3_all.deb
+python3 scripts/build-deb.py --version 1.4.0                                # -> dist/piano-synth_1.4.0_all.deb
+python3 scripts/build-deb.py --version 1.4.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.4.0_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.3.3_all.deb ./piano-synth-soundfonts_1.3.3_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.4.0_all.deb ./piano-synth-soundfonts_1.4.0_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.3.3_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.3.3_all.deb && dpkg-deb --contents piano-synth_1.3.3_all.deb`.
+`dpkg-deb --info piano-synth_1.4.0_all.deb && dpkg-deb --contents piano-synth_1.4.0_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -163,7 +163,7 @@ On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bas
 
 **Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
 builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
-and keeps the files as a downloadable artifact; a tag such as `v1.3.3` (it must equal the `VERSION` file) publishes them as a release.
+and keeps the files as a downloadable artifact; a tag such as `v1.4.0` (it must equal the `VERSION` file) publishes them as a release.
 Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
 
 What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
@@ -269,6 +269,9 @@ host name on DietPi is shown in your router). The page has:
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
+- **Log tab**: the journal of the three services (synthesizer, mechanics bridge, web) live, newest at the bottom, updated every 1.5 s. Filter by service and
+  by level (everything / warnings and errors / errors only), pause and clear. Handy for seeing which output and buffer were chosen, whether the bank loaded, and for
+  catching underruns or errors while you play. Only the page's own polling is left out of the web log, so it does not drown the real entries.
 - **Audio output**: the output card, the buffers of the built-in and of the USB output, reverb and polyphony. The buffers are remembered **per audio interface**
   (`/var/lib/piano-synth/devices.json`, keyed by the `ALSA_DEVICE` value): choose another interface and the page fills in the buffers it was
   last used with; an interface never used before keeps the current ones. These need a restart of the synthesizer (~45 s), so they are
