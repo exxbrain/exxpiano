@@ -9,7 +9,8 @@
   GET  /api/wifi           Wi-Fi: link, saved networks, scan results, access point (the setup mode), result of the last change
   POST /api/device         {"name": "piano-kitchen"}  - rename the device (its network name, http://<name>.local:8080/); useful with several devices
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
-  GET  /api/qr             ?kind=join|setup|page  - {text, svg}: a QR code to join the setup network, to open its page, to open this page
+  GET  /api/qr             ?kind=join|setup|page  - {text, svg}: a QR code to join the setup network, to open its page, to open this page (the
+                           page codes carry ?d=<device number>: the page warns when it is a different device)
   GET  /api/monitor        ?since=<ms>  - CPU, temperature, frequency, memory, throttling, load of the piano services, chart points since <ms>
 
 Settings that can be changed are whitelisted with ranges in pianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
@@ -437,23 +438,24 @@ class App:
         asking browser reached it (for a phone on the same network)."""
         kind = (query.get('kind') or [''])[0]
         conf = pianoconf.parse_conf(self.conf_path)
+        number = wifilib.device_number(self.actions.wifi_mac())     # the codes name the device they belong to: the page checks it
         port = conf.get('WEB_PORT') or '8080'
         if kind == 'join':
             ssid, password = wifilib.setup_credentials(conf, self.actions.wifi_mac())
             text, extra = qrlib.wifi_text(ssid, password), dict(ssid=ssid, password=password)
         elif kind == 'setup':
-            text, extra = 'http://%s:%s/#/wifi' % (wifilib.AP_ADDRESS, port), {}
+            text, extra = 'http://%s:%s/?d=%s#/wifi' % (wifilib.AP_ADDRESS, port, number), {}
         elif kind == 'page':
             if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}(:\d{1,5})?', host or ''):
                 host = '%s:%s' % ((self.wifi().get('link') or {}).get('ip') or wifilib.AP_ADDRESS, port)
-            text, extra = 'http://%s/#/wifi' % host, {}
+            text, extra = 'http://%s/?d=%s#/wifi' % (host, number), {}
         else:
             raise ValueError('kind must be join, setup or page')
         return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(qrlib.encode(text, 'M')))
 
     def device_info(self):
         mac = self.actions.wifi_mac()
-        return dict(number=wifilib.device_number(mac), suggested=wifilib.suggested_hostname(mac))
+        return dict(number=wifilib.device_number(mac))
 
     def rename(self, body):
         name = body.get('name') if isinstance(body, dict) else None
@@ -608,7 +610,7 @@ def make_handler(app):
             return json.loads(self.rfile.read(length).decode('utf-8'))
 
         def do_GET(self):
-            if self.path in ('/', '/index.html'):
+            if urlsplit(self.path).path in ('/', '/index.html'):                 # a query (?d=81DE from a QR code) still means the page
                 try:
                     with open(os.path.join(WEB_DIR, 'index.html'), 'rb') as f:
                         return self._send(200, f.read(), 'text/html')

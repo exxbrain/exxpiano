@@ -62,8 +62,9 @@ def main():
     ssid = args.ssid or wifilib.ap_ssid(args.prefix, args.mac)
     wifilib.validate_ssid(ssid)
     wifilib.validate_passphrase(args.password)
-    page_url = 'http://%s:%d/#/wifi' % (args.address, args.port)
     number = wifilib.device_number(args.mac) if args.mac else (ssid.rsplit('-', 1)[-1] if ssid.rsplit('-', 1)[-1].isalnum() else '')
+    # the code names its device: the page warns when it is opened on another one
+    page_url = 'http://%s:%d/%s#/wifi' % (args.address, args.port, '?d=%s' % number.upper() if number else '')
     codes = {'join-wifi': qrlib.wifi_text(ssid, args.password), 'open-page': page_url}
     os.makedirs(args.out, exist_ok=True)
     import base64

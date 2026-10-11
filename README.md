@@ -129,11 +129,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.8.0                                # -> dist/piano-synth_1.8.0_all.deb
-python3 scripts/build-deb.py --version 1.8.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.8.0_all.deb
+python3 scripts/build-deb.py --version 1.8.1                                # -> dist/piano-synth_1.8.1_all.deb
+python3 scripts/build-deb.py --version 1.8.1 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.8.1_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.8.0_all.deb ./piano-synth-soundfonts_1.8.0_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.8.1_all.deb ./piano-synth-soundfonts_1.8.1_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -147,7 +147,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.8.0_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.8.0_all.deb && dpkg-deb --contents piano-synth_1.8.0_all.deb`.
+`dpkg-deb --info piano-synth_1.8.1_all.deb && dpkg-deb --contents piano-synth_1.8.1_all.deb`.
 
 ## DietPi installer (built on every commit)
 
@@ -163,7 +163,7 @@ On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bas
 
 **Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
 builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
-and keeps the files as a downloadable artifact; a tag such as `v1.8.0` (it must equal the `VERSION` file) publishes them as a release.
+and keeps the files as a downloadable artifact; a tag such as `v1.8.1` (it must equal the `VERSION` file) publishes them as a release.
 Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
 
 What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
@@ -295,7 +295,7 @@ the synthesizer; hardening that is a task for a real product.
 Every device has a **number**: the last four hex digits of its Wi-Fi address (for example `81DE`). The same number ends the setup network's name
 (`Piano-Setup-81DE`), is printed on the QR sticker (`scripts/make-qr.py`), and is shown in the menu and in the browser tab, so devices never get mixed up. A new device that still
 has a generic network name (`dietpi`, `raspberrypi`, `piano`) is named `piano-81de` by the package; a name you chose is never changed by itself. The **Device name**
-box on the Wi-Fi page renames a device (the page then also opens at `http://<name>.local:8080/`) and offers `piano-<number>` with one click.
+box on the Wi-Fi page renames a device (the page then also opens at `http://<name>.local:8080/`) (the number is also in the page QR code, `?d=81DE`: the page shows a red warning when a code made for another device is used on it).
 
 ## Connecting to a new Wi-Fi
 

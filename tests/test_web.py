@@ -163,6 +163,15 @@ class WebTests(ServerCase):
         self.assertEqual(code, 200)
         self.assertIn(b'<title>', body)
 
+    def test_the_page_opens_with_a_query_and_a_fragment_as_in_the_qr_codes(self):
+        self.start()
+        for path in ('/?d=81DE', '/index.html?d=81DE', '/?d=81DE&x=1'):
+            with self.subTest(path):
+                code, body = self.call(path)
+                self.assertEqual(code, 200)
+                self.assertIn(b'<title>', body)
+        self.assertEqual(self.call('/nothing?d=1')[0], 404)
+
     def test_state_has_settings_spec_and_status(self):
         self.start()
         code, s = self.jcall('/api/state')
@@ -579,7 +588,7 @@ class DeviceNameTests(ServerCase):
         self.start()
         r = self.jcall('/api/state')[1]
         self.assertEqual(r['hostname'], 'pi-synth')
-        self.assertEqual(r['device'], dict(number='81DE', suggested='piano-81de'))
+        self.assertEqual(r['device'], dict(number='81DE'))
 
     def test_rename_stores_a_clean_name_and_the_state_follows(self):
         self.start()
@@ -640,16 +649,16 @@ class QrApiTests(ServerCase):
 
     def test_setup_page_code_uses_the_web_port(self):
         self.start(CONF + 'WEB_PORT=9090\n')
-        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:9090/#/wifi')
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:9090/?d=81DE#/wifi')
         self.start()
-        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:8080/#/wifi')
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=81DE#/wifi')                 # the device number is in the code
 
     def test_page_code_is_the_address_the_browser_used_or_the_known_ip(self):
         self.start()
-        self.assertEqual(self.qr('kind=page', 'pi-synth.local:8080')[1]['text'], 'http://pi-synth.local:8080/#/wifi')
-        self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/#/wifi')
+        self.assertEqual(self.qr('kind=page', 'pi-synth.local:8080')[1]['text'], 'http://pi-synth.local:8080/?d=81DE#/wifi')
+        self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/?d=81DE#/wifi')
         r = self.qr('kind=page', 'evil.example/<script>')[1]                                  # an odd Host header is not copied into a code
-        self.assertEqual(r['text'], 'http://192.168.1.9:8080/#/wifi')
+        self.assertEqual(r['text'], 'http://192.168.1.9:8080/?d=81DE#/wifi')
 
     def test_unknown_kinds_and_the_token(self):
         self.start(CONF + 'WEB_TOKEN=s3cret\n')

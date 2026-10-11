@@ -20,6 +20,7 @@ NetworkManager instead: there the feature stays off and says so (`nmtui` does th
 | Where is the password stored? | Only the derived 256-bit PSK (PBKDF2-SHA1, 4096 rounds, as `wpa_passphrase` does) goes into `wpa_supplicant.conf` (0600); the password is never logged, never passed on a command line | the same format DietPi already uses |
 | Who changes the network? | One owner: the service `piano-wifi` (root). The web server only writes a request file in `/run/piano-wifi/` (0600) and reads a status file | no two processes fight over `wlan0` |
 | What if the new network does not work? | The old configuration is restored (wrong password and out of range look the same to the radio); in AP mode the AP comes back with the reason on the page | the device can never be left without a way in |
+| Two devices, one sticker mixed up? | The page codes carry the device number (`?d=81DE`); the page warns loudly when it is another device. The join code holds the number in the network's name | all setup networks use the same address `10.42.0.1`, so the address alone cannot tell the devices apart |
 | After success, how do I find it? | `http://<hostname>.local:8080/` through `avahi-daemon` (recommended package), plus the router's client list | the phone leaves the AP and cannot be told the new address |
 
 ## Phases
