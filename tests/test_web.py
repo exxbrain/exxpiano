@@ -1,4 +1,5 @@
 """Tests for pi/exxpiano-web.py: the HTTP API with the system actions replaced by fakes (no Pi, no root needed)."""
+import base64
 import importlib.util
 import json
 import os
@@ -645,6 +646,11 @@ class QrApiTests(ServerCase):
         self.assertEqual((r['ssid'], r['password']), ('exxpiano-Setup-0123456789ABCDEF', 'exxpianosetup'))
         self.assertEqual(r['text'], 'WIFI:T:WPA;S:exxpiano-Setup-0123456789ABCDEF;P:exxpianosetup;;')
         self.assertTrue(r['svg'].startswith('<svg') and 'viewBox' in r['svg'])
+        png = base64.b64decode(r['png'])                                                          # the page offers it as a download: a real PNG
+        self.assertEqual(png[:8], b'\x89PNG\r\n\x1a\n')
+        self.assertEqual(r['filename'], 'exxpiano-join-wifi-0123456789ABCDEF')
+        for kind, name in (('setup', 'setup-page'), ('page', 'page')):
+            self.assertEqual(self.qr('kind=' + kind)[1]['filename'], 'exxpiano-%s-0123456789ABCDEF' % name)
 
     def test_a_changed_name_and_password_and_a_bad_password(self):
         self.start(CONF + 'WIFI_AP_SSID=My-Piano\nWIFI_AP_PASSWORD="much better; secret"\n')

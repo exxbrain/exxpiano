@@ -31,6 +31,7 @@ from urllib.parse import parse_qs, urlsplit
 import banklib
 import exxpianoconf
 import profiles
+import base64
 import qrlib
 import sysmon
 import wifilib
@@ -447,7 +448,10 @@ class App:
             text, extra = 'http://%s/?d=%s#/wifi' % (host, install_id), {}
         else:
             raise ValueError('kind must be join, setup or page')
-        return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(qrlib.encode(text, 'M')))
+        matrix = qrlib.encode(text, 'M')
+        # svg and png are what the page offers for download (the only place where a code can be taken: it belongs to this installation)
+        return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(matrix), png=base64.b64encode(qrlib.to_png(matrix, scale=10, border=4)).decode('ascii'),
+                    filename='exxpiano-%s-%s' % ({'join': 'join-wifi', 'setup': 'setup-page', 'page': 'page'}[kind], install_id))
 
     def device_info(self):
         return dict(installation_id=self.actions.installation_id())

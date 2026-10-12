@@ -32,6 +32,7 @@ mkdir -p "$W/mnt"; mount -o ro "$ROOT" "$W/mnt"
 BOOTDIR="$(awk '$3=="vfat"{print $2; exit}' "$W/mnt/etc/fstab" 2>/dev/null || true)"; BOOTDIR="${BOOTDIR:-/boot}"
 BOOT_MOUNT="$W/mnt$BOOTDIR"; mkdir -p "$BOOT_MOUNT"; mount -o ro "$BOOT" "$BOOT_MOUNT"
 mount --bind /dev "$W/mnt/dev"; mount -t proc proc "$W/mnt/proc"
+mount -t tmpfs tmpfs "$W/mnt/tmp"      # the image is read only: the programs create their runtime files (the installation ID) in a memory file system, as on the device (/tmp is tmpfs there too)
 fail=0; ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; fail=1; }
 check_required_layout "$W/mnt" "$BOOT_MOUNT" || fail=1
 chroot "$W/mnt" dpkg -s exxpiano 2>/dev/null | grep -q '^Status: install ok installed' && ok "the package is installed" || bad "the package is not installed"
@@ -46,7 +47,9 @@ get() { python3 -c "import sys, urllib.request; print(urllib.request.urlopen(sys
 ( chroot "$W/mnt" /usr/bin/env EXXPIANO_CONF=/dev/null PROFILE_FILE=/tmp/profiles.json EXXPIANO_INSTALLATION_ID_PATH=/tmp/exxpiano-installation-id python3 /opt/exxpiano/exxpiano-web.py >"$W/web.log" 2>&1 & ) || true
 sleep 3
 get http://127.0.0.1:8080/api/ping | grep -q '"ok": true' && ok "the web service answers" || bad "the web service does not answer: $(tail -3 "$W/web.log")"
-get "http://127.0.0.1:8080/api/qr?kind=join" | grep -q 'WIFI:T:WPA;S:exxpiano-Setup-' && ok "the QR code for the setup network is made" || bad "no QR code"
+QR_JOIN="$(get "http://127.0.0.1:8080/api/qr?kind=join")"
+ECHO_ID="$(cat "$W/mnt/tmp/exxpiano-installation-id" 2>/dev/null || true)"
+echo "$QR_JOIN" | grep -q "WIFI:T:WPA;S:exxpiano-Setup-$ECHO_ID;" && echo "$QR_JOIN" | grep -q '"png": "' && ok "the page makes the QR codes of the setup network for the generated installation ID" || bad "no QR code for the generated installation ID: $(echo "$QR_JOIN" | head -c 200)"
 get http://127.0.0.1:8080/ | grep -q 'id="drawer"' && ok "the page with the menu is served" || bad "the page is not served"
 for unit in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
   grep -q '^ExecStart=' "$W/mnt/lib/systemd/system/$unit.service" && ok "$unit.service has an ExecStart" || bad "$unit.service is broken"

@@ -88,6 +88,7 @@
   .qrs figure { margin: 0; width: 220px; max-width: 100%; text-align: center; }
   .qrs img { width: 100%; background: #fff; border-radius: 6px; image-rendering: crisp-edges; }
   .qrs figcaption b { display: block; margin-top: 6px; font-size: .95rem; }
+  .qrs figcaption .noprint { margin-top: 4px; font-size: .88rem; }
   .qrs figcaption span { display: block; color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
   @media print {
     .top, #drawer, #backdrop, #msg, #login, main > section:not(#paneWifi), #paneWifi > :not(#qrCard), #qrCard .noprint, #qrCard .hint { display: none !important; }
@@ -238,7 +239,7 @@
       <p id="wSetupRow" hidden><button class="secondary" id="wSetup" data-t="w_setup">Start the setup network for 5 minutes</button></p></div>
     <div class="card" id="qrCard">
       <h2 data-t="q_title">Phone setup by QR code</h2>
-      <p class="hint" data-t="q_hint">Scan with the phone camera: the first code joins the Pi's setup network, the second opens this settings page. Print the page as a sticker for the device.</p>
+      <p class="hint" data-t="q_hint">Scan with the phone camera: the first code joins this device's setup network, the second opens this settings page. The codes belong to this installation and can be downloaded only here: save the PNG or SVG and print a sticker for the device. The join code works whenever the setup network is on.</p>
       <div class="qrs">
         <figure id="qrJoinBox"><img id="qrJoin" alt=""><figcaption><b data-t="q_join">1. Join the setup network</b><span id="qrJoinText"></span></figcaption></figure>
         <figure id="qrSetupBox"><img id="qrSetup" alt=""><figcaption><b data-t="q_setup">2. Open the setup page</b><span id="qrSetupText"></span></figcaption></figure>
@@ -299,8 +300,8 @@ const T = {
     w_setup_started: "Starting the setup network… join it from your phone: its name begins with exxpiano-Setup.",
     w_only_way: "in use, the only way to reach the Pi: add another network or plug in a cable first",
     n_title: "Device name", n_hint: "The installation ID is generated automatically at first boot; you never have to enter a board serial. It already makes the default hostname and setup Wi-Fi unique. You may give the device a friendlier name; use lowercase letters, digits and hyphens.", n_label: "Name", n_save: "Save the name", d_mismatch: "Warning: this code belongs to installation {wanted}, but this page is installation {have}. You may be connected to another device.", n_saved: "Saved: {name}. The page also opens at http://{name}.local:8080/.",
-    q_title: "Phone setup by QR code", q_hint: "Scan with the phone camera: the first code joins the Pi's setup network, the second opens this settings page. Print the page as a sticker for the device.",
-    q_join: "1. Join the setup network", q_setup: "2. Open the setup page", q_page: "Open this page on a phone", q_print: "Print",
+    q_title: "Phone setup by QR code", q_hint: "Scan with the phone camera: the first code joins this device's setup network, the second opens this settings page. The codes belong to this installation and can be downloaded only here: save the PNG or SVG and print a sticker for the device. The join code works whenever the setup network is on.",
+    q_join: "1. Join the setup network", q_setup: "2. Open the setup page", q_page: "Open this page on a phone", q_print: "Print", q_png: "Download PNG", q_svg: "SVG",
     w_title: "Wi-Fi", w_add: "Connect to a network", w_network: "Network", w_name: "Network name", w_password: "Password", w_show: "Show the password",
     w_add_hint: "Choose the network and type its password. The Pi tries it for up to a minute and keeps the previous settings if it does not work.",
     w_connect: "Connect", w_scan: "Scan again", w_saved: "Saved networks", w_forget: "Forget", w_other: "Another network (type the name)…", w_none_saved: "No saved networks.",
@@ -355,8 +356,8 @@ const T = {
     w_setup_started: "Запускаю сеть настройки… подключитесь к ней с телефона: имя начинается с exxpiano-Setup.",
     w_only_way: "используется, единственный путь к Pi: сначала добавьте другую сеть или подключите кабель",
     n_title: "Имя устройства", n_hint: "Идентификатор установки создаётся автоматически при первом запуске; серийный номер платы вводить не нужно. Он уже делает hostname и сеть настройки уникальными. При желании устройству можно дать понятное имя: строчные латинские буквы, цифры и дефис.", n_label: "Имя", n_save: "Сохранить имя", d_mismatch: "Внимание: этот код принадлежит установке {wanted}, а эта страница — установке {have}. Возможно, вы подключились к другому устройству.", n_saved: "Сохранено: {name}. Страница открывается и по http://{name}.local:8080/.",
-    q_title: "Настройка с телефона по QR-коду", q_hint: "Наведите камеру телефона: первый код подключает к сети настройки Pi, второй открывает эту страницу. Страницу можно распечатать как наклейку на устройство.",
-    q_join: "1. Подключиться к сети настройки", q_setup: "2. Открыть страницу настройки", q_page: "Открыть эту страницу на телефоне", q_print: "Печать",
+    q_title: "Настройка с телефона по QR-коду", q_hint: "Наведите камеру телефона: первый код подключает к сети настройки этого устройства, второй открывает эту страницу. Коды принадлежат этой установке и скачиваются только здесь: сохраните PNG или SVG и напечатайте наклейку для устройства. Код подключения работает всякий раз, когда включена сеть настройки.",
+    q_join: "1. Подключиться к сети настройки", q_setup: "2. Открыть страницу настройки", q_page: "Открыть эту страницу на телефоне", q_print: "Печать", q_png: "Скачать PNG", q_svg: "SVG",
     w_title: "Wi-Fi", w_add: "Подключение к сети", w_network: "Сеть", w_name: "Имя сети", w_password: "Пароль", w_show: "Показать пароль",
     w_add_hint: "Выберите сеть и введите пароль. Pi пробует подключиться до минуты и при неудаче оставляет прежние настройки.",
     w_connect: "Подключить", w_scan: "Обновить список", w_saved: "Сохранённые сети", w_forget: "Забыть", w_other: "Другая сеть (ввести имя)…", w_none_saved: "Сохранённых сетей нет.",
@@ -850,6 +851,14 @@ function fillNetworks(list) {
 }
 function netChosen() { $("wNameRow").hidden = $("wNet").value !== "\u0000other"; }
 const qr = { loaded: "", busy: false };
+// A code can be taken only here, from the page of the installation it belongs to: PNG for a sticker, SVG for print at any size.
+function addDownloads(imgId, r) {
+  const fig = $(imgId).parentElement; fig.querySelectorAll("a.dl").forEach(a => a.remove());
+  const row = document.createElement("span"); row.className = "noprint";
+  const link = (label, href, ext) => { const a = document.createElement("a"); a.className = "dl"; a.textContent = label; a.href = href; a.download = r.filename + "." + ext; return a; };
+  row.append(link(tr("q_png"), "data:image/png;base64," + r.png, "png"), document.createTextNode(" · "), link(tr("q_svg"), "data:image/svg+xml;charset=utf-8," + encodeURIComponent(r.svg), "svg"));
+  fig.querySelector("figcaption").append(row);
+}
 async function loadQr(d) {
   const mode = d && d.mode === "ap" ? "ap" : "client";
   if (qr.busy || qr.loaded === mode) return;
@@ -859,10 +868,10 @@ async function loadQr(d) {
       const r = await api("/api/qr?kind=" + kind);
       $(imgId).src = "data:image/svg+xml;utf8," + encodeURIComponent(r.svg);
       $(imgId).alt = r.text;
+      addDownloads(imgId, r);
       if (textId) $(textId).textContent = kind === "join" ? r.ssid + " · " + r.password : r.text;
     };
     await Promise.all([put("join", "qrJoin", "qrJoinText"), put("setup", "qrSetup", "qrSetupText"), put("page", "qrPage", "qrPageText")]);
-    $("qrJoinBox").hidden = $("qrSetupBox").hidden = mode === "ap";      // a phone that is already on the setup network needs only the page
     qr.loaded = mode;
   } catch (e) { /* the codes are an extra: the page works without them */ } finally { qr.busy = false; }
 }

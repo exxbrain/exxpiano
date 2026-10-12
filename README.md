@@ -278,7 +278,7 @@ Good to know:
   Wi-Fi password typed during the setup.
 - The password of the home network is turned into a key before it is saved (as `wpa_passphrase` does) and is never logged.
 - This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the tab says so; use `sudo nmtui` there.
-- **QR codes.** The Wi-Fi page shows a code for the unique setup network, one for the setup page, and one for the current page, with a **Print** button. The built-in `pi/qrlib.py` creates them without internet or extra packages.
+- **QR codes.** The Wi-Fi page shows a code for the unique setup network, one for the setup page, and one for the current page, with a **Print** button and **Download PNG / SVG** links for each (file names contain the installation ID). **The codes exist only there**: the ID is created at the first start, so the image build makes no QR codes or stickers; take them from the page of the device they belong to and print a sticker. The join code works whenever the setup network is on, so a sticker printed in advance stays valid. The built-in `pi/qrlib.py` creates them without internet or extra packages.
 - The setup network starts **10 s** after the Pi finds itself without a network (immediately after you remove the last saved network and no cable is plugged
   in). The **Start the setup network for 5 minutes** button on the Wi-Fi page does it by hand and the Pi comes back to its network by itself. The only network in use
   cannot be forgotten while it is the only way to reach the Pi (no cable, no other saved network).
