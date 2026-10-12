@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="piano-synth-0001-sd">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/build/sd-e2e/out/0001/piano-synth-0001-sd.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

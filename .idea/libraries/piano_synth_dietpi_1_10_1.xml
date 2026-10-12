@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="piano-synth-dietpi-1.10.1">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/dist/piano-synth-dietpi-1.10.1.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
