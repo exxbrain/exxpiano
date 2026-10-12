@@ -49,6 +49,8 @@ Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The wor
 - `README.txt`;
 - `SHA256SUMS`.
 
+The release title names exxpiano, its version, and the supported Raspberry Pi family. Its English description explains the image contents, flashing and first boot, checksum verification, and why an already-booted card must not be cloned.
+
 No release is created if any preceding step fails. An existing release is not silently overwritten: a rerun may add missing assets, but a name collision fails and requires an explicit operator decision.
 
 Ordinary pushes and pull requests run only the fast tests. The complete stand-in image pipeline runs separately when image builder, DietPi setup, packaging, or their workflow changes; it can also be started manually from GitHub Actions.
