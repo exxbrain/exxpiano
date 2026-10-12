@@ -10,7 +10,7 @@
   POST /api/device         {"name": "piano-kitchen"}  - rename the device (its network name, http://<name>.local:8080/); useful with several devices
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
   GET  /api/qr             ?kind=join|setup|page  - {text, svg}: a QR code to join the setup network, to open its page, to open this page (the
-                           page codes carry ?d=<device number>: the page warns when it is a different device)
+                           page codes carry ?d=<installation ID>: the page warns when it is a different installation)
   GET  /api/monitor        ?since=<ms>  - CPU, temperature, frequency, memory, throttling, load of the piano services, chart points since <ms>
 
 Settings that can be changed are whitelisted with ranges in exxpianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
@@ -29,7 +29,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import banklib
-import deviceid
 import exxpianoconf
 import profiles
 import qrlib
@@ -179,15 +178,8 @@ class Actions:
         wifilib.apply_hostname(name, run)
         return socket.gethostname()
 
-    def device_serial(self):
-        return deviceid.read_serial()
-
-    def wifi_mac(self):
-        try:
-            with open('/sys/class/net/%s/address' % self.wifi_iface) as f:
-                return f.read().strip()
-        except OSError:
-            return ''
+    def installation_id(self):
+        return wifilib.installation_id()
 
     def network_manager_active(self):
         return self._service_state('NetworkManager') == 'active'
@@ -442,26 +434,23 @@ class App:
         asking browser reached it (for a phone on the same network)."""
         kind = (query.get('kind') or [''])[0]
         conf = exxpianoconf.parse_conf(self.conf_path)
-        number = self.device_info()['number']                        # the codes name the device they belong to: the page checks it
+        install_id = self.device_info()['installation_id']           # the codes identify the installed copy they belong to
         port = conf.get('WEB_PORT') or '8080'
         if kind == 'join':
-            ssid, password = wifilib.setup_credentials(conf, self.actions.wifi_mac())
+            ssid, password = wifilib.setup_credentials(conf, install_id)
             text, extra = qrlib.wifi_text(ssid, password), dict(ssid=ssid, password=password)
         elif kind == 'setup':
-            text, extra = 'http://%s:%s/?d=%s#/wifi' % (wifilib.AP_ADDRESS, port, number), {}
+            text, extra = 'http://%s:%s/?d=%s#/wifi' % (wifilib.AP_ADDRESS, port, install_id), {}
         elif kind == 'page':
             if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}(:\d{1,5})?', host or ''):
                 host = '%s:%s' % ((self.wifi().get('link') or {}).get('ip') or wifilib.AP_ADDRESS, port)
-            text, extra = 'http://%s/?d=%s#/wifi' % (host, number), {}
+            text, extra = 'http://%s/?d=%s#/wifi' % (host, install_id), {}
         else:
             raise ValueError('kind must be join, setup or page')
         return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(qrlib.encode(text, 'M')))
 
     def device_info(self):
-        conf = exxpianoconf.parse_conf(self.conf_path)
-        board = deviceid.status(conf.get('DEVICE_SERIAL'), self.actions.device_serial())
-        return dict(number=wifilib.device_number(self.actions.wifi_mac(), conf.get('DEVICE_NUMBER')), serial=board['serial'], bound=board['bound'],
-                    bound_serial=board['bound_serial'], serial_ok=board['ok'], locked=conf.get('DEVICE_LOCK') == '1')
+        return dict(installation_id=self.actions.installation_id())
 
     def rename(self, body):
         name = body.get('name') if isinstance(body, dict) else None

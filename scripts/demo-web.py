@@ -3,7 +3,7 @@
 
   python3 scripts/demo-web.py                    # http://127.0.0.1:8080/
   python3 scripts/demo-web.py --mode ap          # the device in setup mode (its own Wi-Fi), the page opens on the Wi-Fi tab
-  python3 scripts/demo-web.py --number 0007 --open --other-board
+  python3 scripts/demo-web.py --installation-id 0123456789ABCDEF --open
 
 Everything works as on the device: move the sliders, change the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" in it does not connect;
 "Cafe" is open), start the setup network, scan the QR codes. Nothing is written outside a temporary folder and nothing is sent anywhere.
@@ -92,8 +92,8 @@ class DemoActions(web.Actions):
     def wifi_mac(self):
         return 'b8:27:eb:d2:81:de'
 
-    def device_serial(self):
-        return '00000000d2f2f1de'
+    def installation_id(self):
+        return self.args.installation_id
 
     def network_manager_active(self):
         return False
@@ -127,7 +127,7 @@ class DemoActions(web.Actions):
 
     def wifi_status(self):
         self._tick()
-        ap = dict(ssid='exxpiano-Setup-%s' % self.args.number)
+        ap = dict(ssid=web.wifilib.ap_ssid('exxpiano-Setup', self.args.installation_id))
         return dict(mode=self.mode, busy=self.busy, link=self.link, cable=self.cable, hostname=self.host, ap=ap if self.mode == 'ap' else None,
                     scan=self.scan, scanned_at=int(time.time()), last_result=self.last_result, updated=int(time.time()))
 
@@ -169,9 +169,7 @@ def main():
     ap.add_argument('--bind', default='127.0.0.1', help='127.0.0.1 (this computer only); 0.0.0.0 to look at it from a phone on the same network')
     ap.add_argument('--mode', choices=('client', 'ap'), default='client', help='ap: the device has no network and runs its own (setup mode)')
     ap.add_argument('--hostname', default='exxpiano')
-    ap.add_argument('--number', default='81DE', help='the device number (DEVICE_NUMBER)')
-    ap.add_argument('--other-board', action='store_true', help='simulate a card that was made for another Raspberry Pi (the red warning)')
-    ap.add_argument('--locked', action='store_true', help='with --other-board: the lock is on')
+    ap.add_argument('--installation-id', default='0123456789ABCDEF', help='16 hexadecimal characters, generated automatically on a real device')
     ap.add_argument('--throttled', action='store_true', help='show that the board was throttled earlier (under-voltage)')
     ap.add_argument('--token', default='', help='ask for this access token, as WEB_TOKEN does')
     ap.add_argument('--open', action='store_true', help='open the page in the browser')
@@ -186,9 +184,7 @@ def main():
     conf = os.path.join(tmp, 'exxpiano.conf')
     lines = ['PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'), 'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'), 'BANK_DIR=%s' % banks, 'ALSA_DEVICE=auto',
              'GAIN=1.0', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--hammer-boost 0 --hammer-exp 0.8 --random 1"',
-             'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'DEVICE_NUMBER=%s' % args.number, 'WEB_PORT=%d' % args.port]
-    if args.other_board:
-        lines += ['DEVICE_SERIAL=000000001234abcd', 'DEVICE_LOCK=%d' % (1 if args.locked else 0)]
+             'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'WEB_PORT=%d' % args.port]
     if args.token:
         lines.append('WEB_TOKEN=%s' % args.token)
     with open(conf, 'w') as f:

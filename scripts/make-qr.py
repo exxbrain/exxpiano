@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Make the QR codes of the setup network: one to join it, one to open the setup page. Files: PNG, SVG and a page to print (a sticker for the device).
 
-  python3 scripts/make-qr.py --ssid exxpiano-Setup-81DE                  # password exxpianosetup, page http://10.42.0.1:8080/#/wifi
-  python3 scripts/make-qr.py --mac b8:27:eb:d2:81:de --password 'my secret'
+  python3 scripts/make-qr.py --installation-id 0123456789ABCDEF
 
-The setup network is called exxpiano-Setup-XXXX, XXXX = the last four digits of the Pi's Wi-Fi address (the Wi-Fi tab and
-`python3 /opt/exxpiano/exxpiano-wifi.py status` show it). Nothing here needs the internet or any package.
+The installation ID is generated automatically on first boot and is shown by the Wi-Fi tab. Nothing here needs the internet or any package.
 """
 import argparse
 import html
@@ -32,7 +30,7 @@ PAGE = """<!doctype html>
   @media print {{ body {{ margin: 8mm; }} .noprint {{ display: none; }} }}
 </style></head><body>
 <h1>exxpiano: Wi-Fi setup / Настройка Wi-Fi</h1>
-<p class="sub">Device <b>&#8470; {number}</b> &middot; network <b>{ssid}</b> &middot; password <b>{password}</b></p>
+<p class="sub">Installation <b>{install_id}</b> &middot; network <b>{ssid}</b> &middot; password <b>{password}</b></p>
 <div class="codes">
   <div class="code"><img alt="Join the network" src="data:image/png;base64,{join_png}">
     <b>1. Join the network / Подключитесь к сети</b><span>{ssid}</span></div>
@@ -50,9 +48,7 @@ PAGE = """<!doctype html>
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--ssid', help='the setup network name (default: exxpiano-Setup-<last 4 digits of --mac>)')
-    ap.add_argument('--mac', default='', help='the Wi-Fi address of the Pi, to build the name')
-    ap.add_argument('--number', default='', help='the number given to the device when its image was built (instead of --mac)')
+    ap.add_argument('--installation-id', required=True, help='the persistent 16-character hexadecimal ID shown by the device')
     ap.add_argument('--password', default='exxpianosetup', help='WIFI_AP_PASSWORD of the device (default exxpianosetup)')
     ap.add_argument('--prefix', default='exxpiano-Setup')
     ap.add_argument('--address', default=wifilib.AP_ADDRESS)
@@ -60,12 +56,12 @@ def main():
     ap.add_argument('--out', default=os.path.join(ROOT, 'build', 'qr'))
     args = ap.parse_args()
 
-    ssid = args.ssid or wifilib.ap_ssid(args.prefix, args.mac, args.number)
+    install_id = args.installation_id.upper()
+    ssid = wifilib.ap_ssid(args.prefix, install_id)
     wifilib.validate_ssid(ssid)
     wifilib.validate_passphrase(args.password)
-    number = wifilib.device_number(args.mac, args.number) if (args.mac or args.number) else (ssid.rsplit('-', 1)[-1] if ssid.rsplit('-', 1)[-1].isalnum() else '')
     # the code names its device: the page warns when it is opened on another one
-    page_url = 'http://%s:%d/%s#/wifi' % (args.address, args.port, '?d=%s' % number.upper() if number else '')
+    page_url = 'http://%s:%d/?d=%s#/wifi' % (args.address, args.port, install_id)
     codes = {'join-wifi': qrlib.wifi_text(ssid, args.password), 'open-page': page_url}
     os.makedirs(args.out, exist_ok=True)
     import base64
@@ -80,9 +76,9 @@ def main():
             f.write(qrlib.to_svg(matrix))
     sheet = os.path.join(args.out, 'setup-codes-%s.html' % ssid)
     with open(sheet, 'w', encoding='utf-8') as f:
-        f.write(PAGE.format(number=html.escape(number), ssid=html.escape(ssid), password=html.escape(args.password), page_url=html.escape(page_url),
+        f.write(PAGE.format(install_id=html.escape(install_id), ssid=html.escape(ssid), password=html.escape(args.password), page_url=html.escape(page_url),
                             join_png=images['join-wifi'], page_png=images['open-page']))
-    print('Device number:', number, '| network:', ssid, '| password:', args.password)
+    print('Installation ID:', install_id, '| network:', ssid)
     print('Join code text :', codes['join-wifi'])
     print('Page code text :', page_url)
     for name in sorted(os.listdir(args.out)):

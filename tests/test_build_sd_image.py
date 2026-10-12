@@ -1,5 +1,4 @@
-"""Tests for scripts/build-sd-image.py with a fake `docker` (no Docker, no image, no root): inputs, the number and the register, the mounts, the
-packing, the sticker, the README. The real build is exercised by scripts/sd-fake-dietpi.sh + sd-image-inner.sh + sd-smoke-test.sh in Docker."""
+"""Fast tests for the reusable SD image builder with a fake Docker executable."""
 import importlib.util
 import json
 import os
@@ -28,7 +27,7 @@ if args[:2] == ['image', 'inspect']:
     sys.exit(0)
 if args[:1] == ['run']:
     if 'sd-image-inner.sh' in ' '.join(args):
-        out = args[args.index('--out') + 1]                       # /out/exxpiano-0007.img
+        out = args[args.index('--out') + 1]                       # /out/exxpiano.img
         version_out = args[args.index('--dietpi-version-out') + 1]
         host = [a.split(':')[0] for a in args if a.endswith(':/out')][0]
         if os.environ.get('FAKE_DOCKER_FAIL_BUILD'):
@@ -61,12 +60,10 @@ class Case(unittest.TestCase):
             f.write(FAKE_DOCKER)
         os.chmod(os.path.join(self.bin, 'docker'), 0o755)
         self.log = os.path.join(t, 'docker.log')
-        self.registry = os.path.join(t, 'reg', 'devices.csv')
         self.out = os.path.join(t, 'out')
         self.dietpi = self.touch('dietpi/DietPi_test.img.xz', b'dietpi')
         self.piano = self.touch('banks/piano.sf2', b'p' * 10)
         self.mech = self.touch('banks/mech.sf2', b'm' * 10)
-        self.serial_counter = 0
         self.env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ['PATH'], FAKE_DOCKER_LOG=self.log, EXXPIANO_SD_WORK=os.path.join(t, 'work'))
         self.env.pop('SD_PASSWORD', None)
         self.env.pop('SD_AP_PASSWORD', None)
@@ -78,13 +75,10 @@ class Case(unittest.TestCase):
             f.write(data)
         return path
 
-    def run_build(self, *extra, env=None, serial=True, banks=True):
-        args = ['--dietpi', self.dietpi, '--registry', self.registry, '--out', self.out]
+    def run_build(self, *extra, env=None, banks=True):
+        args = ['--dietpi', self.dietpi, '--out', self.out]
         if banks:
             args += ['--piano', self.piano, '--mech', self.mech]
-        if serial and '--serial' not in extra and '--serials' not in extra:
-            self.serial_counter += 1
-            args += ['--serial', '%016x' % self.serial_counter]
         r = subprocess.run([sys.executable, SCRIPT] + args + list(extra), capture_output=True, text=True, env=dict(self.env, **(env or {})))
         return r
 
@@ -98,30 +92,25 @@ class Case(unittest.TestCase):
 
 class PlanTests(Case):
     def test_a_dry_run_checks_and_makes_nothing(self):
-        r = self.run_build('--number', '7', '--dry-run')
+        r = self.run_build('--dry-run')
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn('Device № 0007 (exxpiano-0007)', r.stdout)
-        self.assertIn('exxpiano-Setup-0007', r.stdout)
+        self.assertIn('installation ID, hostname and setup Wi-Fi are generated automatically', r.stdout)
         self.assertIn('dry run', r.stdout)
-        self.assertFalse(os.path.exists(self.out) or os.path.exists(self.registry))
+        self.assertFalse(os.path.exists(self.out))
         self.assertEqual(self.docker_calls(), [])
 
     def test_missing_inputs_are_named(self):
-        r = subprocess.run([sys.executable, SCRIPT, '--registry', self.registry, '--piano', self.piano, '--mech', self.mech,
-                            '--serial', '1' * 16, '--dry-run'], capture_output=True, text=True, env=self.env)
+        r = subprocess.run([sys.executable, SCRIPT, '--piano', self.piano, '--mech', self.mech, '--dry-run'], capture_output=True, text=True, env=self.env)
         self.assertEqual(r.returncode, 1)
         self.assertIn('--dietpi', r.stderr)
         r = self.run_build('--dry-run', '--piano', os.path.join(self.tmp.name, 'nope.sf2'))
         self.assertIn('required piano bank', r.stderr)
-        r = self.run_build('--dry-run', serial=False)
-        self.assertIn('--serial', r.stderr)
         r = subprocess.run([sys.executable, SCRIPT, '--dietpi', '/nonexistent.img.xz', '--piano', self.piano, '--mech', self.mech,
-                            '--serial', '1' * 16, '--registry', self.registry, '--dry-run'], capture_output=True, text=True, env=self.env)
+                            '--dry-run'], capture_output=True, text=True, env=self.env)
         self.assertIn('no such DietPi image', r.stderr)
 
     def test_bad_values_are_refused_before_anything_starts(self):
-        for extra, text in ((('--number', 'a b'), 'number'), (('--password', 'short'), 'at least 8'), (('--ap-password', 'short'), '8 to 63'),
-                            (('--name', 'Bad_Name'), 'lowercase')):
+        for extra, text in ((('--password', 'short'), 'at least 8'), (('--ap-password', 'short'), '8 to 63')):
             with self.subTest(extra):
                 r = self.run_build('--dry-run', *extra)
                 self.assertEqual(r.returncode, 1)
@@ -132,24 +121,30 @@ class PlanTests(Case):
         self.assertEqual(r.returncode, 2)
         self.assertIn('unrecognized arguments: --no-banks', r.stderr)
 
+    def test_serials_and_numbers_are_not_part_of_the_product_interface(self):
+        for args in (('--number', 'auto'), ('--serial', '000000003c1c783e'), ('--serials', 'boards.csv')):
+            r = self.run_build(*args, '--dry-run')
+            self.assertEqual(r.returncode, 2)
+            self.assertIn('unrecognized arguments', r.stderr)
+
     def test_default_banks_and_explicit_overrides_are_resolved_before_planning(self):
         old_root = bsi.ROOT
         try:
             bsi.ROOT = self.tmp.name
             default_piano = self.touch('build/piano-standard.sf2', b'default piano')
             default_mech = self.touch('build/mech.sf2', b'default mech')
-            args = bsi.parse_args(['--dietpi', self.dietpi, '--serial', '1' * 16])
+            args = bsi.parse_args(['--dietpi', self.dietpi])
             self.assertEqual(bsi.resolve_inputs(args), dict(dietpi=os.path.abspath(self.dietpi), piano=default_piano, mech=default_mech))
-            args = bsi.parse_args(['--dietpi', self.dietpi, '--serial', '1' * 16, '--piano', self.piano, '--mech', self.mech])
+            args = bsi.parse_args(['--dietpi', self.dietpi, '--piano', self.piano, '--mech', self.mech])
             self.assertEqual((bsi.resolve_inputs(args)['piano'], bsi.resolve_inputs(args)['mech']), (self.piano, self.mech))
         finally:
             bsi.ROOT = old_root
 
-    def test_each_missing_default_bank_stops_before_the_registry(self):
+    def test_each_missing_default_bank_stops_before_building(self):
         old_root = bsi.ROOT
         try:
             bsi.ROOT = self.tmp.name
-            args = bsi.parse_args(['--dietpi', self.dietpi, '--serial', '1' * 16, '--registry', self.registry])
+            args = bsi.parse_args(['--dietpi', self.dietpi])
             for present, missing in (('mech.sf2', 'piano'), ('piano-standard.sf2', 'mech')):
                 build = os.path.join(self.tmp.name, 'build')
                 os.makedirs(build, exist_ok=True)
@@ -161,21 +156,21 @@ class PlanTests(Case):
                     f.write(b'bank')
                 with self.assertRaisesRegex(bsi.BuildError, 'required %s bank' % missing):
                     bsi.resolve_inputs(args)
-                self.assertFalse(os.path.exists(self.registry))
+                self.assertEqual(self.docker_calls(), [])
         finally:
             bsi.ROOT = old_root
 
 
 class BuildTests(Case):
     def test_passwords_default_to_environment_and_arguments_override_them(self):
-        r = self.run_build('--number', '6', env={'SD_PASSWORD': 'environment root password',
-                                                 'SD_AP_PASSWORD': 'environment setup password'})
+        r = self.run_build(env={'SD_PASSWORD': 'environment root password',
+                                'SD_AP_PASSWORD': 'environment setup password'})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         builds = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])]
         self.assertEqual(builds[-1]['env'], {'SD_PASSWORD': 'environment root password',
                                              'SD_AP_PASSWORD': 'environment setup password'})
 
-        r = self.run_build('--number', '7', '--password', 'argument root password',
+        r = self.run_build('--password', 'argument root password',
                            '--ap-password', 'argument setup password',
                            env={'SD_PASSWORD': 'ignored root password', 'SD_AP_PASSWORD': 'ignored setup password'})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -183,43 +178,31 @@ class BuildTests(Case):
         self.assertEqual(builds[-1]['env'], {'SD_PASSWORD': 'argument root password',
                                              'SD_AP_PASSWORD': 'argument setup password'})
 
-    def test_a_build_makes_the_zip_the_sticker_the_readme_and_the_register_entry(self):
-        r = self.run_build('--number', 'auto', '--password', 'root password 1', '--ap-password', 'sticker pw 1', '--note', 'for Ivan', '--country', 'RU')
+    def test_a_build_makes_one_reusable_zip_readme_and_manifest(self):
+        r = self.run_build('--password', 'root password 1', '--ap-password', 'setup password 1', '--country', 'RU')
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        out = os.path.join(self.out, '0001')
-        stem = 'exxpiano-rpi234-v1.10.1-dietpi-10.7.0-0001-sn-0000000000000001'
-        zip_path = os.path.join(out, stem + '-sd.zip')
+        stem = 'exxpiano-rpi234-v1.10.1-dietpi-10.7.0'
+        zip_path = os.path.join(self.out, stem + '-sd.zip')
         with zipfile.ZipFile(zip_path) as z:
             self.assertEqual(z.namelist(), [stem + '.img'])
             self.assertEqual(z.read(stem + '.img'), b'fake image ' * 1000)
-        self.assertFalse(os.path.exists(os.path.join(out, 'exxpiano-0001.img')))        # the raw image is not kept
-        sticker = os.listdir(os.path.join(out, 'sticker'))
-        self.assertIn('setup-codes-exxpiano-Setup-0001.html', sticker)
-        self.assertIn('join-wifi-exxpiano-Setup-0001.png', sticker)
-        with open(os.path.join(out, 'sticker', 'setup-codes-exxpiano-Setup-0001.html'), encoding='utf-8') as f:
-            self.assertIn('0001', f.read())
-        with open(os.path.join(out, 'README-0001.txt'), encoding='utf-8') as f:
+        self.assertFalse(os.path.exists(os.path.join(self.out, 'exxpiano.img')))
+        self.assertFalse(os.path.exists(os.path.join(self.out, 'sticker')))
+        with open(os.path.join(self.out, 'README.txt'), encoding='utf-8') as f:
             text = f.read()
-        for needle in ('№ 0001', 'exxpiano-0001', 'exxpiano-Setup-0001', 'sticker pw 1', 'Ethernet', 'DietPi: 10.7.0', '0000000000000001'):
+        for needle in ('No serial number has to be entered', 'exxpiano-Setup-<INSTALLATION-ID>', 'setup password 1',
+                       'needs neither Internet nor an Ethernet cable', 'DietPi: 10.7.0'):
             self.assertIn(needle, text)
-        with open(os.path.join(out, 'manifest-0001.json'), encoding='utf-8') as f:
+        with open(os.path.join(self.out, 'manifest.json'), encoding='utf-8') as f:
             manifest = json.load(f)
-        self.assertEqual((manifest['product_version'], manifest['dietpi_version'], manifest['device_number'], manifest['serial'], manifest['image']),
-                         ('1.10.1', '10.7.0', '0001', '0000000000000001', stem + '-sd.zip'))
+        self.assertEqual((manifest['product_version'], manifest['dietpi_version'], manifest['installation_identity'], manifest['image']),
+                         ('1.10.1', '10.7.0', 'generated-at-first-boot', stem + '-sd.zip'))
+        self.assertNotIn('serial', manifest)
+        self.assertNotIn('device_number', manifest)
         self.assertRegex(manifest['dietpi_sha256'], r'^[0-9a-f]{64}$')
         self.assertRegex(manifest['image_sha256'], r'^[0-9a-f]{64}$')
-        import importlib.util as iu
-        spec2 = iu.spec_from_file_location('reg', os.path.join(ROOT, 'scripts', 'sd-registry.py'))
-        reg = iu.module_from_spec(spec2)
-        spec2.loader.exec_module(reg)
-        row = reg.get('1', self.registry)
-        self.assertEqual((row['hostname'], row['ssid'], row['note'], row['image']), ('exxpiano-0001', 'exxpiano-Setup-0001', 'for Ivan', stem + '-sd.zip'))
-        self.assertRegex(row['image_sha256'], r'^[0-9a-f]{64}$')
-        self.assertEqual(row['banks'], 'piano.sf2, mech.sf2')
-        self.assertEqual((row['serial'], row['locked']), ('0000000000000001', 'yes'))
-
     def test_the_container_gets_read_only_inputs_a_writable_output_and_the_passwords_in_the_environment(self):
-        self.run_build('--number', '7', '--password', 'root password 1', '--ap-password', 'sticker pw 1')
+        self.run_build('--password', 'root password 1', '--ap-password', 'setup password 1')
         calls = [c for c in self.docker_calls() if c['args'][:1] == ['run']]
         build = [c for c in calls if 'sd-image-inner.sh' in ' '.join(c['args'])][0]
         args = build['args']
@@ -229,135 +212,35 @@ class BuildTests(Case):
         self.assertTrue(any(m.endswith(':/out') for m in mounts))
         inputs = [m for m in mounts if m.endswith(':ro') and '/in/' in m]
         self.assertEqual(len(inputs), 4)                                                     # the image, the package, both banks
-        self.assertEqual((args[args.index('--number') + 1], args[args.index('--hostname') + 1]), ('0007', 'exxpiano-0007'))
+        self.assertEqual(args[args.index('--hostname') + 1], 'exxpiano')
+        self.assertNotIn('--serial', args)
+        self.assertNotIn('--number', args)
         self.assertNotIn('root password 1', ' '.join(args))                                  # no password in the arguments ...
-        self.assertNotIn('sticker pw 1', ' '.join(args))
-        self.assertEqual(build['env'], {'SD_PASSWORD': 'root password 1', 'SD_AP_PASSWORD': 'sticker pw 1'})   # ... but in the environment
+        self.assertNotIn('setup password 1', ' '.join(args))
+        self.assertEqual(build['env'], {'SD_PASSWORD': 'root password 1', 'SD_AP_PASSWORD': 'setup password 1'})
 
     def test_the_finished_image_is_run_in_a_container_too(self):
-        self.run_build('--number', '3')
+        self.run_build()
         smoke = [c for c in self.docker_calls() if 'sd-smoke-test.sh' in ' '.join(c['args'])]
         self.assertEqual(len(smoke), 1)
-        self.assertIn('/out/exxpiano-0003.img', smoke[0]['args'])
+        self.assertIn('/out/exxpiano.img', smoke[0]['args'])
         self.docker_calls()
-        r = self.run_build('--number', '4', '--no-smoke')
+        r = self.run_build('--no-smoke')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(len([c for c in self.docker_calls() if 'sd-smoke-test.sh' in ' '.join(c['args'])]), 1)    # still only the first one
 
-    def test_numbers_are_unique_and_auto_takes_the_next(self):
-        self.assertEqual(self.run_build('--number', '5').returncode, 0)
-        r = self.run_build('--number', '5')
-        self.assertEqual(r.returncode, 1)
-        self.assertIn('already registered', r.stderr)
-        self.assertEqual(self.run_build('--number', 'auto').returncode, 0)
-        self.assertTrue(os.path.isdir(os.path.join(self.out, '0006')))
-        r = self.run_build('--number', '5', '--force', '--note', 'new card')
-        self.assertEqual(r.returncode, 0, r.stderr)
-        with open(self.registry) as f:
-            text = f.read()
-        self.assertIn('0005~', text)                                                         # the old line stays, marked
-
-    def test_a_failed_build_leaves_no_entry_and_says_so(self):
-        r = self.run_build('--number', '9', env=dict(FAKE_DOCKER_FAIL_BUILD='1'))
+    def test_a_failed_build_says_so(self):
+        r = self.run_build(env=dict(FAKE_DOCKER_FAIL_BUILD='1'))
         self.assertEqual(r.returncode, 1)
         self.assertIn('could not be made', r.stderr)
-        self.assertFalse(os.path.exists(self.registry))
-        r = self.run_build('--number', '9', env=dict(FAKE_DOCKER_FAIL_SMOKE='1'))
+        r = self.run_build(env=dict(FAKE_DOCKER_FAIL_SMOKE='1'))
         self.assertEqual(r.returncode, 1)
         self.assertIn('smoke test', r.stderr)
-        self.assertFalse(os.path.exists(self.registry))                                      # a card that fails its check is not registered
 
     def test_docker_that_is_not_running_is_explained(self):
-        r = self.run_build('--number', '2', env=dict(FAKE_DOCKER_INFO='1'))
+        r = self.run_build(env=dict(FAKE_DOCKER_INFO='1'))
         self.assertEqual(r.returncode, 1)
         self.assertIn('Docker is not running', r.stderr)
-        self.assertFalse(os.path.exists(self.registry))
-
-
-class SerialTests(Case):
-    ME = '00000000d2f2f1de'
-
-    def registry_module(self):
-        spec2 = importlib.util.spec_from_file_location('reg2', os.path.join(ROOT, 'scripts', 'sd-registry.py'))
-        reg = importlib.util.module_from_spec(spec2)
-        spec2.loader.exec_module(reg)
-        return reg
-
-    def inner_args(self):
-        build = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])]
-        return [c['args'] for c in build]
-
-    def test_a_card_for_one_board_carries_its_serial_and_the_lock(self):
-        r = self.run_build('--serial', 'D2F2F1DE', '--number', 'serial')
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        (args,) = self.inner_args()
-        self.assertEqual(args[args.index('--serial') + 1], self.ME)                         # normalised to 16 digits
-        self.assertIn('--lock', args)
-        self.assertEqual(args[args.index('--number') + 1], 'F1DE')                           # the last four digits of the serial
-        row = self.registry_module().get('F1DE', self.registry)
-        self.assertEqual((row['serial'], row['locked']), (self.ME, 'yes'))
-        with open(os.path.join(self.out, 'F1DE', 'README-F1DE.txt'), encoding='utf-8') as f:
-            text = f.read()
-        self.assertIn(self.ME, text)
-        self.assertIn('refuses another board', text)
-
-    def test_every_product_image_is_locked(self):
-        self.run_build('--serial', self.ME)
-        (args,) = self.inner_args()
-        self.assertIn('--serial', args)
-        self.assertIn('--lock', args)
-        self.assertEqual(self.registry_module().get('1', self.registry)['locked'], 'yes')
-
-    def test_bad_or_missing_serials_are_refused(self):
-        for extra, text, default_serial in ((('--serial', 'nonsense'), 'hex digits', True), ((), 'must be bound', False),
-                                            (('--serial', self.ME, '--serials', 'x.csv'), 'not both', True),
-                                            (('--number', 'serial'), 'must be bound', False)):
-            with self.subTest(extra):
-                r = self.run_build('--dry-run', *extra, serial=default_serial)
-                self.assertEqual(r.returncode, 1)
-                self.assertIn(text, r.stderr)
-
-    def test_a_board_gets_one_card_unless_forced(self):
-        self.assertEqual(self.run_build('--serial', self.ME).returncode, 0)
-        r = self.run_build('--serial', 'D2F2F1DE')                                           # the same board, written differently
-        self.assertEqual(r.returncode, 1)
-        self.assertIn('already has a card', r.stderr)
-        self.assertEqual(self.run_build('--serial', self.ME, '--force').returncode, 0)
-
-    def write_list(self, text):
-        path = os.path.join(self.tmp.name, 'boards.csv')
-        with open(path, 'w') as f:
-            f.write(text)
-        return path
-
-    def test_a_list_makes_a_card_per_board_with_numbers_names_and_notes(self):
-        path = self.write_list('# the boards of the first batch\nserial,number,name,note\n00000000d2f2f1de,,,Ivan\n00000000aaaabbbb,0042,piano-kitchen,Olga\n100000001234cdef,,,\n')
-        r = self.run_build('--serials', path, '--note', 'batch 1')
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn('All 3 cards are made: 0001, 0042, 0043', r.stdout)
-        reg = self.registry_module()
-        self.assertEqual([(r_['number'], r_['hostname'], r_['note'], r_['locked']) for r_ in reg.load(self.registry)],
-                         [('0001', 'exxpiano-0001', 'Ivan', 'yes'), ('0042', 'piano-kitchen', 'Olga', 'yes'), ('0043', 'exxpiano-0043', 'batch 1', 'yes')])
-        self.assertEqual(len(self.inner_args()), 3)
-
-    def test_a_bad_list_is_refused_before_the_first_card(self):
-        for text, needle in (('serial\n00000000d2f2f1de\n00000000D2F2F1DE\n', 'listed twice'), ('serial\nxyz\n', 'hex digits'), ('number\n7\n', 'columns'),
-                             ('', 'columns'), ('serial,number\n00000000d2f2f1de,7\n00000000aaaabbbb,0007\n', 'twice in this run')):
-            with self.subTest(text):
-                r = self.run_build('--serials', self.write_list(text))
-                self.assertEqual(r.returncode, 1)
-                self.assertIn(needle, r.stderr)
-                self.assertEqual(self.inner_args(), [])
-                self.assertFalse(os.path.exists(self.registry))
-
-    def test_a_failure_in_the_middle_says_which_cards_were_made(self):
-        path = self.write_list('serial\n00000000d2f2f1de\n00000000aaaabbbb\n100000001234cdef\n')
-        r = self.run_build('--serials', path, env=dict(FAKE_DOCKER_FAIL_AFTER='1'))
-        self.assertEqual(r.returncode, 1)
-        self.assertIn('could not be made', r.stderr)
-        self.assertIn('made before the failure: 0001', r.stderr)
-        self.assertEqual([row['number'] for row in self.registry_module().load(self.registry)], ['0001'])       # only the finished card is registered
-        self.assertEqual(len(self.inner_args()), 2)                                                             # and the third was not attempted
 
 
 class DownloadTests(unittest.TestCase):
@@ -421,12 +304,74 @@ class ConfQuotingTests(unittest.TestCase):
 
 
 class ShellScriptTests(unittest.TestCase):
+    def test_product_image_first_boot_is_offline_and_leaves_wifi_to_exxpiano(self):
+        with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:
+            src = f.read()
+        set_start = src.index('set_kv() {')
+        set_end = src.index('\n}\n', set_start) + 3
+        setup_start = src.index('configure_offline_product_boot() {')
+        setup_end = src.index('\n}\n', setup_start) + 3
+        with tempfile.TemporaryDirectory() as d:
+            root = os.path.join(d, 'root')
+            bootdir = '/boot/firmware'
+            os.makedirs(root + bootdir)
+            dietpi_txt = root + bootdir + '/dietpi.txt'
+            with open(dietpi_txt, 'w') as f:
+                f.write('AUTO_SETUP_NET_WIFI_ENABLED=1\nAUTO_SETUP_BOOT_WAIT_FOR_NETWORK=1\n'
+                        'CONFIG_CHECK_DIETPI_UPDATES=1\nCONFIG_CHECK_APT_UPDATES=1\n')
+            script = src[set_start:set_end] + src[setup_start:setup_end] + '\nconfigure_offline_product_boot "$ROOT" "$BOOTDIR"\n'
+            r = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
+                               env=dict(os.environ, ROOT=root, BOOTDIR=bootdir, HERE=os.path.join(ROOT, 'scripts')))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            with open(dietpi_txt) as f:
+                settings = f.read()
+            self.assertIn('AUTO_SETUP_NET_WIFI_ENABLED=0\n', settings)
+            self.assertIn('AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0\n', settings)
+            self.assertIn('CONFIG_CHECK_DIETPI_UPDATES=0\n', settings)
+            self.assertIn('CONFIG_CHECK_APT_UPDATES=0\n', settings)
+            dropin = os.path.join(root, 'etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf')
+            with open(dropin) as f:
+                self.assertIn('ExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled', f.read())
+            self.assertTrue(os.access(os.path.join(root, 'usr/local/sbin/exxpiano-dietpi-preinstalled'), os.X_OK))
+            self.assertTrue(os.access(os.path.join(root, 'var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot'), os.X_OK))
+
+    def test_the_offline_chroot_gets_the_runtime_tmpfs_permissions(self):
+        with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:
+            src = f.read()
+        start = src.index('prepare_chroot_tmp() {')
+        end = src.index('\n}\n', start) + 3
+        with tempfile.TemporaryDirectory() as d:
+            tmp = os.path.join(d, 'tmp')
+            os.mkdir(tmp, 0o755)
+            script = src[start:end] + '\nprepare_chroot_tmp "$ROOT"\n'
+            r = subprocess.run(['bash', '-c', script], capture_output=True, text=True, env=dict(os.environ, ROOT=d))
+            mode = stat.S_IMODE(os.stat(tmp).st_mode)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(mode, 0o1777)
+
+    def test_dietpi_version_is_read_from_root_boot_when_firmware_is_a_separate_partition(self):
+        with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:
+            src = f.read()
+        start = src.index('read_dietpi_version() {')
+        end = src.index('\n}\n', start) + 3
+        with tempfile.TemporaryDirectory() as d:
+            version = os.path.join(d, 'boot', 'dietpi', '.version')
+            os.makedirs(os.path.dirname(version))
+            with open(version, 'w') as f:
+                f.write('G_DIETPI_VERSION_CORE=10\nG_DIETPI_VERSION_SUB=7\nG_DIETPI_VERSION_RC=2\n')
+            os.makedirs(os.path.join(d, 'boot', 'firmware'))
+            script = 'die() { echo "sd-image: $*" >&2; exit 1; }\n' + src[start:end] + '\nread_dietpi_version "$ROOT" /boot/firmware\n'
+            r = subprocess.run(['bash', '-c', script], capture_output=True, text=True, env=dict(os.environ, ROOT=d))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), '10.7.2')
+
     def test_the_scripts_have_valid_syntax_and_the_key_value_helper_behaves(self):
         for name in ('sd-image-inner.sh', 'sd-fake-dietpi.sh', 'sd-smoke-test.sh'):
             r = subprocess.run(['bash', '-n', os.path.join(ROOT, 'scripts', name)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, name + r.stderr)
-        r = subprocess.run(['bash', '-n', os.path.join(ROOT, 'dietpi', 'Automation_Custom_Script.image.sh')], capture_output=True, text=True)
-        self.assertEqual(r.returncode, 0, r.stderr)
+        for name in ('Automation_Custom_Script.image.sh', 'exxpiano-dietpi-preinstalled.sh'):
+            r = subprocess.run(['bash', '-n', os.path.join(ROOT, 'dietpi', name)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, name + r.stderr)
         # set_kv is copied out of the script and tried on a file (awk is on every machine)
         src = open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')).read()
         start = src.index('set_kv() {')
@@ -456,8 +401,7 @@ class ShellScriptTests(unittest.TestCase):
                 with open(path, 'wb') as f:
                     f.write(b'x')
             base = ['bash', os.path.join(ROOT, 'scripts', 'sd-image-inner.sh'), '--out', os.path.join(d, 'out.img'),
-                    '--dietpi-version-out', os.path.join(d, 'version'), '--deb', deb, '--piano', piano, '--mech', mech,
-                    '--number', '1', '--serial', '1' * 16, '--lock']
+                    '--dietpi-version-out', os.path.join(d, 'version'), '--deb', deb, '--piano', piano, '--mech', mech]
             env = dict(os.environ, PATH=fake_bin + os.pathsep + os.environ['PATH'])
             r = subprocess.run(base + ['--image', os.path.join(d, 'missing.img')], capture_output=True, text=True, env=env)
             self.assertEqual(r.returncode, 1)
@@ -476,30 +420,50 @@ class ShellScriptTests(unittest.TestCase):
         def tree(base):
             root, boot = os.path.join(base, 'root'), os.path.join(base, 'boot')
             files = {
-                os.path.join(boot, 'dietpi.txt'): 'AUTO_SETUP_AUTOMATED=1\n',
-                os.path.join(boot, 'dietpi', '.version'): 'G_DIETPI_VERSION_CORE=10\n',
+                os.path.join(boot, 'dietpi.txt'): ('AUTO_SETUP_AUTOMATED=1\nAUTO_SETUP_NET_WIFI_ENABLED=0\n'
+                                                      'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0\nCONFIG_CHECK_DIETPI_UPDATES=0\n'
+                                                      'CONFIG_CHECK_APT_UPDATES=0\n'),
+                os.path.join(root, 'boot', 'dietpi', '.version'): 'G_DIETPI_VERSION_CORE=10\n',
                 os.path.join(boot, 'Automation_Custom_Script.sh'): '#!/bin/sh\n',
+                os.path.join(root, 'usr', 'local', 'sbin', 'exxpiano-dietpi-preinstalled'): '#!/bin/sh\n',
+                os.path.join(root, 'etc', 'systemd', 'system', 'dietpi-firstboot.service.d', 'exxpiano-preinstalled.conf'):
+                    '[Service]\nExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled\n',
+                os.path.join(root, 'var', 'lib', 'dietpi', 'postboot.d', '10-exxpiano-image-firstboot'): '#!/bin/sh\n',
                 os.path.join(root, 'opt', 'exxpiano', 'exxpiano-web.py'): '#!/usr/bin/python3\n',
                 os.path.join(root, 'opt', 'exxpiano', 'exxpiano-wifi.py'): '#!/usr/bin/python3\n',
                 os.path.join(root, 'lib', 'systemd', 'system', 'exxpiano.service'): '[Service]\n',
                 os.path.join(root, 'opt', 'exxpiano', 'soundfonts', 'piano.sf2'): 'piano',
                 os.path.join(root, 'opt', 'exxpiano', 'soundfonts', 'mech.sf2'): 'mech',
                 os.path.join(root, 'etc', 'exxpiano.conf'): ('PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2\n'
-                                                                  'MECH_SF2=/opt/exxpiano/soundfonts/mech.sf2\n'
-                                                                  'DEVICE_SERIAL=00000000d2f2f1de\nDEVICE_LOCK=1\n'),
+                                                                  'MECH_SF2=/opt/exxpiano/soundfonts/mech.sf2\n'),
             }
             for path, content in files.items():
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, 'w') as f:
                     f.write(content)
-                if path.endswith(('.sh', '.py')):
+                if path.endswith(('.sh', '.py', 'exxpiano-dietpi-preinstalled', '10-exxpiano-image-firstboot')):
                     os.chmod(path, 0o755)
             return root, boot, files
 
         with tempfile.TemporaryDirectory() as d:
             root, boot, _ = tree(d)
             self.assertEqual(subprocess.run(['bash', script, '--check-tree', root, boot], capture_output=True).returncode, 0)
-        for rel in ('boot/dietpi.txt', 'boot/dietpi/.version', 'boot/Automation_Custom_Script.sh',
+        for good, bad in (('AUTO_SETUP_NET_WIFI_ENABLED=0', 'AUTO_SETUP_NET_WIFI_ENABLED=1'),
+                          ('AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0', 'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=1'),
+                          ('CONFIG_CHECK_DIETPI_UPDATES=0', 'CONFIG_CHECK_DIETPI_UPDATES=1'),
+                          ('CONFIG_CHECK_APT_UPDATES=0', 'CONFIG_CHECK_APT_UPDATES=1')):
+            with self.subTest(bad), tempfile.TemporaryDirectory() as d:
+                root, boot, _ = tree(d)
+                path = os.path.join(boot, 'dietpi.txt')
+                with open(path) as f:
+                    text = f.read()
+                with open(path, 'w') as f:
+                    f.write(text.replace(good, bad))
+                self.assertNotEqual(subprocess.run(['bash', script, '--check-tree', root, boot], capture_output=True).returncode, 0)
+        for rel in ('boot/dietpi.txt', 'root/boot/dietpi/.version', 'boot/Automation_Custom_Script.sh',
+                    'root/usr/local/sbin/exxpiano-dietpi-preinstalled',
+                    'root/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf',
+                    'root/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot',
                     'root/opt/exxpiano/exxpiano-web.py', 'root/lib/systemd/system/exxpiano.service',
                     'root/opt/exxpiano/soundfonts/piano.sf2', 'root/opt/exxpiano/soundfonts/mech.sf2',
                     'root/etc/exxpiano.conf'):

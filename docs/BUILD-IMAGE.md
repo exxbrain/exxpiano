@@ -1,113 +1,61 @@
-# Building the production SD-card image
+# Building the reusable SD card image
 
-[Русский](BUILD-IMAGE.ru.md)
-
-The product is a ready-to-use exxpiano device. Its delivery artifact is one complete DietPi image for one Raspberry Pi board, written directly to a clean SD card. A standalone Debian package or installer archive is not a customer delivery format.
-
-The image targets the DietPi `RPi234 ARMv8` family: Raspberry Pi 2, 3 and 4 supported by that upstream image. Actual hardware verification is tracked separately for every model; the automated stand-in test is not a hardware test.
+The shipped artifact is a complete bootable image for a clean Raspberry Pi 2/3/4 ARMv8 SD card. It already contains DietPi, exxpiano, the standard piano and the mechanics bank. One ZIP can be flashed to many cards; no board serial is entered during the build or setup.
 
 ## Prerequisites
 
-- Run the commands from the repository root and keep several gigabytes of disk space free for the unpacked image and temporary files.
-- Python 3 and a running Docker installation (or a Linux root environment with `--no-docker`).
-- An official `DietPi_RPi234-ARMv8-*.img.xz` base image.
-- The required standard banks `build/piano-standard.sf2` and `build/mech.sf2`. Build them once with `scripts/make-soundfonts.sh -p standard`.
-- The serial number of every target board.
-
-Check Docker before starting:
+Use Docker Desktop on macOS or Docker on Linux, the official `DietPi_RPi234-ARMv8-Trixie.img.xz`, and prepare the banks:
 
 ```bash
-docker info >/dev/null
+scripts/make-soundfonts.sh -p standard -o build
 ```
 
-The build stops before changing the base image when the DietPi image, either bank, or the serial is missing. A finished image is always locked to its board. If the device cannot read its serial at runtime, or reads a different one, the synthesizer MUST NOT start.
+The builder defaults to `build/piano-standard.sf2` and `build/mech.sf2`. Use `--piano` and `--mech` for controlled replacements. An image is never released without both banks.
 
-## Reading the board serial
+## Build
 
-Before building the final image, boot the target Raspberry Pi once from a temporary service SD card containing DietPi or Raspberry Pi OS. Run this command on the board:
-
-```bash
-awk -F ': ' '/^Serial/ {print tolower($2)}' /proc/cpuinfo
-```
-
-Record all 16 hexadecimal digits without whitespace. The builder accepts 8–16 digits for compatibility and left-pads a short value with zeroes, but the production registry should contain the complete value read from the board. Shut the board down with `sudo poweroff`; the service card is not needed in the finished device.
-
-## Build passwords
-
-Do not put production passwords in command arguments: shell history records them and process listings expose them. In Bash or Zsh, read them without echo and export them only for the builder:
+Pass passwords through the environment so they do not appear in process arguments:
 
 ```bash
 printf 'DietPi password: '; read -r -s SD_PASSWORD; printf '\n'
 printf 'Setup network password: '; read -r -s SD_AP_PASSWORD; printf '\n'
 export SD_PASSWORD SD_AP_PASSWORD
-```
 
-Set both passwords explicitly for a production build. The DietPi password must contain at least 8 characters; the setup-network password must contain 8–63 characters. `--password` and `--ap-password` remain as compatibility overrides, but should not be used in the normal build procedure.
-
-## One board
-
-```bash
 python3 scripts/build-sd-image.py \
   --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
-  --serial 00000000d2f2f1de \
-  --number auto \
-  --country RU --timezone Europe/Moscow \
-  --note 'device owner or production note' \
-  --dry-run
-```
+  --country RU --timezone Europe/Moscow --dry-run
 
-First inspect the printed plan, serial, number, and paths. Then repeat the command without `--dry-run`: only the second run creates the image and registry entry. After it finishes, remove the passwords from the current environment with `unset SD_PASSWORD SD_AP_PASSWORD`.
-
-The command uses the standard banks automatically. `--piano FILE.sf2` and `--mech FILE.sf2` override them for an intentional variant. There is no product mode without banks and no optional lock switch.
-
-`--number auto` selects the next free number from `registry/devices.csv`; `--number serial` uses the last four serial digits; an explicit number is also accepted. Use `--dry-run` to validate the inputs and show the plan without creating anything.
-
-## A batch of boards
-
-Create `boards.csv`:
-
-```csv
-serial,number,name,note
-00000000d2f2f1de,,,Ivan
-00000000aaaabbbb,0042,exxpiano-kitchen,Olga
-100000001234cdef,,,
-```
-
-Then run:
-
-```bash
 python3 scripts/build-sd-image.py \
   --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
-  --serials boards.csv \
   --country RU --timezone Europe/Moscow
+
+unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
-Passwords come from `SD_PASSWORD` and `SD_AP_PASSWORD` as described above. All rows are validated before the first image is built. The command creates one independently locked image per serial. For a batch, also add `--dry-run` first, inspect the complete plan, and only then rerun without it.
+`--dry-run` validates inputs and prints the plan. The full run writes to `dist/sd/`:
 
-## Output and traceability
+- `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` — the flashable image;
+- `manifest.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
+- `README.txt` — brief instructions for that release.
 
-For every board, `dist/sd/<number>/` contains:
+The product version comes from `VERSION`; the DietPi version comes from `dietpi/.version` in the base image. A release is rejected when that version cannot be read, either required bank is absent, or the smoke check fails.
 
-- `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-<number>-sn-<serial>-sd.zip` — the complete flashable image;
-- `manifest-<number>.json` — product version, DietPi version and source SHA-256, normalized number and serial, image SHA-256 and bank metadata;
-- `README-<number>.txt` — the same device identity and flashing instructions;
-- `sticker/` — the printable setup QR codes.
+## Flashing and first boot
 
-`VERSION` supplies the product version. The DietPi version is read from `dietpi/.version` inside the base image. If that metadata is missing or invalid, no release artifact is produced. The same identity is recorded in `registry/devices.csv`.
+1. In Raspberry Pi Imager choose “Choose OS” → “Use custom” and select the ZIP, or select it in balenaEtcher.
+2. Flash a clean SD card, put it in a Raspberry Pi 2, 3 or 4, and power it on.
+3. First boot takes several minutes and needs no internet, Ethernet, saved Wi-Fi, or serial input.
+4. The installation creates a persistent random 16-character hexadecimal ID in `/var/lib/exxpiano/installation-id`.
+5. The ID produces a unique `exxpiano-Setup-<ID>` network and `exxpiano-<lowercase-id>` hostname. Join the setup network and open `http://10.42.0.1:8080/`; the web UI shows the exact ID, network name, and QR codes.
 
-Before flashing, verify that the serial, number, and both versions in the ZIP filename match `manifest-<number>.json`. Compare the ZIP's SHA-256 with `image_sha256` in the manifest (`shasum -a 256 <file.zip>` on macOS or `sha256sum <file.zip>` on Linux). `registry/devices.csv` is not stored in Git and may contain owner information; make a protected backup after each batch.
+Cards cloned from the same ZIP receive different IDs on their own first boot. ID creation is atomic and the stored value is reused, so rebooting does not change Wi-Fi or hostname.
 
-## Flashing a clean SD card
+## Verification
 
-1. Open Raspberry Pi Imager, choose **Use custom**, and select the ZIP itself; do not unpack it. balenaEtcher can also flash the ZIP directly.
-2. Select the intended SD card and write the image. All existing data on the selected card will be destroyed.
-3. Insert the card into the exact board whose serial is in the filename, connect Ethernet for DietPi's first setup, and power it on.
-4. After setup, open `http://exxpiano-<number>.local:8080/`. Without a configured network, use the `exxpiano-Setup-<number>` network and the printed QR codes.
+For ordinary changes run the fast tests:
 
-When accepting the first unit of each hardware model, inspect `/var/log/exxpiano-firstboot.log`, `systemctl status exxpiano`, and `journalctl -u exxpiano`; then test MIDI, sound from both banks, and a reboot without Ethernet. An unreadable or mismatched serial MUST leave `exxpiano` stopped. That is the expected protection, not a reason to disable the lock.
+```bash
+python3 -m unittest tests.test_build_sd_image tests.test_wifilib tests.test_exxpiano_wifi tests.test_web tests.test_demo_web
+```
 
-## Verification status
-
-`scripts/test-sd-image-pipeline.sh` builds the complete flow on a small DietPi-layout stand-in. `scripts/sd-smoke-test.sh` reads the result back and checks the DietPi boot files, installed application, both banks, their configuration and the serial lock. CI runs this pipeline but publishes no personalized images or package artifacts.
-
-This does not prove real hardware operation. Before release, flash and test separate cards on Raspberry Pi 2, 3 and 4, including first boot, MIDI input, sound, standard piano and mechanics banks, and an offline reboot. Record those results per model.
+Run the full Docker pipeline and image build only when the pipeline itself changes or before a release. A container smoke test is not a substitute for real Raspberry Pi 2, 3, and 4 checks. On hardware verify `/var/log/exxpiano-firstboot.log`, the unique setup network, web UI, MIDI, sound, and an offline reboot.

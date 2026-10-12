@@ -6,11 +6,12 @@ set -euo pipefail
 check_required_layout() {
   local root="$1" boot="$2" fail=0
   required() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
-  required "DietPi boot configuration" "[ -s '$boot/dietpi.txt' ] && [ -s '$boot/dietpi/.version' ] && [ -x '$boot/Automation_Custom_Script.sh' ]"
+  required "DietPi boot configuration" "[ -s '$boot/dietpi.txt' ] && { [ -s '$root/boot/dietpi/.version' ] || [ -s '$boot/dietpi/.version' ]; } && [ -x '$boot/Automation_Custom_Script.sh' ]"
+  required "offline DietPi first boot" "grep -qx 'AUTO_SETUP_NET_WIFI_ENABLED=0' '$boot/dietpi.txt' && grep -qx 'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0' '$boot/dietpi.txt' && grep -qx 'CONFIG_CHECK_DIETPI_UPDATES=0' '$boot/dietpi.txt' && grep -qx 'CONFIG_CHECK_APT_UPDATES=0' '$boot/dietpi.txt' && [ -x '$root/usr/local/sbin/exxpiano-dietpi-preinstalled' ] && grep -qx 'ExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled' '$root/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf' && [ -x '$root/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot' ]"
   required "the installed application" "[ -x '$root/opt/exxpiano/exxpiano-web.py' ] && [ -x '$root/opt/exxpiano/exxpiano-wifi.py' ] && [ -f '$root/lib/systemd/system/exxpiano.service' ]"
   required "both mandatory banks" "[ -s '$root/opt/exxpiano/soundfonts/piano.sf2' ] && [ -s '$root/opt/exxpiano/soundfonts/mech.sf2' ]"
   required "the mandatory bank configuration" "grep -qx 'PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2' '$root/etc/exxpiano.conf' && grep -qx 'MECH_SF2=/opt/exxpiano/soundfonts/mech.sf2' '$root/etc/exxpiano.conf'"
-  required "the locked board serial" "grep -Eq '^DEVICE_SERIAL=[0-9a-f]{16}$' '$root/etc/exxpiano.conf' && grep -qx 'DEVICE_LOCK=1' '$root/etc/exxpiano.conf'"
+  required "no identity is baked into the reusable image" "[ ! -e '$root/var/lib/exxpiano/installation-id' ] && ! grep -Eq '^DEVICE_(NUMBER|SERIAL)=' '$root/etc/exxpiano.conf'"
   [ "$fail" = 0 ]
 }
 
@@ -42,7 +43,7 @@ print('modules import: ok')
 " && ok "the Python modules import in the image" || bad "the Python modules do not import"
 # the web service from the image (read only: no configuration file, so its defaults and port 8080; the builder has no curl: Python asks)
 get() { python3 -c "import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())" "$1" 2>/dev/null; }
-( chroot "$W/mnt" /usr/bin/env EXXPIANO_CONF=/dev/null PROFILE_FILE=/tmp/profiles.json python3 /opt/exxpiano/exxpiano-web.py >"$W/web.log" 2>&1 & ) || true
+( chroot "$W/mnt" /usr/bin/env EXXPIANO_CONF=/dev/null PROFILE_FILE=/tmp/profiles.json EXXPIANO_INSTALLATION_ID_PATH=/tmp/exxpiano-installation-id python3 /opt/exxpiano/exxpiano-web.py >"$W/web.log" 2>&1 & ) || true
 sleep 3
 get http://127.0.0.1:8080/api/ping | grep -q '"ok": true' && ok "the web service answers" || bad "the web service does not answer: $(tail -3 "$W/web.log")"
 get "http://127.0.0.1:8080/api/qr?kind=join" | grep -q 'WIFI:T:WPA;S:exxpiano-Setup-' && ok "the QR code for the setup network is made" || bad "no QR code"
@@ -51,20 +52,6 @@ for unit in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
   grep -q '^ExecStart=' "$W/mnt/lib/systemd/system/$unit.service" && ok "$unit.service has an ExecStart" || bad "$unit.service is broken"
 done
 chroot "$W/mnt" python3 /opt/exxpiano/exxpiano-wifi.py status >/dev/null 2>&1; ok "exxpiano-wifi.py runs"
-# a card bound to a board: the check passes on that board and (with the lock) refuses another
-SERIAL="$(sed -n 's/^DEVICE_SERIAL=//p' "$W/mnt/etc/exxpiano.conf" | head -1)"; LOCK="$(sed -n 's/^DEVICE_LOCK=//p' "$W/mnt/etc/exxpiano.conf" | head -1)"
-if [ -n "$SERIAL" ]; then
-  mount -t tmpfs tmpfs "$W/mnt/tmp"
-  printf 'Serial\t\t: %s\n' "$SERIAL" > "$W/mnt/tmp/cpuinfo-same"; printf 'Serial\t\t: 00000000deadbeef\n' > "$W/mnt/tmp/cpuinfo-other"; printf 'Model\t\t: Raspberry Pi\n' > "$W/mnt/tmp/cpuinfo-missing"
-  chroot "$W/mnt" env DEVICE_SERIAL="$SERIAL" DEVICE_LOCK="$LOCK" EXXPIANO_CPUINFO=/tmp/cpuinfo-same python3 /opt/exxpiano/deviceid.py check >/dev/null 2>&1 && ok "the card runs on its own board" || bad "the card does not accept its own board"
-  rc=0
-  chroot "$W/mnt" env DEVICE_SERIAL="$SERIAL" DEVICE_LOCK="$LOCK" EXXPIANO_CPUINFO=/tmp/cpuinfo-other python3 /opt/exxpiano/deviceid.py check >/dev/null 2>&1 || rc=$?
-  if [ "$LOCK" = 1 ]; then [ "$rc" = 78 ] && ok "a locked card refuses another board" || bad "a locked card accepts another board (exit $rc)"; else [ "$rc" = 0 ] && ok "an unlocked card still runs on another board" || bad "an unlocked card refuses another board"; fi
-  rc=0
-  chroot "$W/mnt" env DEVICE_SERIAL="$SERIAL" DEVICE_LOCK="$LOCK" EXXPIANO_CPUINFO=/tmp/cpuinfo-missing python3 /opt/exxpiano/deviceid.py check >/dev/null 2>&1 || rc=$?
-  if [ "$LOCK" = 1 ]; then [ "$rc" = 78 ] && ok "a locked card refuses an unreadable board serial" || bad "a locked card runs without a readable board serial (exit $rc)"; else [ "$rc" = 0 ] && ok "an unlocked card runs without a readable board serial" || bad "an unlocked card refuses an unreadable board serial"; fi
-  umount "$W/mnt/tmp"
-fi
-echo "number in the image: $(sed -n 's/^DEVICE_NUMBER=//p' "$W/mnt/etc/exxpiano.conf"), name: $(cat "$W/mnt/etc/hostname")"
+echo "generic name in the reusable image: $(cat "$W/mnt/etc/hostname")"
 [ "$fail" = 0 ] || { echo "smoke test FAILED"; exit 1; }
 echo "smoke test passed"

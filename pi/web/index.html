@@ -146,7 +146,6 @@
 </nav>
 <main>
 <div class="card wrong" id="wrongDevice" role="alert" hidden></div>
-<div class="card wrong" id="wrongBoard" role="alert" hidden></div>
   <div class="card" id="login">
     <h2 data-t="token_title">Access token</h2>
     <p class="hint" data-t="token_hint">This module asks for a token (WEB_TOKEN in /etc/exxpiano.conf).</p>
@@ -233,7 +232,6 @@
       <h2 data-t="n_title">Device name</h2>
       <p class="hint" data-t="n_hint">With several devices, give each its own name: it is shown in the menu and in the browser tab, and the page opens at http://name.local:8080/. Lowercase letters, digits and hyphens.</p>
       <div class="row"><label for="nameInput" data-t="n_label">Name</label><input type="text" id="nameInput" maxlength="63" autocomplete="off" autocapitalize="off" style="grid-column:1/3"></div>
-      <p class="hint" id="serialLine"></p>
       <p><button class="secondary" id="nameSave" data-t="n_save">Save the name</button> <span class="wnote" id="nameResult" role="status"></span></p>
     </div>
     <div class="card"><h2 data-t="w_title">Wi-Fi</h2><div id="wState"></div>
@@ -300,7 +298,7 @@ const T = {
     w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (exxpiano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
     w_setup_started: "Starting the setup network… join it from your phone: its name begins with exxpiano-Setup.",
     w_only_way: "in use, the only way to reach the Pi: add another network or plug in a cable first",
-    n_title: "Device name", n_hint: "Every device has a number: the last four digits of its Wi-Fi address (it ends the setup network's name too). With several devices give each its own name, for example exxpiano-<number>: it is shown in the menu and in the browser tab, and the page opens at http://name.local:8080/. Lowercase letters, digits and hyphens.", n_label: "Name", n_save: "Save the name", b_serial: "Serial of this Raspberry Pi: {serial} (give it to build-sd-image.py --serial).", b_bound: "This card was made for {bound}.", b_mismatch: "Warning: this card was made for the Raspberry Pi with serial {bound}, but it is in the board {have}.", b_locked: "This card was made for the Raspberry Pi with serial {bound}, but it is in the board {have}: the synthesizer does not start here.", d_mismatch: "Warning: this code was made for device № {wanted}, but this page is device № {have}. Check the sticker: you may be connected to the wrong device.", n_saved: "Saved: {name}. The page also opens at http://{name}.local:8080/.",
+    n_title: "Device name", n_hint: "The installation ID is generated automatically at first boot; you never have to enter a board serial. It already makes the default hostname and setup Wi-Fi unique. You may give the device a friendlier name; use lowercase letters, digits and hyphens.", n_label: "Name", n_save: "Save the name", d_mismatch: "Warning: this code belongs to installation {wanted}, but this page is installation {have}. You may be connected to another device.", n_saved: "Saved: {name}. The page also opens at http://{name}.local:8080/.",
     q_title: "Phone setup by QR code", q_hint: "Scan with the phone camera: the first code joins the Pi's setup network, the second opens this settings page. Print the page as a sticker for the device.",
     q_join: "1. Join the setup network", q_setup: "2. Open the setup page", q_page: "Open this page on a phone", q_print: "Print",
     w_title: "Wi-Fi", w_add: "Connect to a network", w_network: "Network", w_name: "Network name", w_password: "Password", w_show: "Show the password",
@@ -356,7 +354,7 @@ const T = {
     w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (exxpiano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
     w_setup_started: "Запускаю сеть настройки… подключитесь к ней с телефона: имя начинается с exxpiano-Setup.",
     w_only_way: "используется, единственный путь к Pi: сначала добавьте другую сеть или подключите кабель",
-    n_title: "Имя устройства", n_hint: "У каждого устройства есть номер: последние четыре цифры его Wi-Fi-адреса (им же заканчивается имя сети настройки). Если устройств несколько, дайте каждому своё имя, например exxpiano-<номер>: оно показано в меню и во вкладке браузера, а страница открывается по http://имя.local:8080/. Строчные латинские буквы, цифры и дефис.", n_label: "Имя", n_save: "Сохранить имя", b_serial: "Серийный номер этой Raspberry Pi: {serial} (передайте его в build-sd-image.py --serial).", b_bound: "Эта карта сделана для {bound}.", b_mismatch: "Внимание: эта карта сделана для Raspberry Pi с серийным номером {bound}, а стоит в плате {have}.", b_locked: "Эта карта сделана для Raspberry Pi с серийным номером {bound}, а стоит в плате {have}: синтезатор здесь не запускается.", d_mismatch: "Внимание: этот код сделан для устройства № {wanted}, а эта страница принадлежит устройству № {have}. Проверьте наклейку: возможно, вы подключились не к тому устройству.", n_saved: "Сохранено: {name}. Страница открывается и по http://{name}.local:8080/.",
+    n_title: "Имя устройства", n_hint: "Идентификатор установки создаётся автоматически при первом запуске; серийный номер платы вводить не нужно. Он уже делает hostname и сеть настройки уникальными. При желании устройству можно дать понятное имя: строчные латинские буквы, цифры и дефис.", n_label: "Имя", n_save: "Сохранить имя", d_mismatch: "Внимание: этот код принадлежит установке {wanted}, а эта страница — установке {have}. Возможно, вы подключились к другому устройству.", n_saved: "Сохранено: {name}. Страница открывается и по http://{name}.local:8080/.",
     q_title: "Настройка с телефона по QR-коду", q_hint: "Наведите камеру телефона: первый код подключает к сети настройки Pi, второй открывает эту страницу. Страницу можно распечатать как наклейку на устройство.",
     q_join: "1. Подключиться к сети настройки", q_setup: "2. Открыть страницу настройки", q_page: "Открыть эту страницу на телефоне", q_print: "Печать",
     w_title: "Wi-Fi", w_add: "Подключение к сети", w_network: "Сеть", w_name: "Имя сети", w_password: "Пароль", w_show: "Показать пароль",
@@ -407,10 +405,10 @@ const tr = k => (T[L][k] !== undefined ? T[L][k] : T.en[k]);
 document.documentElement.lang = L;
 document.title = tr("title");
 document.getElementById("title").textContent = tr("title");
-function showDeviceName(name, number) {          // several devices: the number and the name tell them apart, in the menu and in the browser tab
+function showDeviceName(name, installId) {       // several installed copies: the installation ID and name tell them apart
   if (!name) return;
-  document.title = (number ? "№" + number + " · " : "") + name + " · " + tr("title");
-  $("devName").textContent = (number ? "№ " + number + " · " : "") + name;
+  document.title = (installId ? installId + " · " : "") + name + " · " + tr("title");
+  $("devName").textContent = (installId ? installId + " · " : "") + name;
 }
 document.querySelectorAll("[data-t]").forEach(el => { el.textContent = tr(el.dataset.t); });
 
@@ -895,16 +893,9 @@ async function connectNetwork() {
     wifi.waiting = true; setTimeout(() => pollWifi(true), 1200);
   } catch (e) { wText(out, "bad", tr("err") + ": " + e.message); }
 }
-// A QR code names the device it belongs to (?d=81DE). With several devices a code of one scanned next to another would open the wrong page: say so.
-// A card made for one Raspberry Pi (build-sd-image.py --serial) says so when it is in another board.
-function checkBoard() {
-  const d = state.device || {}, box = $("wrongBoard");
-  box.hidden = d.serial_ok !== false;
-  if (!box.hidden) box.textContent = fmt(tr(d.locked ? "b_locked" : "b_mismatch"), { bound: d.bound_serial, have: d.serial });
-  $("serialLine").textContent = d.serial ? fmt(tr("b_serial"), { serial: d.serial }) + (d.bound ? " " + fmt(tr("b_bound"), { bound: d.bound_serial }) : "") : "";
-}
+// A QR code names the installation it belongs to. If code and page IDs differ, the user is looking at another device.
 function checkDeviceParam() {
-  const wanted = (new URLSearchParams(location.search).get("d") || "").toUpperCase(), have = (state.device && state.device.number || "").toUpperCase();
+  const wanted = (new URLSearchParams(location.search).get("d") || "").toUpperCase(), have = (state.device && state.device.installation_id || "").toUpperCase();
   const box = $("wrongDevice");
   box.hidden = !wanted || wanted === have;
   if (!box.hidden) box.textContent = fmt(tr("d_mismatch"), { wanted, have });
@@ -913,7 +904,7 @@ async function saveName() {
   const out = $("nameResult"), name = $("nameInput").value.trim().toLowerCase();
   try {
     const r = await api("/api/device", { name });
-    state.hostname = r.hostname; $("nameInput").value = r.hostname; showDeviceName(r.hostname, state.device && state.device.number);
+    state.hostname = r.hostname; $("nameInput").value = r.hostname; showDeviceName(r.hostname, state.device && state.device.installation_id);
     wText(out, "ok", fmt(tr("n_saved"), { name: r.hostname }));
   } catch (e) { wText(out, "bad", tr("err") + ": " + e.message); }
 }
@@ -968,8 +959,8 @@ async function start() {
     state = await api("/api/state");
   } catch (e) { say(e.message, "err"); return; }
   $("login").style.display = "none";
-  showDeviceName(state.hostname, state.device && state.device.number); $("nameInput").value = state.hostname || "";
-  checkDeviceParam(); checkBoard();
+  showDeviceName(state.hostname, state.device && state.device.installation_id); $("nameInput").value = state.hostname || "";
+  checkDeviceParam();
   $("ver").textContent = [state.version ? "exxpiano " + state.version : "", state.fluidsynth ? "FluidSynth " + state.fluidsynth : ""].filter(Boolean).join(" · ");
   ["touchRows", "volumeRows", "mechRows"].forEach(id => { $(id).textContent = ""; });
   buildSliders(); drawCurve(state.settings.velocity_curve); fillAudio(); renderStatus(); renderBanks(true);

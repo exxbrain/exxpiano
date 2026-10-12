@@ -109,11 +109,8 @@ class FakeActions:
     def network_manager_active(self):
         return self.nm
 
-    def wifi_mac(self):
-        return 'b8:27:eb:d2:81:de'
-
-    def device_serial(self):
-        return '00000000d2f2f1de'
+    def installation_id(self):
+        return '0123456789ABCDEF'
 
     def hostname(self):
         return self.host
@@ -587,27 +584,16 @@ class WifiApiTests(ServerCase):
 
 
 class DeviceNameTests(ServerCase):
-    def test_the_state_tells_the_name_and_the_number_of_the_device(self):
+    def test_the_state_tells_the_name_and_the_automatic_installation_id(self):
         self.start()
         r = self.jcall('/api/state')[1]
         self.assertEqual(r['hostname'], 'exxpiano')
-        self.assertEqual(r['device'], dict(number='81DE', serial='00000000d2f2f1de', bound=False, bound_serial=None, serial_ok=None, locked=False))
+        self.assertEqual(r['device'], dict(installation_id='0123456789ABCDEF'))
 
-    def test_a_configured_number_is_used_everywhere(self):
-        self.start(CONF + 'DEVICE_NUMBER=0007\n')
-        self.assertEqual(self.jcall('/api/state')[1]['device']['number'], '0007')
-        self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'exxpiano-Setup-0007')
-        self.assertEqual(self.jcall('/api/qr?kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0007#/wifi')
-
-    def test_a_card_bound_to_this_board_and_to_another_one(self):
-        self.start(CONF + 'DEVICE_SERIAL=d2f2f1de\n')
-        d = self.jcall('/api/state')[1]['device']
-        self.assertEqual((d['bound'], d['serial_ok'], d['bound_serial'], d['locked']), (True, True, '00000000d2f2f1de', False))
-        self.start(CONF + 'DEVICE_SERIAL=000000001234abcd\nDEVICE_LOCK=1\n')
-        d = self.jcall('/api/state')[1]['device']
-        self.assertEqual((d['bound'], d['serial_ok'], d['locked']), (True, False, True))
-        self.start(CONF + 'DEVICE_SERIAL=nonsense\n')
-        self.assertEqual(self.jcall('/api/state')[1]['device']['bound'], False)
+    def test_the_installation_id_is_used_everywhere_without_configuration(self):
+        self.start()
+        self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'exxpiano-Setup-0123456789ABCDEF')
+        self.assertEqual(self.jcall('/api/qr?kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0123456789ABCDEF#/wifi')
 
     def test_rename_stores_a_clean_name_and_the_state_follows(self):
         self.start()
@@ -656,28 +642,28 @@ class QrApiTests(ServerCase):
         self.start()
         code, r = self.qr('kind=join')
         self.assertEqual(code, 200)
-        self.assertEqual((r['ssid'], r['password']), ('exxpiano-Setup-81DE', 'exxpianosetup'))
-        self.assertEqual(r['text'], 'WIFI:T:WPA;S:exxpiano-Setup-81DE;P:exxpianosetup;;')
+        self.assertEqual((r['ssid'], r['password']), ('exxpiano-Setup-0123456789ABCDEF', 'exxpianosetup'))
+        self.assertEqual(r['text'], 'WIFI:T:WPA;S:exxpiano-Setup-0123456789ABCDEF;P:exxpianosetup;;')
         self.assertTrue(r['svg'].startswith('<svg') and 'viewBox' in r['svg'])
 
     def test_a_changed_name_and_password_and_a_bad_password(self):
         self.start(CONF + 'WIFI_AP_SSID=My-Piano\nWIFI_AP_PASSWORD="much better; secret"\n')
-        self.assertEqual(self.qr('kind=join')[1]['text'], 'WIFI:T:WPA;S:My-Piano-81DE;P:much better\\; secret;;')
+        self.assertEqual(self.qr('kind=join')[1]['text'], 'WIFI:T:WPA;S:My-Piano-0123456789ABCDEF;P:much better\\; secret;;')
         self.start(CONF + 'WIFI_AP_PASSWORD=short\n')
         self.assertEqual(self.qr('kind=join')[1]['password'], 'exxpianosetup')                  # the same fallback the supervisor makes
 
     def test_setup_page_code_uses_the_web_port(self):
         self.start(CONF + 'WEB_PORT=9090\n')
-        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:9090/?d=81DE#/wifi')
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:9090/?d=0123456789ABCDEF#/wifi')
         self.start()
-        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=81DE#/wifi')                 # the device number is in the code
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0123456789ABCDEF#/wifi')
 
     def test_page_code_is_the_address_the_browser_used_or_the_known_ip(self):
         self.start()
-        self.assertEqual(self.qr('kind=page', 'exxpiano.local:8080')[1]['text'], 'http://exxpiano.local:8080/?d=81DE#/wifi')
-        self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/?d=81DE#/wifi')
+        self.assertEqual(self.qr('kind=page', 'exxpiano.local:8080')[1]['text'], 'http://exxpiano.local:8080/?d=0123456789ABCDEF#/wifi')
+        self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/?d=0123456789ABCDEF#/wifi')
         r = self.qr('kind=page', 'evil.example/<script>')[1]                                  # an odd Host header is not copied into a code
-        self.assertEqual(r['text'], 'http://192.168.1.9:8080/?d=81DE#/wifi')
+        self.assertEqual(r['text'], 'http://192.168.1.9:8080/?d=0123456789ABCDEF#/wifi')
 
     def test_unknown_kinds_and_the_token(self):
         self.start(CONF + 'WEB_TOKEN=s3cret\n')

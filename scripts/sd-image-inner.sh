@@ -1,16 +1,16 @@
 #!/bin/bash
-# Turns a DietPi image for the Raspberry Pi into the image of one exxpiano device: the software, the sound banks, the number and the name of the
-# device, DietPi's first-boot automation. Runs as root on Linux (build-sd-image.py starts it in Docker on a Mac).
+# Turns a DietPi image for the Raspberry Pi into the reusable exxpiano image: the software, sound banks and DietPi's first-boot automation.
+# Each installed copy creates its own persistent installation ID at first boot. Runs as root on Linux (build-sd-image.py starts it in Docker on a Mac).
 #
-#   sd-image-inner.sh --image IN.img[.xz] --out OUT.img --dietpi-version-out VERSION.txt --deb exxpiano_X_all.deb --piano P.sf2 --mech M.sf2 --number 0007 --serial SERIAL --lock [options]
+#   sd-image-inner.sh --image IN.img[.xz] --out OUT.img --dietpi-version-out VERSION.txt --deb exxpiano_X_all.deb --piano P.sf2 --mech M.sf2 [options]
 #
-# Options: --serial S (the board this card is made for: 8-16 hex digits)  --lock (the synthesizer refuses another board)  --hostname NAME (default exxpiano-<number>)  --password PW (DietPi's global password)  --ap-password PW  --country RU  --timezone Europe/Moscow
+# Options: --hostname NAME (generic image hostname; default exxpiano)  --password PW (DietPi's global password)  --ap-password PW  --country RU  --timezone Europe/Moscow
 #          --locale en_GB.UTF-8  --keyboard us  --extra-mb N (room added to the image)  --workdir DIR
 # The image is NOT started here: nothing can be tried without a Pi. It is checked by reading it back (the last step).
 set -euo pipefail
 
-IMAGE="" OUT="" DIETPI_VERSION_OUT="" DEB="" PIANO="" MECH="" NUMBER="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
-KEYBOARD="us" SERIAL="" LOCK=0 EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work" NETWORK_IN_CHROOT=1
+IMAGE="" OUT="" DIETPI_VERSION_OUT="" DEB="" PIANO="" MECH="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
+KEYBOARD="us" EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work" NETWORK_IN_CHROOT=1
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 die() { echo "sd-image: $*" >&2; exit 1; }
@@ -24,7 +24,6 @@ while [ $# -gt 0 ]; do
     --deb) DEB="$2"; shift 2 ;;
     --piano) PIANO="$2"; shift 2 ;;
     --mech) MECH="$2"; shift 2 ;;
-    --number) NUMBER="$2"; shift 2 ;;
     --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
     --password) PASSWORD="$2"; shift 2 ;;
     --ap-password) AP_PASSWORD="$2"; shift 2 ;;
@@ -32,8 +31,6 @@ while [ $# -gt 0 ]; do
     --timezone) TIMEZONE="$2"; shift 2 ;;
     --locale) LOCALE="$2"; shift 2 ;;
     --keyboard) KEYBOARD="$2"; shift 2 ;;
-    --serial) SERIAL="$2"; shift 2 ;;
-    --lock) LOCK=1; shift ;;
     --extra-mb) EXTRA_MB="$2"; shift 2 ;;
     --workdir) WORKDIR="$2"; shift 2 ;;
     -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -48,13 +45,7 @@ PASSWORD="${PASSWORD:-${SD_PASSWORD:-}}"; AP_PASSWORD="${AP_PASSWORD:-${SD_AP_PA
 [ -f "$DEB" ] || die "no such package: $DEB"
 [ -n "$OUT" ] || die "--out is required"
 [ -n "$DIETPI_VERSION_OUT" ] || die "--dietpi-version-out is required"
-[[ "$NUMBER" =~ ^[0-9A-Za-z]{1,8}$ ]] || die "--number: 1 to 8 letters or digits"
-[[ "$SERIAL" =~ ^[0-9a-fA-F]{8,16}$ ]] || die "--serial is required: 8 to 16 hex digits (cat /proc/cpuinfo shows the Serial of the board)"
-SERIAL="$(printf '%016s' "$(echo "$SERIAL" | tr A-F a-f)" | tr ' ' 0)"
-[ "$LOCK" = 1 ] || die "--lock is required for a product image"
-NUMBER="$(echo "$NUMBER" | tr a-z A-Z)"
-[[ "$NUMBER" =~ ^[0-9]+$ ]] && NUMBER="$(printf '%04d' "$((10#$NUMBER))")"        # 7 -> 0007 (the same rule as sd-registry.py)
-[ -n "$HOSTNAME_NEW" ] || HOSTNAME_NEW="exxpiano-$(echo "$NUMBER" | tr A-Z a-z)"
+[ -n "$HOSTNAME_NEW" ] || HOSTNAME_NEW="exxpiano"
 [[ "$HOSTNAME_NEW" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || die "--hostname: lowercase letters, digits and hyphens"
 [ -r "$PIANO" ] || die "--piano is required and must be readable"
 [ -r "$MECH" ] || die "--mech is required and must be readable"
@@ -87,6 +78,39 @@ quote_conf() {   # a value for /etc/exxpiano.conf: in double quotes, \ and " esc
   printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\"]/\\&/g')"
 }
 
+read_dietpi_version() {   # mounted root, the boot partition's mount point inside it
+  local root="$1" bootdir="$2" version_file="" candidate core sub rc
+  for candidate in "$root/boot/dietpi/.version" "$root$bootdir/dietpi/.version"; do
+    if [ -r "$candidate" ]; then version_file="$candidate"; break; fi
+  done
+  [ -n "$version_file" ] || die "cannot find DietPi version metadata at /boot/dietpi/.version or $bootdir/dietpi/.version"
+  core="$(sed -n 's/^G_DIETPI_VERSION_CORE=//p' "$version_file" 2>/dev/null | head -1)"
+  sub="$(sed -n 's/^G_DIETPI_VERSION_SUB=//p' "$version_file" 2>/dev/null | head -1)"
+  rc="$(sed -n 's/^G_DIETPI_VERSION_RC=//p' "$version_file" 2>/dev/null | head -1)"
+  [[ "$core" =~ ^[0-9]+$ && "$sub" =~ ^[0-9]+$ && "$rc" =~ ^[0-9]+$ ]] || die "cannot read a complete DietPi version from dietpi/.version"
+  printf '%s.%s.%s\n' "$core" "$sub" "$rc"
+}
+
+prepare_chroot_tmp() {   # DietPi mounts a 1777 tmpfs here only at boot; offline apt needs the underlying directory
+  install -d -m 1777 "$1/tmp"
+}
+
+configure_offline_product_boot() {   # mounted root, the boot partition's mount point inside it
+  local root="$1" bootdir="$2" dt
+  dt="$root$bootdir/dietpi.txt"
+  # exxpiano-wifi is the sole owner of wlan0 and creates the setup AP when no saved network is available.
+  set_kv "$dt" AUTO_SETUP_NET_WIFI_ENABLED 0
+  set_kv "$dt" AUTO_SETUP_BOOT_WAIT_FOR_NETWORK 0
+  set_kv "$dt" CONFIG_CHECK_DIETPI_UPDATES 0
+  set_kv "$dt" CONFIG_CHECK_APT_UPDATES 0
+
+  # Let DietPi apply first-boot hardware/password settings, then skip its online update/install workflow.
+  install -d "$root/usr/local/sbin" "$root/etc/systemd/system/dietpi-firstboot.service.d" "$root/var/lib/dietpi/postboot.d"
+  install -m 755 "$HERE/../dietpi/exxpiano-dietpi-preinstalled.sh" "$root/usr/local/sbin/exxpiano-dietpi-preinstalled"
+  install -m 644 "$HERE/../dietpi/dietpi-firstboot-exxpiano.conf" "$root/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf"
+  install -m 755 "$HERE/../dietpi/Automation_Custom_Script.image.sh" "$root/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot"
+}
+
 say "1/9 The DietPi image"
 rm -rf "$MNT" "$DISK"; mkdir -p "$MNT"
 case "$IMAGE" in
@@ -112,14 +136,10 @@ BOOTDIR="$(awk '$3=="vfat"{print $2; exit}' "$MNT/etc/fstab" 2>/dev/null || true
 mkdir -p "$MNT$BOOTDIR"; mount "$BOOT_DEV" "$MNT$BOOTDIR"
 echo "root: $ROOT_DEV, boot: $BOOT_DEV at $BOOTDIR"
 [ -f "$MNT$BOOTDIR/dietpi.txt" ] || die "no dietpi.txt on the boot partition: not a DietPi image"
-VERSION_FILE="$MNT$BOOTDIR/dietpi/.version"
-DIETPI_CORE="$(sed -n 's/^G_DIETPI_VERSION_CORE=//p' "$VERSION_FILE" 2>/dev/null | head -1)"
-DIETPI_SUB="$(sed -n 's/^G_DIETPI_VERSION_SUB=//p' "$VERSION_FILE" 2>/dev/null | head -1)"
-DIETPI_RC="$(sed -n 's/^G_DIETPI_VERSION_RC=//p' "$VERSION_FILE" 2>/dev/null | head -1)"
-[[ "$DIETPI_CORE" =~ ^[0-9]+$ && "$DIETPI_SUB" =~ ^[0-9]+$ && "$DIETPI_RC" =~ ^[0-9]+$ ]] || die "cannot read a complete DietPi version from dietpi/.version"
-DIETPI_VERSION="$DIETPI_CORE.$DIETPI_SUB.$DIETPI_RC"
+DIETPI_VERSION="$(read_dietpi_version "$MNT" "$BOOTDIR")"
 
 say "4/9 The software (installed into the image with its dependencies; the first start needs no download of ours)"
+prepare_chroot_tmp "$MNT"
 mount --bind /dev "$MNT/dev"; mount -t devpts devpts "$MNT/dev/pts" 2>/dev/null || true; mount -t proc proc "$MNT/proc"; mount -t sysfs sys "$MNT/sys"
 chroot "$MNT" /bin/true 2>/dev/null || die "cannot run the image's programs: it is arm64 and this machine is $(uname -m). On x86 add qemu-user-static and binfmt (docker run --privileged tonistiigi/binfmt --install arm64)"
 cp -a "$MNT/etc/resolv.conf" "$WORKDIR/resolv.conf.orig" 2>/dev/null || true
@@ -141,11 +161,9 @@ install -m 644 "$PIANO" "$MNT/opt/exxpiano/soundfonts/piano.sf2"
 install -m 644 "$MECH" "$MNT/opt/exxpiano/soundfonts/mech.sf2"
 ls -l "$MNT/opt/exxpiano/soundfonts"
 
-say "6/9 The number and the name of the device: $NUMBER, $HOSTNAME_NEW"
+say "6/9 Generic image identity; the installation ID is created at first boot"
 CONF="$MNT/etc/exxpiano.conf"
-set_kv "$CONF" DEVICE_NUMBER "$NUMBER"
 [ -z "$AP_PASSWORD" ] || set_kv "$CONF" WIFI_AP_PASSWORD "$(quote_conf "$AP_PASSWORD")"
-set_kv "$CONF" DEVICE_SERIAL "$SERIAL"; set_kv "$CONF" DEVICE_LOCK "$LOCK"
 echo "$HOSTNAME_NEW" > "$MNT/etc/hostname"
 if grep -q '^127\.0\.1\.1' "$MNT/etc/hosts" 2>/dev/null; then sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME_NEW/" "$MNT/etc/hosts"; else printf '127.0.1.1\t%s\n' "$HOSTNAME_NEW" >> "$MNT/etc/hosts"; fi
 
@@ -155,9 +173,7 @@ set_kv "$DT" AUTO_SETUP_AUTOMATED 1
 set_kv "$DT" AUTO_SETUP_ACCEPT_LICENSE 1
 set_kv "$DT" AUTO_SETUP_NET_HOSTNAME "$HOSTNAME_NEW"
 set_kv "$DT" AUTO_SETUP_NET_ETHERNET_ENABLED 1
-set_kv "$DT" AUTO_SETUP_NET_WIFI_ENABLED 1
 set_kv "$DT" AUTO_SETUP_NET_WIFI_COUNTRY_CODE "$COUNTRY"
-set_kv "$DT" AUTO_SETUP_BOOT_WAIT_FOR_NETWORK 0          # the device must start without a network: the setup network is its way in
 set_kv "$DT" AUTO_SETUP_LOCALE "$LOCALE"
 set_kv "$DT" AUTO_SETUP_KEYBOARD_LAYOUT "$KEYBOARD"
 set_kv "$DT" AUTO_SETUP_TIMEZONE "$TIMEZONE"
@@ -165,6 +181,7 @@ set_kv "$DT" AUTO_SETUP_CUSTOM_SCRIPT_EXEC 0
 set_kv "$DT" SURVEY_OPTED_IN 0
 [ -z "$PASSWORD" ] || set_kv "$DT" AUTO_SETUP_GLOBAL_PASSWORD "$PASSWORD"
 install -m 755 "$HERE/../dietpi/Automation_Custom_Script.image.sh" "$MNT$BOOTDIR/Automation_Custom_Script.sh"
+configure_offline_product_boot "$MNT" "$BOOTDIR"
 CFG="$MNT$BOOTDIR/config.txt"
 [ -f "$CFG" ] && set_kv "$CFG" dtparam=audio on        # the 3.5 mm jack is off by default on DietPi
 
@@ -181,11 +198,11 @@ check "dnsmasq-base and hostapd are installed" "[ -x '$MNT/usr/sbin/dnsmasq' ] &
 check "avahi is installed" "[ -x '$MNT/usr/sbin/avahi-daemon' ]"
 check "the banks are in place" "[ -s '$MNT/opt/exxpiano/soundfonts/piano.sf2' ] && [ -s '$MNT/opt/exxpiano/soundfonts/mech.sf2' ]"
 check "the configured banks are the installed defaults" "grep -qx 'PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2' '$CONF' && grep -qx 'MECH_SF2=/opt/exxpiano/soundfonts/mech.sf2' '$CONF'"
-check "the number is in the configuration" "grep -qx 'DEVICE_NUMBER=$NUMBER' '$CONF'"
-check "the card is bound to the board $SERIAL (lock: $LOCK)" "grep -qx 'DEVICE_SERIAL=$SERIAL' '$CONF' && grep -qx 'DEVICE_LOCK=$LOCK' '$CONF'"
+check "no installation ID is baked into the reusable image" "[ ! -e '$MNT/var/lib/exxpiano/installation-id' ]"
 check "the host name is set" "[ \"\$(cat '$MNT/etc/hostname')\" = '$HOSTNAME_NEW' ] && grep -q '$HOSTNAME_NEW' '$MNT/etc/hosts'"
-check "dietpi.txt: automated, host name, no wait for network" "grep -qx 'AUTO_SETUP_AUTOMATED=1' '$DT' && grep -qx 'AUTO_SETUP_NET_HOSTNAME=$HOSTNAME_NEW' '$DT' && grep -qx 'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0' '$DT'"
+check "dietpi.txt: automated, host name, offline boot owned by exxpiano" "grep -qx 'AUTO_SETUP_AUTOMATED=1' '$DT' && grep -qx 'AUTO_SETUP_NET_HOSTNAME=$HOSTNAME_NEW' '$DT' && grep -qx 'AUTO_SETUP_NET_WIFI_ENABLED=0' '$DT' && grep -qx 'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0' '$DT' && grep -qx 'CONFIG_CHECK_DIETPI_UPDATES=0' '$DT' && grep -qx 'CONFIG_CHECK_APT_UPDATES=0' '$DT'"
 check "the first-start script is on the boot partition" "[ -x '$MNT$BOOTDIR/Automation_Custom_Script.sh' ]"
+check "the pre-installed DietPi handoff is configured" "[ -x '$MNT/usr/local/sbin/exxpiano-dietpi-preinstalled' ] && grep -qx 'ExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled' '$MNT/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf' && [ -x '$MNT/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot' ]"
 check "no leftovers (resolver copy, package copy, policy)" "[ ! -e '$MNT/tmp/exxpiano.deb' ] && [ ! -e '$MNT/usr/sbin/policy-rc.d' ]"
 [ "$fail" = 0 ] || die "the checks above failed: the image is not written"
 
@@ -197,4 +214,4 @@ e2fsck -fy "$ROOT_DEV" >/dev/null || [ $? -le 1 ] || die "the file system check 
 for l in "${LOOPS[@]}"; do losetup -d "$l"; done; LOOPS=()
 mkdir -p "$(dirname "$OUT")" "$(dirname "$DIETPI_VERSION_OUT")"; mv "$DISK" "$OUT"
 printf '%s\n' "$DIETPI_VERSION" > "$DIETPI_VERSION_OUT.tmp"; mv "$DIETPI_VERSION_OUT.tmp" "$DIETPI_VERSION_OUT"
-echo "Image: $OUT ($(( $(stat -c %s "$OUT") / 1048576 )) MB), number $NUMBER, name $HOSTNAME_NEW, board $SERIAL, DietPi $DIETPI_VERSION"
+echo "Image: $OUT ($(( $(stat -c %s "$OUT") / 1048576 )) MB), generic name $HOSTNAME_NEW, DietPi $DIETPI_VERSION"

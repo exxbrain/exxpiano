@@ -165,21 +165,22 @@ class ScanTests(unittest.TestCase):
 
 
 class HostnameTests(unittest.TestCase):
-    def test_the_number_and_the_suggested_name_come_from_the_wifi_address(self):
-        self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de'), '81DE')
-        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de'), 'exxpiano-81de')
-        self.assertEqual(wifilib.device_number(''), '0000')
-        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', 'b8:27:eb:d2:81:de'), 'exxpiano-Setup-81DE')   # the same number in the setup network
-        self.assertTrue(wifilib.HOSTNAME_RE.match(wifilib.suggested_hostname('b8:27:eb:d2:81:de')))
+    def test_installation_id_is_created_once_and_persisted(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'installation-id')
+            self.assertEqual(wifilib.installation_id(path, lambda: '0123456789abcdef'), '0123456789ABCDEF')
+            self.assertEqual(wifilib.installation_id(path, lambda: 'ffffffffffffffff'), '0123456789ABCDEF')
+            with open(path) as f:
+                self.assertEqual(f.read(), '0123456789ABCDEF\n')
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o644)
 
-    def test_a_number_given_at_build_time_wins_over_the_address(self):
-        self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', '0007'), '0007')
-        self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', 'ab12'), 'AB12')
-        self.assertEqual(wifilib.suggested_hostname('b8:27:eb:d2:81:de', '0007'), 'exxpiano-0007')
-        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', '', '0007'), 'exxpiano-Setup-0007')                 # no address needed
-        for bad in ('', 'x y', '12345678901', '../1', None):                                          # an unusable value falls back to the address
-            self.assertEqual(wifilib.device_number('b8:27:eb:d2:81:de', bad), '81DE')
-        self.assertEqual(wifilib.setup_credentials({'DEVICE_NUMBER': '0007'}, 'b8:27:eb:d2:81:de'), ('exxpiano-Setup-0007', 'exxpianosetup'))
+    def test_invalid_existing_installation_id_is_not_silently_replaced(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'installation-id')
+            with open(path, 'w') as f:
+                f.write('bad\n')
+            with self.assertRaises(ValueError):
+                wifilib.installation_id(path)
 
     def test_apply_hostname_sets_it_fixes_the_hosts_file_and_restarts_avahi(self):
         calls = []
@@ -203,10 +204,14 @@ class HostnameTests(unittest.TestCase):
 
 
 class AccessPointTests(unittest.TestCase):
-    def test_the_name_ends_with_the_adapter_address(self):
-        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', 'ba:27:eb:d2:81:de'), 'exxpiano-Setup-81DE')
-        self.assertEqual(wifilib.ap_ssid('', ''), 'exxpiano-Setup-0000')
-        self.assertLessEqual(len(wifilib.ap_ssid('x' * 60, 'aa:bb')), 32)
+    def test_the_name_ends_with_the_installation_id(self):
+        install_id = '0123456789ABCDEF'
+        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', install_id), 'exxpiano-Setup-0123456789ABCDEF')
+        self.assertEqual(wifilib.setup_credentials({}, install_id), ('exxpiano-Setup-0123456789ABCDEF', 'exxpianosetup'))
+        self.assertLessEqual(len(wifilib.ap_ssid('x' * 60, install_id).encode()), 32)
+        for bad in ('', '1234', 'not-hex', None):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                wifilib.ap_ssid('exxpiano-Setup', bad)
 
     def test_hostapd_configuration(self):
         text = wifilib.hostapd_conf('wlan0', 'exxpiano-Setup-81DE', 'exxpianosetup', 6, 'RU', '/run/exxpiano-wifi/hostapd')

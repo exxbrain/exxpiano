@@ -6,6 +6,7 @@ Everything here is a pure function on text, so it is tested without a radio. Sec
 import hashlib
 import os
 import re
+import secrets
 import tempfile
 
 SSID_MAX_BYTES = 32
@@ -14,6 +15,8 @@ AP_ADDRESS = '10.42.0.1'
 AP_DEFAULT_PASSWORD = 'exxpianosetup'
 AP_DEFAULT_PREFIX = 'exxpiano-Setup'
 AP_NETWORK = '10.42.0.0/24'
+INSTALLATION_ID_PATH = os.environ.get('EXXPIANO_INSTALLATION_ID_PATH', '/var/lib/exxpiano/installation-id')
+INSTALLATION_ID_RE = re.compile(r'^[0-9A-F]{16}$')
 
 
 # ---- validation and keys
@@ -195,34 +198,54 @@ def parse_scan(text):
 GENERIC_HOSTNAMES = ('dietpi', 'raspberrypi', 'raspberry', 'piano', 'debian', 'localhost', 'pi')
 
 
-NUMBER_RE = re.compile(r'^[0-9A-Za-z]{1,8}$')
+def installation_id(path=INSTALLATION_ID_PATH, random_hex=None):
+    """A persistent random 64-bit identifier for this installed copy. Created atomically on first use."""
+    try:
+        with open(path, encoding='ascii') as f:
+            value = f.read().strip().upper()
+        if INSTALLATION_ID_RE.fullmatch(value):
+            return value
+        raise ValueError('the installation ID file is invalid: %s' % path)
+    except FileNotFoundError:
+        pass
+    os.makedirs(os.path.dirname(os.path.abspath(path)), mode=0o755, exist_ok=True)
+    value = (random_hex() if random_hex else secrets.token_hex(8)).upper()
+    if not INSTALLATION_ID_RE.fullmatch(value):
+        raise ValueError('an installation ID must be 16 hexadecimal characters')
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    except FileExistsError:                                      # another service won the first-start race
+        return installation_id(path, random_hex)
+    with os.fdopen(fd, 'w', encoding='ascii') as f:
+        f.write(value + '\n')
+        f.flush()
+        os.fsync(f.fileno())
+    return value
 
 
-def device_number(mac, configured=None):
-    """The number of the device. A number given when the image was built (DEVICE_NUMBER, for example 0007) wins; otherwise it is the last four
-    hex digits of the Wi-Fi address. It ends the setup network's name and the default host name, and is printed on the sticker."""
-    if configured and NUMBER_RE.match(configured):
-        return configured.upper()
-    return re.sub(r'[^0-9A-Fa-f]', '', mac or '')[-4:].upper() or '0000'
+def _ssid_prefix(prefix, max_bytes):
+    prefix = prefix or AP_DEFAULT_PREFIX
+    while len(prefix.encode('utf-8')) > max_bytes:
+        prefix = prefix[:-1]
+    return prefix
 
 
-def suggested_hostname(mac, configured=None):
-    return 'exxpiano-' + device_number(mac, configured).lower()
+def ap_ssid(prefix, install_id):
+    """A setup SSID whose 16-hex suffix uniquely identifies this installed copy."""
+    install_id = str(install_id or '').upper()
+    if not INSTALLATION_ID_RE.fullmatch(install_id):
+        raise ValueError('an installation ID must be 16 hexadecimal characters')
+    return '%s-%s' % (_ssid_prefix(prefix, SSID_MAX_BYTES - len(install_id) - 1), install_id)
 
 
-def ap_ssid(prefix, mac, configured=None):
-    """`exxpiano-Setup-AB12`: the prefix and the number of the device."""
-    return ('%s-%s' % (prefix or 'exxpiano-Setup', device_number(mac, configured)))[:SSID_MAX_BYTES]
-
-
-def setup_credentials(conf, mac):
-    """(name, password) of the setup network from the configuration values (a dict) and the Wi-Fi address; bad values fall back to the defaults."""
+def setup_credentials(conf, install_id):
+    """(name, password) of the setup network for an installed copy; bad passwords fall back to the default."""
     password = conf.get('WIFI_AP_PASSWORD') or AP_DEFAULT_PASSWORD
     try:
         validate_passphrase(password)
     except ValueError:
         password = AP_DEFAULT_PASSWORD
-    return ap_ssid(conf.get('WIFI_AP_SSID') or AP_DEFAULT_PREFIX, mac, conf.get('DEVICE_NUMBER')), password
+    return ap_ssid(conf.get('WIFI_AP_SSID') or AP_DEFAULT_PREFIX, install_id), password
 
 
 def hostapd_conf(interface, ssid, passphrase, channel=6, country_code=None, ctrl_dir=None):

@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
-"""The serial number of the Raspberry Pi board, and the binding of a card (an image) to one board.
+"""Reads the Raspberry Pi board serial for diagnostics.
 
   deviceid.py            print the serial of this board (16 hex digits, as /proc/cpuinfo shows it)
-  deviceid.py check      exit 0 when the card may run here, 78 when a locked card cannot verify this board (exxpiano-run uses it)
 
-An image can be built for one board (build-sd-image.py --serial ...). The serial is then in /etc/exxpiano.conf as DEVICE_SERIAL:
-  * always: the web page warns in red when the card is in another board, the register of the images knows which board each card was made for;
-  * with DEVICE_LOCK=1: the synthesizer does not start on another board or when the board serial cannot be read.
-This is bookkeeping and a lock against copying a card to a board it was not made for, not copy protection: whoever has root on the device can edit
-the configuration. Production images always set DEVICE_LOCK=1.
+The reusable image does not ask for this serial and never uses it to control synthesizer startup.
 """
 import os
 import re
 import sys
 
 SERIAL_RE = re.compile(r'^[0-9a-fA-F]{8,16}$')
-EX_CONFIG = 78
 
 
 def normalize_serial(text):
@@ -64,27 +58,8 @@ def status(configured, actual):
     return dict(bound=bool(bound), serial=actual, bound_serial=bound, ok=ok)
 
 
-def check(env=None, actual='unread'):
-    """(exit code, message). 0 = may run, 78 = a locked image cannot verify its board."""
-    env = os.environ if env is None else env
-    actual = read_serial() if actual == 'unread' else actual
-    st = status(env.get('DEVICE_SERIAL'), actual)
-    locked = env.get('DEVICE_LOCK') == '1'
-    if not locked or not st['bound']:
-        return 0, 'not locked'
-    if st['ok'] is None:
-        return EX_CONFIG, 'the serial of this board cannot be read: the synthesizer does not start'
-    if st['ok']:
-        return 0, 'this card belongs to this board'
-    return EX_CONFIG, 'this card was made for the Raspberry Pi with serial %s, this one is %s: the synthesizer does not start' % (st['bound_serial'], actual)
-
-
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if argv and argv[0] == 'check':
-        code, message = check()
-        print('deviceid:', message, file=sys.stderr if code else sys.stdout)
-        return code
     serial = read_serial()
     print(serial or 'unknown')
     return 0 if serial else 1

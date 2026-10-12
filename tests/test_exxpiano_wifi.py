@@ -142,7 +142,8 @@ class SupervisorCase(unittest.TestCase):
         self.system = FakeSystem(self.wpa, self.clock)
         self.portal = FakePortal()
         self.cfg = pw.config_from_env({})
-        self.sup = pw.Supervisor(self.system, self.cfg, self.run_dir, self.wpa, self.clock, lambda: 1_700_000_000 + self.clock.t, self.clock.sleep, self.portal)
+        self.sup = pw.Supervisor(self.system, self.cfg, self.run_dir, self.wpa, self.clock, lambda: 1_700_000_000 + self.clock.t, self.clock.sleep,
+                                 self.portal, install_id='0123456789ABCDEF')
 
     def write_wpa(self, text):
         with open(self.wpa, 'w') as f:
@@ -178,10 +179,10 @@ class WhenToStartTests(SupervisorCase):
         self.assertEqual(self.sup.mode, 'client')
         self.advance(10)
         self.assertEqual(self.sup.mode, 'ap')                                          # 10 s of grace by default
-        self.assertEqual(self.system.ap_args, ('exxpiano-Setup-81DE', 'exxpianosetup', 6, 'GB'))
+        self.assertEqual(self.system.ap_args, ('exxpiano-Setup-0123456789ABCDEF', 'exxpianosetup', 6, 'GB'))
         self.assertTrue(self.portal.running)
         st = self.status()
-        self.assertEqual((st['mode'], st['ap']['ssid']), ('ap', 'exxpiano-Setup-81DE'))
+        self.assertEqual((st['mode'], st['ap']['ssid']), ('ap', 'exxpiano-Setup-0123456789ABCDEF'))
         self.assertEqual([n['ssid'] for n in st['scan']], ['Home', 'Cafe'])             # scanned before the radio became an access point
         self.assertLess(self.system.calls.index('scan'), self.system.calls.index('ap_start'))
 
@@ -525,46 +526,35 @@ class EnsureNameTests(unittest.TestCase):
             def mac(self):
                 return mac
         real = pw.System
+        real_installation_id = pw.wifilib.installation_id
         pw.System = FakeSystem
+        pw.wifilib.installation_id = lambda: '0123456789ABCDEF'
         try:
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
                 code = pw.main(['ensure-name'])
         finally:
             pw.System = real
+            pw.wifilib.installation_id = real_installation_id
         return code, out.getvalue(), calls
 
     def test_a_generic_name_gets_the_unique_one(self):
         for generic in ('DietPi', 'raspberrypi', 'piano', 'localhost'):
             code, out, calls = self.run_cli(generic)
             self.assertEqual(code, 0)
-            self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-81de'], calls)
-            self.assertIn('exxpiano-81de', out)
+            self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-0123456789abcdef'], calls)
+            self.assertIn('exxpiano-0123456789abcdef', out)
 
-    def test_a_number_from_the_build_names_the_device_even_without_an_adapter(self):
-        old = os.environ.get('DEVICE_NUMBER')
-        os.environ['DEVICE_NUMBER'] = '0007'
-        try:
-            code, out, calls = self.run_cli('dietpi', mac='')
-        finally:
-            os.environ.pop('DEVICE_NUMBER') if old is None else os.environ.__setitem__('DEVICE_NUMBER', old)
-        self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-0007'], calls)
-
-    def test_the_setup_network_carries_the_configured_number(self):
-        cfg = pw.config_from_env({'DEVICE_NUMBER': '0007'})
-        self.assertEqual(cfg['number'], '0007')
-        self.assertIsNone(pw.config_from_env({'DEVICE_NUMBER': 'bad number'})['number'])
+    def test_the_installation_id_names_the_device_even_without_an_adapter(self):
+        code, out, calls = self.run_cli('dietpi', mac='')
+        self.assertEqual(code, 0)
+        self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-0123456789abcdef'], calls)
 
     def test_a_chosen_name_is_kept(self):
         for chosen in ('exxpiano', 'kitchen-piano', 'exxpiano-81de'):
             code, out, calls = self.run_cli(chosen)
             self.assertEqual(calls, [])
             self.assertIn('kept', out)
-
-    def test_without_a_wifi_adapter_nothing_is_changed(self):
-        code, out, calls = self.run_cli('dietpi', mac='')
-        self.assertEqual(calls, [])
-
 
 class ExchangeTests(unittest.TestCase):
     def test_requests_are_private_one_shot_and_junk_is_dropped(self):

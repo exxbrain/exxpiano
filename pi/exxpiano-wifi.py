@@ -4,7 +4,7 @@
   exxpiano-wifi.py            run the supervisor (the systemd service does this)
   exxpiano-wifi.py status     print what the supervisor says
   exxpiano-wifi.py scan       scan now (client mode only)
-  exxpiano-wifi.py ensure-name give a device that still has a generic name (dietpi, raspberrypi ...) the unique name exxpiano-<number>
+  exxpiano-wifi.py ensure-name give a device that still has a generic name the unique name exxpiano-<installation-id>
   exxpiano-wifi.py ap-test N  start the access point for N seconds, then go back to the normal network by itself
 
 The supervisor is the only process that touches wlan0. The web page asks it for things through files in /run/exxpiano-wifi
@@ -49,8 +49,7 @@ def config_from_env(env=None):
         log('WIFI_AP_PASSWORD is not 8 to 63 ordinary characters: using the default')
         password = wifilib.AP_DEFAULT_PASSWORD
     channel = num('WIFI_AP_CHANNEL', 6, 1, 11)
-    number = env.get('DEVICE_NUMBER') if wifilib.NUMBER_RE.match(env.get('DEVICE_NUMBER') or '') else None
-    return dict(number=number, ap_prefix=env.get('WIFI_AP_SSID') or 'exxpiano-Setup', ap_password=password, channel=channel if channel in wifilib.CHANNELS_2G else 6,
+    return dict(ap_prefix=env.get('WIFI_AP_SSID') or 'exxpiano-Setup', ap_password=password, channel=channel if channel in wifilib.CHANNELS_2G else 6,
                 grace_new=num('WIFI_GRACE_NEW', 10, 5, 3600), grace_known=num('WIFI_GRACE_KNOWN', 150, 5, 3600),
                 retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600), retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
                 connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300), web_port=num('WEB_PORT', 8080, 1, 65535),
@@ -236,10 +235,11 @@ class Portal:
 # ---------------------------------------------------------------- the state machine
 class Supervisor:
     def __init__(self, system, cfg, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, clock=time.monotonic, wall=time.time, sleep=time.sleep,
-                 portal=None):
+                 portal=None, install_id=None):
         self.sys, self.cfg, self.run_dir, self.wpa_conf = system, cfg, run_dir, wpa_conf
         self.clock, self.wall, self.sleep = clock, wall, sleep
         self.portal = portal
+        self.installation_id = install_id or wifilib.installation_id()
         self.mode = 'client'
         self.offline_since = None
         self.idle_since = None
@@ -284,7 +284,7 @@ class Supervisor:
         if self.mode == 'client' and self.sys.exists():
             self.scan_result, self.scanned_at = self.sys.scan(), int(self.wall())
         wpa = self._read_wpa()
-        self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.sys.mac(), self.cfg.get('number'))
+        self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.installation_id)
         try:
             self.sys.ap_start(self.ap_ssid, self.cfg['ap_password'], self.cfg['channel'], wifilib.country(wpa))
         except Exception as exc:                                    # noqa: BLE001 - any failure must end with the normal network back
@@ -466,10 +466,9 @@ def main(argv=None):
     if cmd == 'ensure-name':
         system = System()
         current = system.hostname().lower()
-        mac = system.mac()
-        number = config_from_env()['number']
-        if current in wifilib.GENERIC_HOSTNAMES and (mac or number):
-            name = wifilib.suggested_hostname(mac, number)
+        install_id = wifilib.installation_id()
+        if current in wifilib.GENERIC_HOSTNAMES:
+            name = 'exxpiano-' + install_id.lower()
             wifilib.apply_hostname(name, system.run)
             print('The device is now called %s (it was %s)' % (name, current))
         else:
@@ -493,7 +492,7 @@ def main(argv=None):
         return 0
     if not shutil.which('hostapd') or not shutil.which('dnsmasq'):
         log('hostapd or dnsmasq is missing: the access point is not available (apt install hostapd dnsmasq-base)')
-    sup = Supervisor(system, cfg, portal=Portal(wifilib.AP_ADDRESS, cfg['web_port']))
+    sup = Supervisor(system, cfg, portal=Portal(wifilib.AP_ADDRESS, cfg['web_port']), install_id=wifilib.installation_id())
     stop = threading.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, lambda *a: stop.set())

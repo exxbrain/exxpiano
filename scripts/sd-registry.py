@@ -9,7 +9,7 @@
 
 The file is `registry/devices.csv` (override: --registry or EXXPIANO_REGISTRY). It is a plain CSV that a spreadsheet opens: back it up, it is the
 only list of what was handed out (it is kept out of git because the notes may name customers). build-sd-image.py reads and writes it: it
-refuses a number that is already used and takes the next free one for `--number auto`.
+refuses a board-derived identifier that is already used unless the build explicitly replaces it.
 """
 import argparse
 import csv
@@ -20,7 +20,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PATH = os.environ.get('EXXPIANO_REGISTRY') or os.path.join(ROOT, 'registry', 'devices.csv')
-COLUMNS = ['number', 'hostname', 'ssid', 'version', 'built_at', 'image', 'image_sha256', 'banks', 'note', 'serial', 'locked']
+COLUMNS = ['number', 'hostname', 'ssid', 'version', 'built_at', 'image', 'image_sha256', 'banks', 'note', 'serial']
 NUMBER_RE = re.compile(r'^[0-9A-Za-z]{1,8}$')
 
 

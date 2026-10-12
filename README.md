@@ -29,19 +29,19 @@ but this setup was not measured with one.
 
 | | |
 |---|---|
-| A Raspberry Pi 2, 3 or 4 supported by the DietPi RPi234 ARMv8 image | an SD card containing the personalized product image |
+| A Raspberry Pi 2, 3 or 4 supported by the DietPi RPi234 ARMv8 image | an SD card containing the product image |
 | **A 5.1 V / 2.5 A power supply and a short cable** | see "Power supply" - this is not a formality |
 | A USB MIDI keyboard | class-compliant, no drivers needed |
 | A Mac or Linux machine to build the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
 
 ## Deployment in short
 
-The shipped product is a ready device with exxpiano already installed. Production uses one complete, personalized DietPi image per Raspberry Pi board; a separate package or installer bundle is not a delivery format.
+The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards; a separate package or installer bundle is not a delivery format.
 
 1. Build the standard banks once: `scripts/make-soundfonts.sh -p standard`. This creates the required `build/piano-standard.sf2` and `build/mech.sf2`.
-2. Read the target board's serial and build its image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz> --serial <serial> --number auto`.
-3. Flash the resulting `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-<number>-sn-<serial>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
-4. Insert the card into that board and power it on. If the serial cannot be read or does not match, the synthesizer MUST NOT start.
+2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`. No board serial is entered.
+3. Flash `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
+4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
 
 See [the image-building guide](docs/BUILD-IMAGE.md) for the complete procedure and current verification status.
 
@@ -91,11 +91,11 @@ it is not used here because it has no mechanics presets and no layer reduction.
 The whole file is read into RAM, and a Pi 3 has 1 GB. I did not measure the free memory after loading `standard`
 precisely; check yourself (`free -m`, the `available` column). If the Pi runs out of memory or CPU, use `lite` or `small`.
 
-## SD card image for a new device (one zip per device)
+## SD card image for new devices
 
-For a device that you build for somebody else: one zip, written to the card in one step. Inside is DietPi with everything installed, the sound banks, and the
-**number and the name of this very device** (`0007` -> host name `exxpiano-0007`, setup network `exxpiano-Setup-0007`); a sticker with its QR codes is made
-with it, and the device is entered in the **register** (`registry/devices.csv`: number, name, version, date, checksum of the image, banks, a note).
+This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and both required banks. At first boot every installed copy creates a
+persistent random 16-character hexadecimal installation ID. The user enters neither a board serial nor another identifier. The ID gives it a unique hostname
+`exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 
 ```bash
 # once: download DietPi_RPi234-ARMv8-Trixie.img.xz from dietpi.com (or add --download to let the script fetch it)
@@ -103,23 +103,20 @@ printf 'DietPi password: '; read -r -s SD_PASSWORD; printf '\n'
 printf 'Setup network password: '; read -r -s SD_AP_PASSWORD; printf '\n'
 export SD_PASSWORD SD_AP_PASSWORD
 python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
-    --serial 00000000d2f2f1de --number auto \
-    --country RU --timezone Europe/Moscow --note 'for Ivan'
+    --country RU --timezone Europe/Moscow
 unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
-It makes `dist/sd/<number>/`: a versioned `exxpiano-rpi234-...-sd.zip` card image, `sticker/`, `manifest-<number>.json`, and `README-<number>.txt`. Write the zip with **Raspberry Pi
+It makes `dist/sd/`: `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`, `manifest.json`, and `README.txt`. Write the zip with **Raspberry Pi
 Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as it is); there is nothing to unzip onto the card by hand, because a Raspberry Pi card needs
-its partitions, which only an image carries. Switch the Pi on with an Ethernet cable plugged in (DietPi's own first-run setup needs the internet once); after that the
-device is `http://exxpiano-<number>.local:8080/` and, with no network, it starts its setup network (see "Connecting to a new Wi-Fi").
+its partitions, which only an image carries. Switch the Pi on without preparing a network: the product image skips DietPi's online first-run update. The device is
+`http://exxpiano-<id>.local:8080/`; with no Ethernet or saved Wi-Fi it starts its unique setup network (see "Connecting to a new Wi-Fi").
 
-- **Tied to a board.** `--serial <the Raspberry Pi's serial>` is mandatory. Every product image is locked: on another board, or when the serial cannot be read, the synthesizer does not start. `--serials boards.csv` makes one locked image per listed board. Step by step: **[docs/BUILD-IMAGE.md](docs/BUILD-IMAGE.md)**.
-- **Numbers.** `--number auto` takes the next free one; a number that is in the register is refused (`--force` replaces it, the old line stays marked). Look things up with
-  `python3 scripts/sd-registry.py list | show 0007 | find ivan | note 0007 "sold 12 Oct"`. The register is a plain CSV (a spreadsheet opens it); it is kept out of git because
-  the notes may name customers: back it up.
+- **Installation identity.** The ID is generated once from 64 cryptographically random bits and stored in `/var/lib/exxpiano/installation-id`. The full ID is present in the setup SSID and QR codes, making collisions extremely unlikely. Step by step: **[docs/BUILD-IMAGE.md](docs/BUILD-IMAGE.md)**.
 - **How it is made.** In a Linux container (Docker Desktop must be running; on Linux with root use `--no-docker`): the image is opened, the package and its dependencies are
-  installed into it (`apt`, no recommended packages), the banks are copied, `dietpi.txt` is set (automated first run, host name, Wi-Fi country, **no waiting for the network at
-  boot**), the finished image is read back and its web service is started in a container as a test. The passwords go in through the environment, never through arguments.
+  installed into it (`apt`, no recommended packages), the banks are copied, and DietPi is configured as a pre-installed offline system. DietPi does not own `wlan0`, wait for
+  a network, or run update checks at first boot; `exxpiano-wifi` owns the radio and starts the setup AP. The finished image is read back and its web service is started in a
+  container as a test. The passwords go in through the environment, never through arguments.
 - **Honest status.** The whole build is tested on a stand-in image with DietPi's layout, and the programs inside the finished image run; **it has not been started on a
   Raspberry Pi**: write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log`. `--download` has not been tried against dietpi.com either: if the address
   has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
@@ -144,7 +141,7 @@ staged file over 5 MB):
 |---|---|---|
 | `pi/`, `tools/`, `scripts/`, `deploy/`, `dietpi/`, `packaging/`, `tests/`, `docs/` | the program, image builder, internal packaging, tests | yes |
 | `build/` | built banks (`mech.sf2`, `piano-<preset>.sf2`), the downloaded Salamander in `build/salamander-44k16/`, older banks in `build/archive/` | no |
-| `dist/sd/` | personalized complete SD images and their metadata | no |
+| `dist/sd/` | the reusable complete SD image and its metadata | no |
 
 ## Power supply (read this)
 
@@ -224,7 +221,7 @@ python3 scripts/demo-web.py --open            # http://127.0.0.1:8080/
 
 The real page and the real server code run on your computer against a **simulated device** (services, CPU and temperature that move, Wi-Fi networks, three banks, the audio
 interface). Change the sliders, switch the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" does not connect, "Cafe" is open), scan the QR codes. Options:
-`--mode ap` (setup mode: the device with no network), `--number 0007`, `--other-board [--locked]` (the red warning of a card made for another board), `--throttled`,
+`--mode ap` (setup mode: the device with no network), `--number 0007`, `--other-board` (the warning of a card made for another board), `--throttled`,
 `--bind 0.0.0.0` (to look from a phone on the same network), `--token SECRET`. Nothing is written outside a temporary folder.
 
 ## Web interface
@@ -258,16 +255,14 @@ the synthesizer; hardening that is a task for a real product.
 
 ## Several devices
 
-Every device has a **number**: the last four hex digits of its Wi-Fi address (for example `81DE`). The same number ends the setup network's name
-(`exxpiano-Setup-81DE`), is printed on the QR sticker (`scripts/make-qr.py`), and is shown in the menu and in the browser tab, so devices never get mixed up. A new device that still
-has a generic network name (`dietpi`, `raspberrypi`, `piano`) is named `exxpiano-81de` by the package; a name you chose is never changed by itself. The **Device name**
-box on the Wi-Fi page renames a device (the page then also opens at `http://<name>.local:8080/`) (the number is also in the page QR code, `?d=81DE`: the page shows a red warning when a code made for another device is used on it).
+At first boot every installation gets a persistent random ID such as `0123456789ABCDEF`. Cards flashed from the same ZIP therefore get different setup networks
+`exxpiano-Setup-0123456789ABCDEF` and hostnames `exxpiano-0123456789abcdef`. The ID appears in the menu and page QR code; the page warns if a QR code belongs to another installation. The **Device name** box may set a friendlier hostname.
 
 ## Connecting to a new Wi-Fi
 
 When the Pi has **no network** (no Ethernet cable and no Wi-Fi it knows: a new device, a new router, you moved) it starts **its own Wi-Fi network** and waits:
 
-1. On a phone join the network **`exxpiano-Setup-XXXX`** (XXXX = the last digits of the Pi's Wi-Fi address), password **`exxpianosetup`**: or **scan the first QR code** (see below).
+1. On a phone join **`exxpiano-Setup-<16-character ID>`**, password **`exxpianosetup`**, or scan the first QR code shown by the web UI.
 2. The phone shows its "sign in to network" window with the page; if not, scan the second QR code or open `http://10.42.0.1:8080/#/wifi`. The **Wi-Fi** page opens by itself.
 3. Pick your home network, type its password, press **Connect**. The setup network disappears; join your own Wi-Fi again and open
    `http://<host name>.local:8080/` (the host name is shown on the page; `avahi-daemon` provides it) or find the address in the router's client list.
@@ -282,9 +277,7 @@ Good to know:
   Wi-Fi password typed during the setup.
 - The password of the home network is turned into a key before it is saved (as `wpa_passphrase` does) and is never logged.
 - This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the tab says so; use `sudo nmtui` there.
-- **QR codes.** Two codes do the whole job from the phone camera: one joins the setup network, one opens the setup page. The Wi-Fi page shows them (and a
-  third one: this page for a phone on the same network) with a **Print** button; `python3 scripts/make-qr.py --mac <the Pi's Wi-Fi address>` writes PNG, SVG and a
-  sticker page to `build/qr/` for a device you are about to hand over. They are made by the built-in generator `pi/qrlib.py` (no internet, no packages).
+- **QR codes.** The Wi-Fi page shows a code for the unique setup network, one for the setup page, and one for the current page, with a **Print** button. The built-in `pi/qrlib.py` creates them without internet or extra packages.
 - The setup network starts **10 s** after the Pi finds itself without a network (immediately after you remove the last saved network and no cable is plugged
   in). The **Start the setup network for 5 minutes** button on the Wi-Fi page does it by hand and the Pi comes back to its network by itself. The only network in use
   cannot be forgotten while it is the only way to reach the Pi (no cable, no other saved network).

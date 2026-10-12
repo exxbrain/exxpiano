@@ -1,4 +1,4 @@
-"""Tests for pi/deviceid.py: the board serial and the binding of a card to a board."""
+"""Tests for pi/deviceid.py: the current board serial and the identity recorded in an image."""
 import os
 import sys
 import tempfile
@@ -50,7 +50,7 @@ class SerialTests(unittest.TestCase):
         self.assertFalse(deviceid.same_board('00000000d2f2f1de', '00000000d2f2f1df'))
 
 
-class StatusAndCheckTests(unittest.TestCase):
+class StatusTests(unittest.TestCase):
     ME, OTHER = '00000000d2f2f1de', '000000001234abcd'
 
     def test_status(self):
@@ -59,39 +59,6 @@ class StatusAndCheckTests(unittest.TestCase):
         self.assertEqual(deviceid.status(self.OTHER, self.ME)['ok'], False)
         self.assertIsNone(deviceid.status(self.ME, None)['ok'])
         self.assertEqual(deviceid.status('garbage', self.ME)['bound'], False)                       # a bad value binds nothing
-
-    def test_only_a_locked_card_on_another_board_is_stopped(self):
-        locked = dict(DEVICE_SERIAL=self.ME, DEVICE_LOCK='1')
-        self.assertEqual(deviceid.check(locked, self.ME)[0], 0)
-        code, message = deviceid.check(locked, self.OTHER)
-        self.assertEqual(code, 78)
-        self.assertIn(self.ME, message)
-        self.assertIn(self.OTHER, message)
-        self.assertEqual(deviceid.check(dict(DEVICE_SERIAL=self.ME), self.OTHER)[0], 0)             # bound but not locked: a warning on the page only
-        self.assertEqual(deviceid.check(dict(DEVICE_LOCK='1'), self.OTHER)[0], 0)                   # locked to nothing
-        self.assertEqual(deviceid.check({}, self.OTHER)[0], 0)
-
-    def test_a_locked_image_refuses_a_board_whose_serial_cannot_be_read(self):
-        code, message = deviceid.check(dict(DEVICE_SERIAL=self.ME, DEVICE_LOCK='1'), None)
-        self.assertEqual(code, 78)
-        self.assertIn('cannot be read', message)
-
-    def test_the_command_line(self):
-        import contextlib
-        import io
-        env = dict(os.environ)
-        old = dict(os.environ)
-        try:
-            os.environ.pop('DEVICE_SERIAL', None)
-            os.environ.pop('DEVICE_LOCK', None)
-            out = io.StringIO()
-            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-                code = deviceid.main(['check'])
-            self.assertEqual(code, 0)
-        finally:
-            os.environ.clear()
-            os.environ.update(old)
-
 
 if __name__ == '__main__':
     unittest.main()
