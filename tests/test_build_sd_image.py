@@ -282,6 +282,42 @@ class DownloadTests(unittest.TestCase):
             bsi.download('http://x/a.img.xz', os.path.join(d, 'a.img.xz'), fetch)
             self.assertTrue(os.path.isfile(os.path.join(d, 'a.img.xz')))
 
+    def test_the_public_downloader_identifies_the_builder(self):
+        calls = []
+
+        def urlopen(request, timeout):
+            calls.append((request, timeout))
+            return self.Response(b'data')
+
+        old = bsi.urllib.request.urlopen
+        bsi.urllib.request.urlopen = urlopen
+        self.addCleanup(setattr, bsi.urllib.request, 'urlopen', old)
+        with bsi.fetch_url('https://example.invalid/image.img.xz') as response:
+            self.assertEqual(response.read(), b'data')
+        self.assertEqual(len(calls), 1)
+        request, timeout = calls[0]
+        self.assertEqual(request.full_url, 'https://example.invalid/image.img.xz')
+        self.assertEqual(request.get_header('User-agent'), bsi.HTTP_USER_AGENT)
+        self.assertEqual(timeout, 60)
+
+
+class ReleaseWorkflowTests(unittest.TestCase):
+    def test_release_uses_the_pinned_github_dietpi_asset(self):
+        metadata = {}
+        with open(os.path.join(ROOT, '.github', 'dietpi-image.env')) as f:
+            for line in f:
+                key, value = line.rstrip('\n').split('=', 1)
+                metadata[key] = value
+        self.assertEqual(metadata['DIETPI_IMAGE'], 'DietPi_RPi234-ARMv8-Trixie.img.xz')
+        self.assertRegex(metadata['DIETPI_SHA256'], r'^[0-9a-f]{64}$')
+        self.assertTrue(metadata['DIETPI_RELEASE_TAG'].endswith(metadata['DIETPI_SHA256'][:8]))
+        with open(os.path.join(ROOT, '.github', 'workflows', 'release.yml')) as f:
+            workflow = f.read()
+        self.assertIn('gh release download "$DIETPI_RELEASE_TAG"', workflow)
+        self.assertIn('sha256sum -c -', workflow)
+        self.assertIn('--dietpi "build/cache/$DIETPI_IMAGE"', workflow)
+        self.assertNotIn('build-sd-image.py --download', workflow)
+
 
 class ConfQuotingTests(unittest.TestCase):
     def test_a_tricky_password_comes_back_unchanged_through_the_programs_parser(self):

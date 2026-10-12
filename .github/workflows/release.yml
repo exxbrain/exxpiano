@@ -34,11 +34,23 @@ jobs:
       - name: Build the standard sound banks
         run: scripts/make-soundfonts.sh -p standard -o build
 
+      - name: Read the pinned DietPi image metadata
+        run: cat .github/dietpi-image.env >> "$GITHUB_ENV"
+
+      - name: Download and verify the pinned DietPi image from GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/cache
+          gh release download "$DIETPI_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$DIETPI_IMAGE" --dir build/cache
+          printf '%s  %s\n' "$DIETPI_SHA256" "build/cache/$DIETPI_IMAGE" | sha256sum -c -
+
       - name: Enable ARM64 programs in the image builder
         run: docker run --privileged --rm tonistiigi/binfmt --install arm64
 
       - name: Build and verify the release image
-        run: python3 scripts/build-sd-image.py --download --country RU --timezone Europe/Moscow
+        run: python3 scripts/build-sd-image.py --dietpi "build/cache/$DIETPI_IMAGE" --country RU --timezone Europe/Moscow
 
       - name: Write release checksums
         working-directory: dist/sd

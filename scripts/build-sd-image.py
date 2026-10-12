@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.join(ROOT, 'pi'))
 import wifilib  # noqa: E402
 
 DIETPI_URL = 'https://dietpi.com/downloads/images/DietPi_RPi234-ARMv8-Trixie.img.xz'
+HTTP_USER_AGENT = 'exxpiano-image-builder (+https://github.com/exxbrain/exxpiano)'
 BUILDER_IMAGE = 'exxpiano-sd-builder'
 TARGET_FAMILY = 'rpi234'
 VERSION_RE = re.compile(r'^[0-9A-Za-z][0-9A-Za-z._-]*$')
@@ -76,9 +77,15 @@ def write_json(path, data):
     os.replace(tmp, path)
 
 
+def fetch_url(url):
+    """Open a public build input while identifying this non-browser client."""
+    request = urllib.request.Request(url, headers={'User-Agent': HTTP_USER_AGENT})
+    return urllib.request.urlopen(request, timeout=60)
+
+
 def download(url, dest, fetch=None):
     """Fetch the official DietPi image (only when asked for with --download); the sha256 file next to it is checked when it exists."""
-    fetch = fetch or (lambda u: urllib.request.urlopen(u, timeout=60))
+    fetch = fetch or fetch_url
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     part = dest + '.part'
     h = hashlib.sha256()

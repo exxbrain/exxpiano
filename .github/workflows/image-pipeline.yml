@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/image-pipeline.yml"
       - ".github/workflows/release.yml"
+      - ".github/dietpi-image.env"
       - "dietpi/**"
       - "packaging/**"
       - "scripts/build-deb.py"
@@ -19,6 +20,7 @@ on:
     paths:
       - ".github/workflows/image-pipeline.yml"
       - ".github/workflows/release.yml"
+      - ".github/dietpi-image.env"
       - "dietpi/**"
       - "packaging/**"
       - "scripts/build-deb.py"

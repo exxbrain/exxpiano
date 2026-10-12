@@ -42,7 +42,7 @@ The product version comes from `VERSION`; the DietPi version comes from `dietpi/
 
 ## GitHub Release
 
-Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the standard banks, downloads the official DietPi RPi 2/3/4 ARMv8 base, builds and smoke-tests the image, and then creates the GitHub Release. The release assets are:
+Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the standard banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
 - `manifest.json`;
@@ -52,6 +52,8 @@ Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The wor
 The release title names exxpiano, its version, and the supported Raspberry Pi family. Its English description explains the image contents, flashing and first boot, checksum verification, and why an already-booted card must not be cloned.
 
 No release is created if any preceding step fails. An existing release is not silently overwritten: a rerun may add missing assets, but a name collision fails and requires an explicit operator decision.
+
+The DietPi build-input prerelease is not a product release. Its tag includes the first eight characters of the verified upstream SHA-256, and its only binary asset is the unchanged official image named by `.github/dietpi-image.env`. Updating DietPi requires a new prerelease/tag and checksum; an existing pinned input is never replaced. Local `--download` remains available and identifies the builder with an HTTP User-Agent accepted by the upstream service.
 
 Ordinary pushes and pull requests run only the fast tests. The complete stand-in image pipeline runs separately when image builder, DietPi setup, packaging, or their workflow changes; it can also be started manually from GitHub Actions.
 
