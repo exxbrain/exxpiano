@@ -44,6 +44,7 @@ The shipped product is a ready device with exxpiano already installed. One compl
 4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
 
 See [the image-building guide](docs/BUILD-IMAGE.md) for the complete procedure and current verification status.
+Version tags named `v<VERSION>` build this image and publish it together with its manifest, README, and checksums as assets of a GitHub Release.
 
 ## Quick start
 

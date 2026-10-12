@@ -1,0 +1,57 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check that the tag matches VERSION
+        run: test "v$(tr -d '\n' < VERSION)" = "${GITHUB_REF_NAME}"
+
+      - name: Install sound-bank tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Run the fast tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Build the standard sound banks
+        run: scripts/make-soundfonts.sh -p standard -o build
+
+      - name: Enable ARM64 programs in the image builder
+        run: docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Build and verify the release image
+        run: python3 scripts/build-sd-image.py --download --country RU --timezone Europe/Moscow
+
+      - name: Write release checksums
+        working-directory: dist/sd
+        run: sha256sum ./*.zip manifest.json README.txt > SHA256SUMS
+
+      - name: Create the GitHub Release and upload the image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets=(dist/sd/*.zip dist/sd/manifest.json dist/sd/README.txt dist/sd/SHA256SUMS)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --verify-tag --generate-notes --title "exxpiano $GITHUB_REF_NAME"
+          fi

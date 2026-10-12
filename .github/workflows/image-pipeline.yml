@@ -1,0 +1,40 @@
+name: image pipeline
+
+# The full stand-in image is useful when image-building code changes, but is too
+# expensive for unrelated application and documentation changes.
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/image-pipeline.yml"
+      - ".github/workflows/release.yml"
+      - "dietpi/**"
+      - "packaging/**"
+      - "scripts/build-deb.py"
+      - "scripts/build-sd-image.py"
+      - "scripts/sd-*"
+      - "tests/test_build_sd_image.py"
+  pull_request:
+    paths:
+      - ".github/workflows/image-pipeline.yml"
+      - ".github/workflows/release.yml"
+      - "dietpi/**"
+      - "packaging/**"
+      - "scripts/build-deb.py"
+      - "scripts/build-sd-image.py"
+      - "scripts/sd-*"
+      - "tests/test_build_sd_image.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stand-in:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the complete image pipeline on the DietPi stand-in
+        run: scripts/test-sd-image-pipeline.sh
