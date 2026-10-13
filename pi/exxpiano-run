@@ -42,6 +42,21 @@ if [ -f "$SF2INFO" ] && command -v python3 >/dev/null && ! python3 "$SF2INFO" --
   fi
 fi
 
+# A bank that does not fit into the memory of this board (a Pi 3 A+ has 512 MB) would be killed by the kernel again and again: play the largest
+# smaller bank of the library instead and remember the choice, so the page shows what really plays.
+BANKLIB="${BANKLIB:-$HERE/banklib.py}"
+if [ -f "$BANKLIB" ] && command -v python3 >/dev/null && [ -n "${PIANO_SF2:-}" ]; then
+  smaller="$(python3 "$BANKLIB" "$PIANO_SF2" "${MECH_SF2:-}" "${BANK_DIR:-/opt/exxpiano/soundfonts}" 2>/dev/null || true)"
+  if [ -n "$smaller" ] && [ "$smaller" != "$PIANO_SF2" ]; then
+    echo "exxpiano: $PIANO_SF2 does not fit into the memory of this board, using the smaller bank $smaller" >&2
+    OLD_PIANO="$PIANO_SF2"; PIANO_SF2="$smaller"
+    CONF_FILE="${EXXPIANO_CONF:-/etc/exxpiano.conf}"
+    if [ -w "$CONF_FILE" ]; then
+      awk -v new="$smaller" 'index($0, "PIANO_SF2=")==1 {print "PIANO_SF2=" new; next} {print}' "$CONF_FILE" > "$CONF_FILE.tmp" && cat "$CONF_FILE.tmp" > "$CONF_FILE"; rm -f "$CONF_FILE.tmp"
+    fi
+  fi
+fi
+
 # prints "<card id> <usb|onboard|other>" for the best card, or nothing
 pick_card() {
   local usb="" onboard="" other="" num id

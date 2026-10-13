@@ -132,3 +132,30 @@ def default_preset(presets):
     if usable:
         return usable[0]['bank'], usable[0]['program']
     return None
+
+
+def fitting_replacement(piano, mech, bank_dir, mem_total=None):
+    """The path of the largest bank that fits the memory, when `piano` does not fit; None when `piano` fits (or the memory is unknown) or nothing fits."""
+    mem_total = mem_total_bytes() if mem_total is None else mem_total
+    try:
+        mech_bytes = os.path.getsize(mech) if mech else 0
+        piano_bytes = os.path.getsize(piano)
+    except OSError:
+        return None
+    limit = size_limit(mem_total, mech_bytes)
+    if limit is None or piano_bytes <= limit:
+        return None
+    best = None
+    for b in list_banks(bank_dir, exclude=[mech] if mech else (), mem_total=mem_total, mech_bytes=mech_bytes):
+        if b['ok'] and b['fits'] and (best is None or b['size'] > best['size']):
+            best = b
+    return os.path.join(bank_dir, best['id']) if best else None
+
+
+if __name__ == '__main__':       # used by exxpiano-run:  banklib.py PIANO MECH BANK_DIR  ->  prints the replacement path, or nothing
+    import sys
+    if len(sys.argv) == 4:
+        meminfo = os.environ.get('EXXPIANO_MEMINFO')           # for tests
+        found = fitting_replacement(sys.argv[1], sys.argv[2], sys.argv[3], mem_total_bytes(meminfo) if meminfo else None)
+        if found:
+            print(found)

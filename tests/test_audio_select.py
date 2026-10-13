@@ -4,6 +4,7 @@ Run from the repository root:   python3 -m unittest discover -s tests -v
 """
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -43,6 +44,34 @@ class AudioSelectTests(unittest.TestCase):
             e.update({k: str(v) for k, v in env.items()})
             r = subprocess.run(['bash', RUN], env=e, capture_output=True, text=True)
             return r
+
+    def test_a_bank_that_does_not_fit_the_memory_is_replaced_by_a_smaller_one(self):
+        sys.path.insert(0, os.path.join(ROOT, 'tests'))
+        from sf2fixture import make_sf2
+        with tempfile.TemporaryDirectory() as d:
+            big = make_sf2(os.path.join(d, 'big.sf2'), presets=[('Big', 0, 0)], name='Big', sample_bytes=8 << 20)
+            small = make_sf2(os.path.join(d, 'small.sf2'), presets=[('Small', 0, 0)], name='Small', sample_bytes=1 << 20)
+            mech = make_sf2(os.path.join(d, 'mech.sf2'), presets=[('Hammer', 0, 1)], name='Mech', sample_bytes=1000)
+            meminfo = os.path.join(d, 'meminfo')
+            with open(meminfo, 'w') as f:
+                f.write('MemTotal:       %d kB\n' % (8 * 1024))        # 8 MB: the library has to leave 28 %
+            conf = os.path.join(d, 'exxpiano.conf')
+            with open(conf, 'w') as f:
+                f.write('PIANO_SF2=%s\nGAIN=1.0\n' % big)
+            env = dict(PIANO_SF2=big, MECH_SF2=mech, BANK_DIR=d, EXXPIANO_MEMINFO=meminfo, EXXPIANO_CONF=conf)
+            r = self.run_script([HEADPHONES], **env)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('does not fit into the memory', r.stderr)
+            self.assertIn(small, r.stdout)
+            with open(conf) as f:
+                self.assertEqual(f.read(), 'PIANO_SF2=%s\nGAIN=1.0\n' % small)         # remembered
+            with open(meminfo, 'w') as f:
+                f.write('MemTotal:       %d kB\n' % (900 * 1024))        # a big board: nothing changes
+            with open(conf, 'w') as f:
+                f.write('PIANO_SF2=%s\n' % big)
+            r = self.run_script([HEADPHONES], **env)
+            self.assertNotIn('does not fit', r.stderr)
+            self.assertIn(big, r.stdout)
 
     def test_only_onboard_uses_its_own_buffer_settings(self):
         r = self.run_script([HEADPHONES])

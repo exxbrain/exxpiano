@@ -96,7 +96,7 @@ instead of 8, tails of 9 s instead of 11 s, and the softest note is louder (−1
 
 ## SD card image for new devices
 
-This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: `standard` and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself; on larger boards `standard` stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
+This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: `standard` and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards `standard` stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
 persistent random 16-character hexadecimal installation ID. The ID gives it a unique hostname
 `exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 
