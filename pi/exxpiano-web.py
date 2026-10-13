@@ -152,7 +152,7 @@ class Actions:
         return self._cached('errors', 5, self._errors)
 
     def _errors(self):
-        cmd = ['journalctl', '-b', '-p', 'warning', '-n', str(ERROR_LIMIT), '--no-pager', '-o', 'json']
+        cmd = ['journalctl', '-b', '-p', 'info', '-n', '400', '--no-pager', '-o', 'json']
         for unit in ERROR_UNITS:
             cmd += ['-u', unit]
         try:
@@ -261,7 +261,8 @@ class Actions:
 
 
 def parse_journal_errors(text):
-    """`journalctl -o json` lines -> [{t, unit, level, text}]; lines that are not JSON are skipped."""
+    """`journalctl -o json` lines -> [{t, unit, level, text}]. Kept: warnings and errors, and the deliberate diagnostics of our own
+    scripts ("exxpiano: ..." even at info level). Lines that are not JSON are skipped; a message repeated again and again is listed once with the last time."""
     out = []
     for line in text.splitlines():
         try:
@@ -276,7 +277,15 @@ def parse_journal_errors(text):
         if not isinstance(msg, str) or not msg.strip():
             continue
         unit = str(e.get('_SYSTEMD_UNIT', '')).replace('.service', '')
-        out.append(dict(t=t, unit=unit, level='error' if prio <= 3 else 'warning', text=msg.strip()[:300]))
+        msg = msg.strip()
+        if prio > 4 and not msg.startswith(('exxpiano:', 'exxpiano-wifi:')):
+            continue
+        item = dict(t=t, unit=unit, level='error' if prio <= 3 else 'warning', text=msg[:300])
+        for i, old in enumerate(out):
+            if old['unit'] == item['unit'] and old['text'] == item['text']:
+                del out[i]
+                break
+        out.append(item)
     return out[-ERROR_LIMIT:]
 
 
