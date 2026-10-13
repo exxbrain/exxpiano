@@ -42,7 +42,7 @@ while getopts "p:v:o:s:u:n:h" opt; do
 done
 
 case "$PRESET" in
-  lite)     ARGS="--layers 2,5,8,10,13,15 --tail 9 --gamma 0.7 --peak-lo -12 --peak-hi -1.5 --veltrack 55" ;;
+  lite)     ARGS="--layers 2,5,8,10,13,15 --tail 9 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
   full)     ARGS="--layers 1,2,4,5,6,7,8,9,10,11,12,13,15,16 --tail 12 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
   *) echo "Unknown preset: $PRESET (full | lite)"; exit 1 ;;
 esac

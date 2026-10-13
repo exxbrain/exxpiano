@@ -72,6 +72,18 @@ def layer_ranges(chosen, centers, gamma=1.0):
     return out
 
 
+def split_range(lo, hi, parts):
+    """Split the velocity range lo..hi into `parts` neighbouring sub-ranges (fewer when the range is too short)."""
+    n = hi - lo + 1
+    parts = max(1, min(parts, n))
+    out, start = [], lo
+    for i in range(parts):
+        end = lo + (n * (i + 1)) // parts - 1
+        out.append((start, end))
+        start = end + 1
+    return out
+
+
 def _filters(tail, dur, extra=None):
     f = []
     if dur > tail:
@@ -130,6 +142,11 @@ def main():
     ap.add_argument('--peak-first', type=float, default=None, help='override target peak of the softest layer')
     ap.add_argument('--stretch', type=float, default=1.0, help='scale distance of every layer target below peak-hi')
     ap.add_argument('--veltrack', type=int, default=100, help='velocity->attenuation amount, cB')
+    ap.add_argument('--subzones', type=int, default=1,
+                    help='cut the velocity range of every layer into this many zones that share the same samples (no extra memory) and make the lower zones '
+                         'quieter by up to --subzone-db, so loudness rises smoothly inside a layer instead of one step per layer')
+    ap.add_argument('--subzone-db', type=float, default=None,
+                    help='attenuation of the quietest zone of a layer, dB; default: the distance between the targets of neighbouring layers')
     args = ap.parse_args()
 
     chosen = [int(x) for x in args.layers.split(',')]
@@ -150,7 +167,7 @@ def main():
     # ---- samples ----
     pcm = bytearray()
     shdr = []          # tuples
-    zones = []         # (key, vel, release, tune, pan, sample_id)
+    zones = []         # (key, vel, release, tune, pan, sample_id, attenuation in centibels)
     n_points = 0
 
     def add_sample(name, data, rate, root, ctype, link):
@@ -189,6 +206,19 @@ def main():
             layer_gain[l] = target - max(v for (n, ll), v in peaks.items() if ll == l)
         print('layer gains (dB):', {l: round(g_, 1) for l, g_ in layer_gain.items()})
 
+    if args.peak_lo is not None and args.peak_hi is not None and len(chosen) > 1:
+        step_db = (args.peak_hi - args.peak_lo) / (len(chosen) - 1)
+    else:
+        step_db = 3.0
+    sub_db = step_db if args.subzone_db is None else args.subzone_db
+
+    def add_zones(key, layer, rel, tune, pan, sid):
+        """One zone per sub-range of the layer; all of them point to the same sample, only the attenuation differs (centibels)."""
+        ranges = split_range(vel[layer][0], vel[layer][1], args.subzones)
+        for i, vr in enumerate(ranges):
+            att = 0 if len(ranges) == 1 else int(round(sub_db * 10 * (len(ranges) - 1 - i) / (len(ranges) - 1)))
+            zones.append((key, vr, rel, tune, pan, sid, att))
+
     for note in sorted(notes, key=lambda n: notes[n][min(notes[n])]['root']):
         for layer in chosen:
             info = notes[note].get(layer)
@@ -206,7 +236,7 @@ def main():
             rel = info['release']
             if args.mono:
                 sid = add_sample('%sv%d' % (note, layer), raw, args.rate, info['root'], 1, 0)
-                zones.append((key, vel[layer], rel, info['tune'], 0, sid))
+                add_zones(key, layer, rel, info['tune'], 0, sid)
             else:
                 # de-interleave stereo
                 left = bytearray()
@@ -217,13 +247,13 @@ def main():
                 lid = len(shdr)
                 add_sample('%sv%dL' % (note, layer), bytes(left), args.rate, info['root'], 4, lid + 1)
                 rid = add_sample('%sv%dR' % (note, layer), bytes(right), args.rate, info['root'], 2, lid)
-                zones.append((key, vel[layer], rel, info['tune'], -500, lid))
-                zones.append((key, vel[layer], rel, info['tune'], 500, rid))
+                add_zones(key, layer, rel, info['tune'], -500, lid)
+                add_zones(key, layer, rel, info['tune'], 500, rid)
         print('.', end='', flush=True)
     print()
 
     # ---- instrument zones ----
-    GEN_PAN, GEN_REL, GEN_FINE, GEN_SAMPLEID = 17, 38, 52, 53
+    GEN_PAN, GEN_REL, GEN_ATT, GEN_FINE, GEN_SAMPLEID = 17, 38, 48, 52, 53
     GEN_KEY, GEN_VEL, GEN_INST = 43, 44, 41
 
     def g(oper, amount):
@@ -252,7 +282,7 @@ def main():
     for src, dest, amt in mods:
         imod += struct.pack('<HHhHH', src, dest, amt, 0, 0); n_mod += 1
 
-    for key, vr, rel, tune, pan, sid in zones:
+    for key, vr, rel, tune, pan, sid, att in zones:
         ibag += struct.pack('<HH', n_gen, n_mod)
         igen += g(GEN_KEY, key); igen += g(GEN_VEL, vr)
         n_gen += 2
@@ -262,6 +292,8 @@ def main():
             igen += g(GEN_REL, tc(rel)); n_gen += 1
         if tune:
             igen += g(GEN_FINE, tune); n_gen += 1
+        if att:
+            igen += g(GEN_ATT, att); n_gen += 1
         igen += g(GEN_SAMPLEID, sid); n_gen += 1
     ibag += struct.pack('<HH', n_gen, n_mod)       # terminal
     igen += struct.pack('<HH', 0, 0)

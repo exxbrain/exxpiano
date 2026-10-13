@@ -96,6 +96,26 @@ class BuilderPackageTests(unittest.TestCase):
                 self.assertEqual({x[3] for x in p}, {21, 24})   # root keys survive the conversion
 
 
+    def test_subzones_share_the_samples_and_only_add_zones(self):
+        name, folder, sep, ext, codec, rate = self.CASES[0]
+
+        def zone_count(path):
+            with open(path, 'rb') as f:
+                data = f.read()
+            i = data.index(b'ibag')
+            return struct.unpack('<I', data[i + 4:i + 8])[0] // 4 - 2          # minus the global zone and the terminal one
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_set(tmp, folder, sep, ext, codec, rate)
+            plain, split = os.path.join(tmp, 'a.sf2'), os.path.join(tmp, 'b.sf2')
+            base = [sys.executable, '-I', os.path.join(ROOT, 'tools', 'build_piano_sf2.py'), tmp]
+            subprocess.run(base + [plain, '--layers', '2,5', '--tail', '8'], check=True, capture_output=True)
+            subprocess.run(base + [split, '--layers', '2,5', '--tail', '8', '--subzones', '3'], check=True, capture_output=True)
+            self.assertEqual(len(sf2_samples(plain)), len(sf2_samples(split)))           # no extra samples: no extra memory
+            self.assertEqual(zone_count(split), 3 * zone_count(plain))
+            self.assertLess(os.path.getsize(split) - os.path.getsize(plain), 4096)        # only the zone tables grew
+
+
 class ReleaseNotesTests(unittest.TestCase):
     def run_notes(self, version, changelog):
         with tempfile.TemporaryDirectory() as d:
