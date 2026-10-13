@@ -396,7 +396,13 @@ class ShellScriptTests(unittest.TestCase):
             dietpi_txt = root + bootdir + '/dietpi.txt'
             with open(dietpi_txt, 'w') as f:
                 f.write('AUTO_SETUP_NET_WIFI_ENABLED=1\nAUTO_SETUP_BOOT_WAIT_FOR_NETWORK=1\n'
-                        'CONFIG_CHECK_DIETPI_UPDATES=1\nCONFIG_CHECK_APT_UPDATES=1\n')
+                        'CONFIG_CHECK_DIETPI_UPDATES=1\nCONFIG_CHECK_APT_UPDATES=1\nCONFIG_SOUNDCARD=none\n')
+            with open(root + bootdir + '/config.txt', 'w') as f:
+                f.write('dtparam=audio=off\n')
+            blacklist = root + '/etc/modprobe.d/dietpi-disable_rpi_audio.conf'
+            os.makedirs(os.path.dirname(blacklist))
+            with open(blacklist, 'w') as f:
+                f.write('blacklist snd_bcm2835\n')
             script = src[set_start:set_end] + src[setup_start:setup_end] + '\nconfigure_offline_product_boot "$ROOT" "$BOOTDIR"\n'
             r = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
                                env=dict(os.environ, ROOT=root, BOOTDIR=bootdir, HERE=os.path.join(ROOT, 'scripts')))
@@ -407,6 +413,10 @@ class ShellScriptTests(unittest.TestCase):
             self.assertIn('AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0\n', settings)
             self.assertIn('CONFIG_CHECK_DIETPI_UPDATES=0\n', settings)
             self.assertIn('CONFIG_CHECK_APT_UPDATES=0\n', settings)
+            self.assertIn('CONFIG_SOUNDCARD=rpi-bcm2835-3.5mm\n', settings)
+            with open(root + bootdir + '/config.txt') as f:
+                self.assertIn('dtparam=audio=on', f.read().splitlines())
+            self.assertFalse(os.path.exists(blacklist))
             dropin = os.path.join(root, 'etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf')
             with open(dropin) as f:
                 self.assertIn('ExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled', f.read())
@@ -503,7 +513,8 @@ class ShellScriptTests(unittest.TestCase):
             files = {
                 os.path.join(boot, 'dietpi.txt'): ('AUTO_SETUP_AUTOMATED=1\nAUTO_SETUP_NET_WIFI_ENABLED=0\n'
                                                       'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0\nCONFIG_CHECK_DIETPI_UPDATES=0\n'
-                                                      'CONFIG_CHECK_APT_UPDATES=0\n'),
+                                                      'CONFIG_CHECK_APT_UPDATES=0\nCONFIG_SOUNDCARD=rpi-bcm2835-3.5mm\n'),
+                os.path.join(boot, 'config.txt'): 'dtparam=audio=on\n',
                 os.path.join(root, 'boot', 'dietpi', '.version'): 'G_DIETPI_VERSION_CORE=10\n',
                 os.path.join(boot, 'Automation_Custom_Script.sh'): '#!/bin/sh\n',
                 os.path.join(root, 'usr', 'local', 'sbin', 'exxpiano-dietpi-preinstalled'): '#!/bin/sh\n',
@@ -534,7 +545,8 @@ class ShellScriptTests(unittest.TestCase):
         for good, bad in (('AUTO_SETUP_NET_WIFI_ENABLED=0', 'AUTO_SETUP_NET_WIFI_ENABLED=1'),
                           ('AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0', 'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=1'),
                           ('CONFIG_CHECK_DIETPI_UPDATES=0', 'CONFIG_CHECK_DIETPI_UPDATES=1'),
-                          ('CONFIG_CHECK_APT_UPDATES=0', 'CONFIG_CHECK_APT_UPDATES=1')):
+                          ('CONFIG_CHECK_APT_UPDATES=0', 'CONFIG_CHECK_APT_UPDATES=1'),
+                          ('CONFIG_SOUNDCARD=rpi-bcm2835-3.5mm', 'CONFIG_SOUNDCARD=none')):
             with self.subTest(bad), tempfile.TemporaryDirectory() as d:
                 root, boot, _ = tree(d)
                 path = os.path.join(boot, 'dietpi.txt')
@@ -543,7 +555,18 @@ class ShellScriptTests(unittest.TestCase):
                 with open(path, 'w') as f:
                     f.write(text.replace(good, bad))
                 self.assertNotEqual(subprocess.run(['bash', script, '--check-tree', root, boot], capture_output=True).returncode, 0)
-        for rel in ('boot/dietpi.txt', 'root/boot/dietpi/.version', 'boot/Automation_Custom_Script.sh',
+        with self.subTest('audio off'), tempfile.TemporaryDirectory() as d:
+            root, boot, _ = tree(d)
+            with open(os.path.join(boot, 'config.txt'), 'w') as f:
+                f.write('dtparam=audio=off\n')
+            self.assertNotEqual(subprocess.run(['bash', script, '--check-tree', root, boot], capture_output=True).returncode, 0)
+        with self.subTest('module blacklisted'), tempfile.TemporaryDirectory() as d:
+            root, boot, _ = tree(d)
+            os.makedirs(os.path.join(root, 'etc', 'modprobe.d'))
+            with open(os.path.join(root, 'etc', 'modprobe.d', 'dietpi-disable_rpi_audio.conf'), 'w') as f:
+                f.write('blacklist snd_bcm2835\n')
+            self.assertNotEqual(subprocess.run(['bash', script, '--check-tree', root, boot], capture_output=True).returncode, 0)
+        for rel in ('boot/dietpi.txt', 'boot/config.txt', 'root/boot/dietpi/.version', 'boot/Automation_Custom_Script.sh',
                     'root/usr/local/sbin/exxpiano-dietpi-preinstalled',
                     'root/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf',
                     'root/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot',
