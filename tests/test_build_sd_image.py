@@ -192,7 +192,7 @@ class BuildTests(Case):
         self.assertFalse(os.path.exists(os.path.join(self.out, 'sticker')))
         with open(os.path.join(self.out, 'README.txt'), encoding='utf-8') as f:
             text = f.read()
-        for needle in ('No serial number has to be entered', 'exxpiano-Setup-<INSTALLATION-ID>', 'setup password 1',
+        for needle in ('creates and permanently saves its own 16-character hexadecimal ID', 'exxpiano-Setup-<INSTALLATION-ID>', 'setup password 1',
                        'needs neither Internet nor an Ethernet cable', 'DietPi: 10.7.0'):
             self.assertIn(needle, text)
         with open(os.path.join(self.out, 'manifest.json'), encoding='utf-8') as f:

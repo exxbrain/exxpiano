@@ -21,7 +21,7 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 
 | Symptom | Cause and fix |
 |---|---|
-| `aplay -l` says "no soundcards found" | Onboard audio is off: `dtparam=audio=on` in `/boot/config.txt` (DietPi: `dietpi-config` -> Audio Options), then `reboot` |
+| `aplay -l` says "no soundcards found" | Onboard audio is off: `dtparam=audio=on` in `/boot/firmware/config.txt` (the product image sets it; on a system set up by hand: `dietpi-config` -> Audio Options), then `reboot` |
 | `exxpiano` restarts all the time, the restart counter keeps growing | FluidSynth exits at once when its input is closed. Always start it through `/opt/exxpiano/exxpiano-run` (the service does): it keeps a root-only pipe open as FluidSynth's input. Do not use `-s` (server mode): that opens a control port on every network interface |
 | The log shows `Out of memory`, the process is `Killed` | The bank does not fit into memory. Use the `lite` or `small` preset |
 | `aconnect -l` does not show "FLUID Synth" | `exxpiano` is not running or is still loading the banks (tens of seconds after boot) |

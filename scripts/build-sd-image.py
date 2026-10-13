@@ -4,7 +4,7 @@
   python3 scripts/build-sd-image.py --dietpi DietPi_RPi234-ARMv8-Trixie.img.xz
 
 Result in dist/sd/: a versioned exxpiano-rpi234-...-sd.zip, a README and a manifest. Flash the same ZIP with Raspberry Pi Imager or balenaEtcher.
-At first boot each installed copy creates a persistent random installation ID; it needs no serial input. The ID makes its setup Wi-Fi and hostname unique.
+At first boot each installed copy creates a persistent random installation ID. The ID makes its setup Wi-Fi and hostname unique.
 
 Needs Docker (on a Mac the image is made in a Linux container; Docker Desktop must be running) or a Linux machine with root and --no-docker.
 The first start is offline: DietPi applies local hardware settings without its online update workflow, while exxpiano owns Wi-Fi setup.
@@ -182,7 +182,7 @@ Writing the card
   1. Raspberry Pi Imager: "Choose OS" -> "Use custom" -> pick the zip (it is used as it is). Or balenaEtcher: "Flash from file" -> the zip.
   2. Put the card in a compatible Raspberry Pi 2/3/4 ARMv8 and switch it on. The first start takes several minutes (DietPi sets itself up, then the card grows to its size).
      The first start is offline: it needs neither Internet nor an Ethernet cable.
-  3. No serial number has to be entered. The installation creates and permanently saves its own 16-character hexadecimal ID.
+  3. The installation creates and permanently saves its own 16-character hexadecimal ID.
 
 Without a saved network the device starts Wi-Fi exxpiano-Setup-<INSTALLATION-ID> (password: {ap_pw}).
 Its hostname is exxpiano-<installation-id-in-lowercase>; open http://<hostname>.local:8080/ or use the address from the router's client list.

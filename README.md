@@ -39,7 +39,7 @@ but this setup was not measured with one.
 The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards; a separate package or installer bundle is not a delivery format.
 
 1. Build the standard banks once: `scripts/make-soundfonts.sh -p standard`. This creates the required `build/piano-standard.sf2` and `build/mech.sf2`.
-2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`. No board serial is entered.
+2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`.
 3. Flash `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
 4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
 
@@ -92,12 +92,10 @@ it is not used here because it has no mechanics presets and no layer reduction.
 The whole file is read into RAM, and a Pi 3 has 1 GB. I did not measure the free memory after loading `standard`
 precisely; check yourself (`free -m`, the `available` column). If the Pi runs out of memory or CPU, use `lite` or `small`.
 
-**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the control page, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH (user `root`, DietPi's password).
-
 ## SD card image for new devices
 
 This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and both required banks. At first boot every installed copy creates a
-persistent random 16-character hexadecimal installation ID. The user enters neither a board serial nor another identifier. The ID gives it a unique hostname
+persistent random 16-character hexadecimal installation ID. The ID gives it a unique hostname
 `exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 
 ```bash
@@ -130,14 +128,14 @@ its partitions, which only an image carries. Switch the Pi on without preparing 
 ## Upgrading a running Pi
 
 ```bash
-scripts/deploy-to-pi.sh 192.168.1.95        # or user@host; logs in by SSH key: no password, no questions
+scripts/deploy-to-pi.sh 192.168.1.95        # or user@host; logs in by SSH key
 ```
 
 It builds the package, sends it to the Pi and upgrades it there: it keeps `/etc/exxpiano.conf`, backs the old version up first, checks that
 the synthesizer and the bridge come back, and rolls back by itself if they do not (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`).
 The sound banks are not touched.
 
-**No passwords during an upgrade.** The script logs in with your SSH key and never asks for a password or a host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs it with `ssh-copy-id`: the password is asked **that one time**, never again. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). If the key cannot be installed, the script falls back to a plain password login (asked once) rather than stopping: nothing is ever asked on the device itself, which has no monitor. DietPi's password is `dietpi` unless the image was built with `--password`. A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
+**Passwords during an upgrade.** The script logs in with your SSH key and asks no password and no host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs the key with `ssh-copy-id`: the SSH password is asked **that one time**. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). If the key cannot be installed, the script falls back to a plain password login (asked once) rather than stopping: nothing is ever asked on the device itself, which has no monitor. DietPi's password is `dietpi` unless `SD_PASSWORD` (`--password`) was set when the image was built. A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
 
 ## Where things live
 
@@ -164,7 +162,7 @@ and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A lo
 
 ## Audio output and latency
 
-- **Onboard 3.5 mm:** enable `dtparam=audio=on` in `/boot/config.txt` (DietPi: `dietpi-config` -> Audio Options), device
+- **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/firmware/config.txt`; on a system you set up by hand: `dietpi-config` -> Audio Options), device
   `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
   30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The default `PERIOD_SIZE=64` x `PERIODS=3` (the smallest value FluidSynth accepts, the driver rounds it up) played without clicks on a Pi 3; raise `PERIOD_SIZE` on the web page if you hear any. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
@@ -217,8 +215,7 @@ that is playing; choose another bank and that bank's own settings come back, the
 starts from the settings in force at that moment. The audio output, buffers, polyphony and reverb switch belong to the device and are the same
 for every bank. If a switch fails, the old bank and its settings are restored.
 
-To add a bank for now, copy a `.sf2` into `BANK_DIR` (for example `scp -O my.sf2 root@<Pi>:/opt/exxpiano/soundfonts/`); importing from a USB
-flash drive is planned (`docs/plans/usb-banks.md`).
+To add a bank, copy a `.sf2` into `BANK_DIR` (for example `scp -O my.sf2 root@<Pi>:/opt/exxpiano/soundfonts/`).
 
 ## Look at the page without a Raspberry Pi
 
@@ -228,13 +225,12 @@ python3 scripts/demo-web.py --open            # http://127.0.0.1:8080/
 
 The real page and the real server code run on your computer against a **simulated device** (services, CPU and temperature that move, Wi-Fi networks, three banks, the audio
 interface). Change the sliders, switch the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" does not connect, "Cafe" is open), scan the QR codes. Options:
-`--mode ap` (setup mode: the device with no network), `--number 0007`, `--other-board` (the warning of a card made for another board), `--throttled`,
+`--mode ap` (setup mode: the device with no network), `--installation-id 0123456789ABCDEF`, `--hostname NAME`, `--throttled`,
 `--bind 0.0.0.0` (to look from a phone on the same network), `--token SECRET`. Nothing is written outside a temporary folder.
 
 ## Web interface
 
-Open `http://<device>:8080/` from a phone or a computer on the same network (the address is printed by `install.sh`; the default
-host name on DietPi is shown in your router). The **menu** (the ☰ button) opens the pages: **Home** (the status of the services, what is playing, the volume, and a
+Open `http://<device>:8080/` from a phone or a computer on the same network (the address is shown on the device's HDMI screen and in your router's list of clients; the name is `exxpiano-<ID>`). The **menu** (the ☰ button) opens the pages: **Home** (the status of the services, what is playing, the volume, and a
 glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch and mechanics**, **Audio output**, **Monitor** and **Wi-Fi**. An address like
 `http://<device>:8080/#/wifi` opens a page directly (Back works, bookmarks work). The pages have:
 
@@ -284,7 +280,7 @@ Good to know:
   in `/etc/exxpiano.conf`; `WIFI_SETUP=0` turns the feature off. **Change the default password before you give a device to somebody**: it protects the
   Wi-Fi password typed during the setup.
 - The password of the home network is turned into a key before it is saved (as `wpa_passphrase` does) and is never logged.
-- This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the tab says so; use `sudo nmtui` there.
+- This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the Wi-Fi page says so; use `sudo nmtui` there.
 - **QR codes.** The Wi-Fi page shows a code for the unique setup network, one for the setup page, and one for the current page, with a **Print** button and **Download PNG / SVG** links for each (file names contain the installation ID). **The codes exist only there**: the ID is created at the first start, so the image build makes no QR codes or stickers; take them from the page of the device they belong to and print a sticker. The join code works whenever the setup network is on, so a sticker printed in advance stays valid. The built-in `pi/qrlib.py` creates them without internet or extra packages.
 - The setup network starts **10 s** after the Pi finds itself without a network (immediately after you remove the last saved network and no cable is plugged
   in). The **Start the setup network for 5 minutes** button on the Wi-Fi page does it by hand and the Pi comes back to its network by itself. The only network in use

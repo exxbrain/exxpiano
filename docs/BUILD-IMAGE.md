@@ -1,6 +1,6 @@
 # Building the reusable SD card image
 
-The shipped artifact is a complete bootable image for a clean Raspberry Pi 2/3/4 ARMv8 SD card. It already contains DietPi, exxpiano, the standard piano and the mechanics bank. One ZIP can be flashed to many cards; no board serial is entered during the build or setup.
+The shipped artifact is a complete bootable image for a clean Raspberry Pi 2/3/4 ARMv8 SD card. It already contains DietPi, exxpiano, the standard piano and the mechanics bank. One ZIP can be flashed to many cards.
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The wor
 
 The release title names exxpiano, its version, and the supported Raspberry Pi family. Its English description explains the image contents, flashing and first boot, checksum verification, and why an already-booted card must not be cloned.
 
-No release is created if any preceding step fails. An existing release is not silently overwritten: a rerun may add missing assets, but a name collision fails and requires an explicit operator decision.
+No release is created if any preceding step fails. For an existing release the title and description are updated and missing assets are added; an asset whose name already exists is never overwritten (the upload fails and the operator decides).
 
 The DietPi build-input prerelease is not a product release. Its tag includes the first eight characters of the verified upstream SHA-256, and its only binary asset is the unchanged official image named by `.github/dietpi-image.env`. Updating DietPi requires a new prerelease/tag and checksum; an existing pinned input is never replaced. Local `--download` remains available and identifies the builder with an HTTP User-Agent accepted by the upstream service.
 
@@ -63,7 +63,7 @@ Ordinary pushes and pull requests run only the fast tests. The complete stand-in
 
 1. In Raspberry Pi Imager choose “Choose OS” → “Use custom” and select the ZIP, or select it in balenaEtcher.
 2. Flash a clean SD card, put it in a Raspberry Pi 2, 3 or 4, and power it on.
-3. First boot takes several minutes and needs no internet, Ethernet, saved Wi-Fi, or serial input.
+3. First boot takes several minutes and needs no internet, Ethernet, or saved Wi-Fi.
 4. The installation creates a persistent random 16-character hexadecimal ID in `/var/lib/exxpiano/installation-id`.
 5. The ID produces a unique `exxpiano-Setup-<ID>` network and `exxpiano-<lowercase-id>` hostname. Join the setup network and open `http://10.42.0.1:8080/`; the web UI shows the exact ID, network name, and QR codes.
 

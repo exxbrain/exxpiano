@@ -21,7 +21,7 @@ free -m
 
 | Симптом | Причина и решение |
 |---|---|
-| `aplay -l` пишет «no soundcards found» | Штатный звук выключен: `dtparam=audio=on` в `/boot/config.txt` (DietPi: `dietpi-config` → Audio Options), `reboot` |
+| `aplay -l` пишет «no soundcards found» | Штатный звук выключен: `dtparam=audio=on` в `/boot/firmware/config.txt` (образ его включает; в системе, настроенной вручную: `dietpi-config` → Audio Options), `reboot` |
 | `exxpiano` постоянно перезапускается, счётчик рестартов растёт | FluidSynth сразу выходит, если его вход закрыт. Запускайте его только через `/opt/exxpiano/exxpiano-run` (служба так и делает): скрипт держит открытым канал только для root как вход FluidSynth. Не используйте `-s` (режим сервера): он открывает управляющий порт на всех сетевых интерфейсах |
 | В журнале `Out of memory`, процесс `Killed` | Банк не помещается в память. Пресет `lite` или `small` |
 | `aconnect -l` не показывает «FLUID Synth» | `exxpiano` не запущен или ещё грузит банки (десятки секунд после старта) |
