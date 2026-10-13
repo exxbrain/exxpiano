@@ -7,10 +7,11 @@
 Нужны Docker Desktop на macOS либо Linux с Docker, официальный `DietPi_RPi234-ARMv8-Trixie.img.xz` и банки:
 
 ```bash
-scripts/make-soundfonts.sh -p standard -o build
+scripts/make-soundfonts.sh -p full -o build
+scripts/make-soundfonts.sh -p lite -o build
 ```
 
-По умолчанию сборщик использует `build/piano-standard.sf2` и `build/mech.sf2`. Другие проверенные банки можно передать через `--piano` и `--mech`; образ без любого из двух банков не выпускается. Если есть `build/piano-lite.sf2` (`scripts/make-soundfonts.sh -p lite` или `--piano-lite ФАЙЛ`), он тоже попадает в образ, и первый запуск на плате с памятью меньше 800 МБ (Pi 3 A+) использует его; release-workflow всегда собирает его.
+По умолчанию сборщик использует `build/piano-full.sf2` и `build/mech.sf2`. Другие проверенные банки можно передать через `--piano` и `--mech`; образ без любого из двух банков не выпускается. Если есть `build/piano-lite.sf2` (`scripts/make-soundfonts.sh -p lite` или `--piano-lite ФАЙЛ`), он тоже попадает в образ, и первый запуск на плате с памятью меньше 800 МБ (Pi 3 A+) использует его; release-workflow всегда собирает его.
 
 ## Сборка
 
@@ -44,7 +45,7 @@ unset SD_PASSWORD SD_AP_PASSWORD
 
 ## GitHub Release
 
-Публикация тега `v<VERSION>` запускает `.github/workflows/release.yml`. Workflow проверяет точное совпадение тега с `VERSION`, запускает быстрые тесты, собирает стандартный и lite-банки, скачивает закреплённую основу DietPi RPi 2/3/4 ARMv8 из отдельного prerelease этого репозитория, проверяет SHA-256 из `.github/dietpi-image.env`, собирает и проверяет образ, а затем создаёт продуктовый GitHub Release. Поэтому выпуск не зависит от доступности upstream-сервиса скачивания, но использует точную копию официального входного образа. К продуктовому выпуску прикладываются:
+Публикация тега `v<VERSION>` запускает `.github/workflows/release.yml`. Workflow проверяет точное совпадение тега с `VERSION`, запускает быстрые тесты, собирает full- и lite-банки, скачивает закреплённую основу DietPi RPi 2/3/4 ARMv8 из отдельного prerelease этого репозитория, проверяет SHA-256 из `.github/dietpi-image.env`, собирает и проверяет образ, а затем создаёт продуктовый GitHub Release. Поэтому выпуск не зависит от доступности upstream-сервиса скачивания, но использует точную копию официального входного образа. К продуктовому выпуску прикладываются:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
 - `manifest.json`;

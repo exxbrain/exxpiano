@@ -38,7 +38,7 @@ but this setup was not measured with one.
 
 The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards; a separate package or installer bundle is not a delivery format.
 
-1. Build the banks once: `scripts/make-soundfonts.sh -p standard` and `scripts/make-soundfonts.sh -p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-standard.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
+1. Build the banks once: `scripts/make-soundfonts.sh -p full` and `scripts/make-soundfonts.sh -p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-full.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
 2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`.
 3. Flash `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
 4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
@@ -54,7 +54,7 @@ The banks themselves are not stored in the repository (hundreds of megabytes, an
 [NOTICE.md](NOTICE.md)). A script makes them from the original archive:
 
 ```bash
-scripts/make-soundfonts.sh -p standard -o build      # downloads ~412 MB and builds
+scripts/make-soundfonts.sh -p full -o build          # downloads ~412 MB and builds
 ```
 
 If you already have Salamander unpacked (a folder with `SalamanderGrandPianoV3Retuned.sfz`), point to it: `-s /path/to/folder`.
@@ -92,12 +92,12 @@ it is not used here because it has no mechanics presets and no layer reduction.
 
 The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `standard` does not fit there:
 on a real Pi 3 A+ the kernel killed FluidSynth at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
-(237 MB; it should fit in 414 MB next to the 36 MB mechanics bank, but it has **not** been played on such a board yet) or `small`. `lite` against `standard`: 6 velocity layers
+(237 MB; **played on a real Pi 3 A+, it works**, including the automatic choice at the first start) or `small`. `lite` against `standard`: 6 velocity layers
 instead of 8, tails of 9 s instead of 11 s, and the softest note is louder (−12 dB instead of −17 dB), so the dynamic range is somewhat smaller. Check the free memory yourself (`free -m`, the `available` column).
 
 ## SD card image for new devices
 
-This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: `standard` and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards `standard` stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
+This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: `full` (about 700 MB, installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards `full` stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
 persistent random 16-character hexadecimal installation ID. The ID gives it a unique hostname
 `exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 

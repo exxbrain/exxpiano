@@ -131,7 +131,7 @@ class PlanTests(Case):
         old_root = bsi.ROOT
         try:
             bsi.ROOT = self.tmp.name
-            default_piano = self.touch('build/piano-standard.sf2', b'default piano')
+            default_piano = self.touch('build/piano-full.sf2', b'default piano')
             default_mech = self.touch('build/mech.sf2', b'default mech')
             args = bsi.parse_args(['--dietpi', self.dietpi])
             self.assertEqual(bsi.resolve_inputs(args), dict(dietpi=os.path.abspath(self.dietpi), piano=default_piano, mech=default_mech))
@@ -152,10 +152,10 @@ class PlanTests(Case):
         try:
             bsi.ROOT = self.tmp.name
             args = bsi.parse_args(['--dietpi', self.dietpi])
-            for present, missing in (('mech.sf2', 'piano'), ('piano-standard.sf2', 'mech')):
+            for present, missing in (('mech.sf2', 'piano'), ('piano-full.sf2', 'mech')):
                 build = os.path.join(self.tmp.name, 'build')
                 os.makedirs(build, exist_ok=True)
-                for name in ('piano-standard.sf2', 'mech.sf2'):
+                for name in ('piano-full.sf2', 'mech.sf2'):
                     path = os.path.join(build, name)
                     if os.path.exists(path):
                         os.unlink(path)

@@ -118,7 +118,7 @@ def resolve_inputs(args):
     if not args.download or args.dietpi:
         if not os.path.isfile(inputs['dietpi']):
             raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
-    inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-standard.sf2'))
+    inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-full.sf2'))
     inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
     lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')      # for boards with 512 MB; optional unless asked for by name
     if args.piano_lite or os.path.isfile(lite):
@@ -203,7 +203,7 @@ def parse_args(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--dietpi', help='DietPi_RPi234-ARMv8-Trixie.img.xz (or an unpacked .img) from dietpi.com')
     ap.add_argument('--download', action='store_true', help='fetch the official DietPi image into build/cache (only when you ask for it)')
-    ap.add_argument('--piano', help='the piano bank (.sf2); default build/piano-standard.sf2')
+    ap.add_argument('--piano', help='the piano bank (.sf2); default build/piano-full.sf2')
     ap.add_argument('--piano-lite', help='the smaller piano bank for boards with 512 MB (.sf2); default build/piano-lite.sf2 when it exists. The image picks it at the first start when the memory is under 800 MB')
     ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/mech.sf2')
     ap.add_argument('--password', default=os.environ.get('SD_PASSWORD', ''),

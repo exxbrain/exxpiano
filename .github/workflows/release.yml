@@ -31,9 +31,9 @@ jobs:
       - name: Run the fast tests
         run: python3 -m unittest discover -s tests -v
 
-      - name: Build the standard sound banks
+      - name: Build the sound banks
         run: |
-          scripts/make-soundfonts.sh -p standard -o build
+          scripts/make-soundfonts.sh -p full -o build            # about 700 MB: the piano of the image, for boards with 1 GB
           scripts/make-soundfonts.sh -p lite -o build          # the same downloaded samples; the image uses it on boards with 512 MB
 
       - name: Read the pinned DietPi image metadata
