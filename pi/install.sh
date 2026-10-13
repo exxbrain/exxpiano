@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install the piano on a Raspberry Pi (DietPi / Raspberry Pi OS Lite / Debian). Run as root.
 #
-#   sudo ./install.sh --piano /path/piano-full.sf2 --mech /path/mech.sf2 [--device plughw:Headphones] [--gain 1.0]
+#   sudo ./install.sh --piano /path/piano-standard.sf2 --mech /path/mech.sf2 [--device plughw:Headphones] [--gain 1.0]
 #
 # Safe to run again: /etc/exxpiano.conf is never overwritten,
 # only the values you pass as flags are changed.
