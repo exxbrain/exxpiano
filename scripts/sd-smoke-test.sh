@@ -52,7 +52,8 @@ get http://127.0.0.1:8080/api/ping | grep -q '"ok": true' && ok "the web service
 QR_JOIN="$(get "http://127.0.0.1:8080/api/qr?kind=join")"
 ECHO_ID="$(cat "$W/mnt/tmp/exxpiano-installation-id" 2>/dev/null || true)"
 echo "$QR_JOIN" | grep -q "WIFI:T:WPA;S:exxpiano-Setup-$ECHO_ID;" && echo "$QR_JOIN" | grep -q '"png": "' && ok "the page makes the QR codes of the setup network for the generated installation ID" || bad "no QR code for the generated installation ID: $(echo "$QR_JOIN" | head -c 200)"
-get http://127.0.0.1:8080/ | grep -q 'id="drawer"' && ok "the page with the menu is served" || bad "the page is not served"
+# Python looks for the menu itself: a pipe into grep -q would break (grep stops early, a page over 64 KB fails the pipe under pipefail)
+python3 -c "import sys, urllib.request; sys.exit(0 if b'id=\"drawer\"' in urllib.request.urlopen(sys.argv[1], timeout=5).read() else 1)" http://127.0.0.1:8080/ 2>/dev/null && ok "the page with the menu is served" || bad "the page is not served"
 for unit in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
   grep -q '^ExecStart=' "$W/mnt/lib/systemd/system/$unit.service" && ok "$unit.service has an ExecStart" || bad "$unit.service is broken"
 done
