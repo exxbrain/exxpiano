@@ -131,7 +131,7 @@ class BankLibTests(unittest.TestCase):
     def test_size_limit_marks_banks_that_do_not_fit(self):
         self.make('big.sf2', sample_bytes=3 << 20)
         self.make('small.sf2', sample_bytes=1000)
-        mem = (800 << 20) + (2 << 20)                       # a board with 1 GB: the reserve of 400 MB leaves 402 MB
+        mem = (800 << 20) + (2 << 20)                       # 802 MB with an explicit reserve of 800 MB leaves 2 MB
         banks = {b['id']: b for b in banklib.list_banks(self.dir, mem_total=mem, reserve_mb=800)}
         self.assertTrue(banks['small.sf2']['fits'])
         self.assertFalse(banks['big.sf2']['fits'])
