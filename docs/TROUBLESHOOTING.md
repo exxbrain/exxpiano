@@ -23,10 +23,10 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 |---|---|
 | `aplay -l` says "no soundcards found" | Onboard audio is off: `dtparam=audio=on` in `/boot/firmware/config.txt` (the product image sets it; on a system set up by hand: `dietpi-config` -> Audio Options), then `reboot` |
 | `exxpiano` restarts all the time, the restart counter keeps growing | FluidSynth exits at once when its input is closed. Always start it through `/opt/exxpiano/exxpiano-run` (the service does): it keeps a root-only pipe open as FluidSynth's input. Do not use `-s` (server mode): that opens a control port on every network interface |
-| The log shows `Out of memory`, the process is `Killed`; the Monitor page lists "out of memory: the kernel killed fluidsynth" | The bank does not fit into memory (a Pi 3 A+ has 512 MB). On the **Piano bank** page choose `piano-lite.sf2` (the image carries it and selects it by itself on such a board), or build the `lite` or `small` preset. Full detail: `journalctl -k -b \| grep -i oom` |
+| The log shows `Out of memory`, the process is `Killed`; the Monitor page lists "out of memory: the kernel killed fluidsynth" | The bank does not fit into memory (a Pi 3 A+ has 512 MB). On the **Piano bank** page choose `piano-lite.sf2` (the image carries it and selects it by itself on such a board), or build the `lite` preset. Full detail: `journalctl -k -b \| grep -i oom` |
 | `aconnect -l` does not show "FLUID Synth" | `exxpiano` is not running or is still loading the banks (tens of seconds after boot) |
 | The keyboard plays but there are no mechanics | `mech.sf2` is not loaded (check `MECH_SF2` in `/etc/exxpiano.conf`) or `exxpiano-fx` is not running |
-| There is sound but it is very quiet | Raise `GAIN` (1.0 for stereo, 2.0 for the mono `small`) and the ALSA volume (`alsamixer`, F6, Headphones ~90%) |
+| There is sound but it is very quiet | Raise `GAIN` (1.0 for these banks) and the ALSA volume (`alsamixer`, F6, Headphones ~90%) |
 | Chords sound harsh or distorted | `GAIN` is too high, lower it |
 | The log says `Failed to find an audio format supported by alsa` | The card was opened directly (`hw:...`) and does not accept 16-bit stereo (USB interfaces often offer only 32-bit / 4 channels). Use the `plughw:` form or leave `ALSA_DEVICE=auto` |
 | The sound comes from the wrong output after plugging or unplugging a USB card | Run `sudo systemctl restart exxpiano` (the automatic udev restart is untested), or set `ALSA_DEVICE` explicitly |
@@ -36,7 +36,7 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 - First check `vcgencmd get_throttled`. If it is not `0x0`, it is the power supply, not the settings (see the README).
 - Clicks: raise `PERIODS` to 3-4 (or `PERIOD_SIZE`).
 - Latency: `PERIODS=2` on the onboard output, or better a USB sound card.
-- Load: `htop` (if the `fluidsynth` thread sits at 100%, use `lite`/`small`, lower `POLYPHONY`, keep `REVERB=0`).
+- Load: `htop` (if the `fluidsynth` thread sits at 100%, use `lite`, lower `POLYPHONY`, keep `REVERB=0`).
 
 ## Network and SSH during installation
 

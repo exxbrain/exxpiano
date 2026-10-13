@@ -84,14 +84,12 @@ it is not used here because it has no mechanics presets and no layer reduction.
 
 | Preset | Memory on the Pi | What it is | `GAIN` | Tested on a Pi 3 |
 |---|---|---|---|---|
-| `soft` | ~390 MB | same, but soft notes are noticeably quieter (wider dynamics) | 1.0 | no, only on the Mac |
 | `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
 | `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | starts and plays on a board with 1 GB and, by the author's ear, sounds better than the earlier 390 MB bank (one listener, not a blind test); the free memory after loading was not recorded, watch `free -m` |
-| `small` | ~135 MB | 6 layers, **mono**, 10 s tails | 2.0 | no, only on the Mac |
 
 The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `full` does not fit there:
 on a real Pi 3 A+ the kernel killed FluidSynth with a 390 MB bank at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
-(237 MB; **played on a real Pi 3 A+, it works**, including the automatic choice at the first start) or `small`. `lite` against `full`: 6 velocity layers
+(237 MB; **played on a real Pi 3 A+, it works**, including the automatic choice at the first start). `lite` against `full`: 6 velocity layers
 instead of 14, tails of 9 s instead of 12 s, and the softest note is louder (−12 dB instead of −17 dB), so the dynamic range is somewhat smaller. Check the free memory yourself (`free -m`, the `available` column).
 
 ## Comparison with alternatives
@@ -200,7 +198,7 @@ Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart ex
 
 | Setting | What it does |
 |---|---|
-| `GAIN` | overall volume (0.2 is FluidSynth's own default; these banks want 1.0, the mono preset `small` wants 2.0) |
+| `GAIN` | overall volume (0.2 is FluidSynth's own default; these banks want 1.0) |
 | `POLYPHONY` | number of voices; stereo uses two voices per note, and the mechanics add more |
 | `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
 | `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
