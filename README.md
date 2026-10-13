@@ -92,6 +92,17 @@ on a real Pi 3 A+ the kernel killed FluidSynth with a 390 MB bank at about 370 M
 (237 MB; **played on a real Pi 3 A+, it works**, including the automatic choice at the first start). `lite` against `full`: 6 velocity layers
 instead of 14, tails of 9 s instead of 12 s, and the softest note is louder (−12 dB instead of −17 dB), so the dynamic range is somewhat smaller. Check the free memory yourself (`free -m`, the `available` column).
 
+### The Salamander limit and how exxpiano works around it
+
+Salamander Grand Piano V3 is recorded for a computer: 16 velocity layers on every note, long tails, separate mechanics recordings. The compressed download is 412 MB, the unpacked recordings are noticeably larger, and FluidSynth reads a bank into RAM whole. The full set does not suit a cheap board with 512 MB or 1 GB.
+
+So exxpiano does not try to load the original. It builds **reduced SF2 banks** from it: it keeps some of the layers (14 of 16 in `full`, 6 in `lite`), trims the tails with a smooth fade, levels the layers and adds a gentle dependence of volume on touch. The mechanics (hammers, dampers, resonance, pedal) live in a separate small bank, because SF2 cannot express the SFZ rules. The result:
+
+- on a board with **1 GB** `full` (about 700 MB) plays and, by the author's ear, sounds better than the earlier 390 MB bank;
+- on the **cheapest Pi 3 A+ with 512 MB** `lite` (about 237 MB) plays, tested on a real board.
+
+The price: fewer velocity layers and shorter tails than the original; `lite` has louder soft notes and a slightly narrower dynamic range. How audible this is has been judged by ear, not measured. We have no comparison of the original against the exxpiano banks.
+
 ## Comparison with alternatives
 
 This comparison comes from project descriptions and reviews, not from my own measurements: I did not measure the sound, latency or resource use of the others. Prices change, check the current ones on the vendors' sites.
