@@ -18,6 +18,8 @@ Everything starts by itself when the Pi powers on, and keyboards connect automat
 ports every 2 seconds. Connecting a keyboard while the Pi is running is supported by design, but only connecting at boot
 was tested on a Pi.
 
+**The sound output is chosen automatically, to keep the delay low.** If an external USB sound card or audio interface is plugged in, exxpiano plays through it with a very small buffer (64 frames x 3, about 4.4 ms of buffering plus the delay of the interface itself); without one it falls back to the 3.5 mm jack of the board, where the driver raises the buffer to 444 frames (about 30 ms by calculation). The choice is made when the service starts, the buffers are remembered per interface. The delay was not measured end to end; a Zoom U-24 played without clicks on a Pi 3.
+
 ## Tested on
 
 - Raspberry Pi 3 Model B (1 GB; a 512 MB Pi 3 A+ needs the smaller `lite` bank, see below), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
