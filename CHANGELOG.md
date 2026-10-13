@@ -2,6 +2,11 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.15
+
+- The release takes DietPi's image for the Raspberry Pi 5 from this repository's own pre-release (pinned by its SHA-256), like the Pi 2/3/4 image; the `dietpi-mirror` workflow can create such a pre-release.
+- The stand-in pipeline test knows the new file names (`manifest-rpi234.json`, `README-rpi234.txt`) and also builds the Raspberry Pi 5 image.
+
 ## 1.10.14
 
 - **Image for the Raspberry Pi 5** (`exxpiano-rpi5-…-sd.zip`), built from DietPi's own Pi 5 image. It carries only the full piano, and since the Pi 5 has no 3.5 mm jack it plays through a USB sound card or an audio interface. **Not tried on a real Pi 5 yet.** The file names of the manifests and READMEs now carry the target: `manifest-rpi234.json`, `manifest-rpi5.json`.
