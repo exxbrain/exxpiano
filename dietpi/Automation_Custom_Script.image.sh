@@ -11,12 +11,12 @@ echo "== exxpiano first start $(date -u +%FT%TZ)"
 python3 /opt/exxpiano/exxpiano-wifi.py ensure-name || true
 
 # A board with little memory (a Pi 3 A+ has 512 MB) cannot hold the full piano bank: the kernel would kill the synthesizer again and again.
-# The image carries a smaller bank next to it; use that one here.
+# The image carries a smaller bank next to it; use that one here. exxpiano-run does the same at every start of the service (before FluidSynth loads
+# anything), so this only saves the choice in the configuration; the service is NOT restarted here: loading a bank twice would double the start.
 LITE=/opt/exxpiano/soundfonts/piano-lite.sf2
 MEM_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
 if [ -s "$LITE" ] && [ "${MEM_KB:-0}" -gt 0 ] && [ "$MEM_KB" -lt 800000 ] && grep -qx 'PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2' /etc/exxpiano.conf; then
   sed -i 's#^PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2$#PIANO_SF2=/opt/exxpiano/soundfonts/piano-lite.sf2#' /etc/exxpiano.conf
-  systemctl try-restart exxpiano.service || true      # it may have started already with the large bank
   echo "memory ${MEM_KB} kB: the smaller piano bank is used"
 fi
 
