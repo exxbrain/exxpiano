@@ -2,6 +2,8 @@
 
 English | [Русский](README.ru.md)
 
+**Purpose:** a good piano sound on a cheap board with the least effort. Write an image to a card, power the board on, set it up from a phone: no installation, no screen on the board.
+
 A digital piano appliance for Raspberry Pi 2/3/4 ARMv8: **Salamander Grand Piano V3** (Yamaha C5) through FluidSynth, plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
 express by itself, so a small bridge program adds them.
