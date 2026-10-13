@@ -2,6 +2,11 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.14
+
+- **Image for the Raspberry Pi 5** (`exxpiano-rpi5-…-sd.zip`), built from DietPi's own Pi 5 image. It carries only the full piano, and since the Pi 5 has no 3.5 mm jack it plays through a USB sound card or an audio interface. **Not tried on a real Pi 5 yet.** The file names of the manifests and READMEs now carry the target: `manifest-rpi234.json`, `manifest-rpi5.json`.
+- Screenshots of the web interface (English and Russian) in the documentation.
+
 ## 1.10.13
 
 - **Import of banks from a USB drive:** put `.sf2` / `.sf3` files into the folder `piano-banks/` of a FAT32, exFAT or ext4 drive, plug it in and press **Import** in the **Piano bank** section; the bank is copied into the device's own library and stays after the drive is taken out. The drive is mounted read only, the copy is transactional (a drive pulled out or a full card leaves no half-copied bank), and the bank in use cannot be deleted. **Not tried on a real Raspberry Pi yet:** mounting the drives, the udev rule, pulling a drive out during the copy, and the load of a big copy on playing and power.
