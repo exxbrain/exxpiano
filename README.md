@@ -117,15 +117,15 @@ This comparison comes from project descriptions and reviews, not from my own mea
 |---|---|---|---|---|
 | Sound | samples of Salamander Grand Piano V3 (CC-BY) through FluidSynth plus a separate mechanics bank (hammers, dampers, resonance, pedal) | physical modelling (Modartt); little memory, the sound is computed live | many engines (piano, electric piano, synths, SoundFont and more) | any SoundFont; no piano mechanics |
 | Software price | free, open source (scripts MIT, sounds CC-BY) | a paid licence | the software is open; the ready Zynthian 5 kit with a screen and knobs is about €490 plus VAT without a Raspberry Pi, about €570 with one (from a review) | free |
-| Hardware | Raspberry Pi 2/3/4, a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | a Pi 4 and a special case with a screen and knobs | any board that runs FluidSynth (Pi Zero and up) |
-| Ready image | yes, one ZIP that works from the first power-on with no monitor | no, installed by hand | yes, an image and a kit | no, usually a guide and scripts |
+| Hardware | Raspberry Pi 2/3/4, a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official Zynthian kits (V3-V5) with a screen and a control board; a Pi 2 is not supported by ZynthianOS; the minimum memory is not stated on that page | any board that runs FluidSynth (Pi Zero and up) |
+| Ready image | yes, one ZIP that works from the first power-on with no monitor | no, installed by hand | yes, the ZynthianOS image: about 7 GB compressed and about 16 GB unpacked, a card of 32 GB or more; a lighter variant with a reduced SoundFont library exists | no, usually a guide and scripts |
 | Settings from a phone | yes: touch curve, mechanics, banks, audio output, Wi-Fi, monitor | no single page; settings are in the program | a screen and knobs on the device, a web interface exists | at best a simple page to choose a bank |
 | Piano mechanics | yes, a separate bank and a bridge | part of the physical model | depends on the chosen engine | none |
 | Changing the sound | banks can be swapped (any `.sf2`), mechanics and touch are tunable | many model parameters | depends on the engine | only swapping the SoundFont |
 
 Where exxpiano is weaker: no physical modelling (the sound is limited by recorded layers and the memory of the board, and on a cheap 512 MB board the `lite` bank is simpler than the full one), no screen or knobs on the body (everything from a phone), no built-in synthesizers besides the piano, and the latency is not measured yet. Where it is stronger: free open code, a ready image, work on the cheapest board with no monitor, a clear settings page and a separate piano mechanics.
 
-Sources: [Modartt forum on Pianoteq for ARM](https://forum.modartt.com/viewtopic.php?id=7220), [Zynthian 5 (review)](https://www.yahoo.com/entertainment/zynthian-5-standalone-open-source-110034729.html), [FluidPi](https://github.com/schollz/FluidPi), [PiPiano](https://jpralves.net/post/2020/03/05/pipiano.html).
+Sources: [Modartt forum on Pianoteq for ARM](https://forum.modartt.com/viewtopic.php?id=7220), [Zynthian Software page](https://wiki.zynthian.org/index.php/Zynthian_Software), [Zynthian 5 (review)](https://www.yahoo.com/entertainment/zynthian-5-standalone-open-source-110034729.html), [FluidPi](https://github.com/schollz/FluidPi), [PiPiano](https://jpralves.net/post/2020/03/05/pipiano.html).
 
 ## SD card image for new devices
 
