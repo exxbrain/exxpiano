@@ -126,12 +126,14 @@ its partitions, which only an image carries. Switch the Pi on without preparing 
 ## Upgrading a running Pi
 
 ```bash
-scripts/deploy-to-pi.sh 192.168.1.95        # or user@host; you type the SSH password once
+scripts/deploy-to-pi.sh 192.168.1.95        # or user@host; logs in by SSH key: no password, no questions
 ```
 
 It builds the package, sends it to the Pi and upgrades it there: it keeps `/etc/exxpiano.conf`, backs the old version up first, checks that
 the synthesizer and the bridge come back, and rolls back by itself if they do not (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`).
 The sound banks are not touched.
+
+**No passwords during an upgrade.** The script logs in with your SSH key and never asks for a password or a host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs it with `ssh-copy-id`: the password is asked **that one time**, never again. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
 
 ## Where things live
 
@@ -271,6 +273,7 @@ When the Pi has **no network** (no Ethernet cable and no Wi-Fi it knows: a new d
 If the network or the password is wrong, the Pi puts the previous settings back; in setup mode it starts its setup network again and the page says why it failed.
 Good to know:
 
+- **The password of the setup network.** It is `exxpianosetup` unless you set another one, and it is the same for every device (only the network name is unique: it ends with the installation ID). Set your own with `WIFI_AP_PASSWORD=...` in `/etc/exxpiano.conf` (8 to 63 ordinary characters; an unusable value is replaced by the default and logged), or for a whole image with `--ap-password` / `SD_AP_PASSWORD` when it is built (see `docs/BUILD-IMAGE.md`). The Wi-Fi page shows the current name and password with the QR code that joins it, so a sticker printed from the page is always right.
 - The Pi waits before starting its network: 10 s if it has no saved network, **150 s** if it has some (after a power cut it boots faster than the router).
   With saved networks, an unused setup network is left every 2 minutes to look for them again; a phone connected to it is never thrown out.
 - Plugging in an Ethernet cable closes the setup network. Change the name, the password and the times with `WIFI_AP_SSID`, `WIFI_AP_PASSWORD`, `WIFI_GRACE_*`

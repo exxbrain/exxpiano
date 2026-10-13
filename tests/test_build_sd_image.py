@@ -181,7 +181,9 @@ class BuildTests(Case):
     def test_a_build_makes_one_reusable_zip_readme_and_manifest(self):
         r = self.run_build('--password', 'root password 1', '--ap-password', 'setup password 1', '--country', 'RU')
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        stem = 'exxpiano-rpi234-v1.10.1-dietpi-10.7.0'
+        with open(os.path.join(ROOT, 'VERSION')) as vf:
+            version = vf.read().strip()                             # the file name carries the current version: not a literal
+        stem = 'exxpiano-rpi234-v%s-dietpi-10.7.0' % version
         zip_path = os.path.join(self.out, stem + '-sd.zip')
         with zipfile.ZipFile(zip_path) as z:
             self.assertEqual(z.namelist(), [stem + '.img'])
@@ -196,7 +198,7 @@ class BuildTests(Case):
         with open(os.path.join(self.out, 'manifest.json'), encoding='utf-8') as f:
             manifest = json.load(f)
         self.assertEqual((manifest['product_version'], manifest['dietpi_version'], manifest['installation_identity'], manifest['image']),
-                         ('1.10.1', '10.7.0', 'generated-at-first-boot', stem + '-sd.zip'))
+                         (version, '10.7.0', 'generated-at-first-boot', stem + '-sd.zip'))
         self.assertNotIn('serial', manifest)
         self.assertNotIn('device_number', manifest)
         self.assertRegex(manifest['dietpi_sha256'], r'^[0-9a-f]{64}$')

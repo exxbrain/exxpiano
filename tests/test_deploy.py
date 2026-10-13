@@ -19,12 +19,22 @@ class DeployTests(unittest.TestCase):
         os.makedirs(self.bin)
         self.args_file = os.path.join(self.tmp.name, 'ssh-args.txt')
         self.stdin_file = os.path.join(self.tmp.name, 'ssh-stdin.tgz')
+        self.probe_log = os.path.join(self.tmp.name, 'probes.txt')
+        self.key_marker = os.path.join(self.tmp.name, 'key-installed')
+        self.copy_id_log = os.path.join(self.tmp.name, 'copy-id.txt')
+        # the fake ssh: `ssh ... true` is the key-login probe (it works once the key is installed, or always when FAKE_KEY=1); anything else is the upgrade stream
         with open(os.path.join(self.bin, 'ssh'), 'w') as f:
-            f.write('#!/bin/bash\nprintf "%%s\\n" "$@" > "%s"\ncat > "%s"\n' % (self.args_file, self.stdin_file))
+            f.write('#!/bin/bash\nif [ "${@: -1}" = true ]; then\n  printf "%%s\\n" "$*" >> "%s"\n  [ "${FAKE_KEY:-0}" = 1 ] || [ -e "%s" ] && exit 0\n  exit 255\nfi\nprintf "%%s\\n" "$@" > "%s"\ncat > "%s"\n'
+                    % (self.probe_log, self.key_marker, self.args_file, self.stdin_file))
         os.chmod(os.path.join(self.bin, 'ssh'), 0o755)
+        with open(os.path.join(self.bin, 'ssh-copy-id'), 'w') as f:
+            f.write('#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s"\n[ "${FAKE_COPY_ID_FAILS:-0}" = 1 ] && exit 1\ntouch "%s"\n' % (self.copy_id_log, self.key_marker))
+        os.chmod(os.path.join(self.bin, 'ssh-copy-id'), 0o755)
 
-    def run_deploy(self, *args):
+    def run_deploy(self, *args, **extra_env):
         env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ['PATH'])
+        env['FAKE_KEY'] = '1'
+        env.update(extra_env)
         return subprocess.run(['bash', os.path.join(ROOT, 'scripts', 'deploy-to-pi.sh')] + list(args),
                               env=env, capture_output=True, text=True)
 
@@ -41,14 +51,41 @@ class DeployTests(unittest.TestCase):
         r = self.run_deploy('192.168.1.95')
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         args = self.ssh_args()
-        self.assertEqual(args[0], 'root@192.168.1.95')
-        self.assertIn('upgrade-on-pi.sh', args[1])
+        target = args.index('root@192.168.1.95')
+        self.assertIn('upgrade-on-pi.sh', args[target + 1])
         self.assertEqual(self.sent_files(), sorted(['exxpiano_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
 
     def test_an_explicit_user_is_kept(self):
         r = self.run_deploy('denis@piano.local')
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual(self.ssh_args()[0], 'denis@piano.local')
+        self.assertIn('denis@piano.local', self.ssh_args())
+
+    def test_the_upgrade_never_asks_for_a_password_or_a_host_key(self):
+        self.run_deploy('192.168.1.95')
+        args = self.ssh_args()
+        self.assertIn('BatchMode=yes', args)                                     # a password prompt is impossible: key login or nothing
+        self.assertIn('StrictHostKeyChecking=accept-new', args)                  # no yes/no question for a new host (a changed key still stops it)
+        self.assertFalse(os.path.exists(self.copy_id_log))                      # the key was already there: nothing is installed
+
+    def test_a_device_without_your_key_gets_it_once_and_then_the_upgrade_runs(self):
+        r = self.run_deploy('192.168.1.95', FAKE_KEY='0')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('installing your SSH key', r.stdout)
+        with open(self.copy_id_log) as f:
+            self.assertEqual(len(f.read().strip().split('\n')), 1)
+        with open(self.copy_id_log) as f:
+            self.assertIn('root@192.168.1.95', f.read())
+        self.assertEqual(self.sent_files(), sorted(['exxpiano_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
+        r = self.run_deploy('192.168.1.95', FAKE_KEY='0')                         # the second upgrade: the key is installed, no second prompt
+        self.assertNotIn('installing your SSH key', r.stdout)
+        with open(self.copy_id_log) as f:
+            self.assertEqual(len(f.read().strip().split('\n')), 1)
+
+    def test_when_the_key_cannot_be_installed_nothing_is_deployed(self):
+        r = self.run_deploy('192.168.1.95', FAKE_KEY='0', FAKE_COPY_ID_FAILS='1')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('Could not install the key', r.stderr)
+        self.assertFalse(os.path.exists(self.stdin_file))
 
     def test_no_host_prints_usage(self):
         r = self.run_deploy()
