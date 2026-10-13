@@ -8,7 +8,6 @@
 #       soft      ~390 MB  same, but soft notes are quieter (wider dynamics) (gain 1.0)
 #       lite      ~250 MB  6 layers, stereo, 9 s tails (gain 1.0)
 #       small     ~135 MB  6 layers, MONO, 10 s tails (gain 2.0)
-#       mini      ~110 MB  3 layers, stereo, 8 s tails; soft notes are the same recordings played quieter and darker (gain 1.0). Not heard yet
 #
 # -v  Which published Salamander package to take the samples from (all CC-BY, from freepats.zenvoid.org):
 #       44k16       WAV, 44.1 kHz 16 bit, 412 MB download.  Default. Tested on real data.
@@ -49,8 +48,7 @@ case "$PRESET" in
   soft)     ARGS="--layers 1,2,4,6,8,10,12,15 --tail 11 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --stretch 1.6 --veltrack 55" ;;
   lite)     ARGS="--layers 2,5,8,10,13,15 --tail 9 --gamma 0.7 --peak-lo -12 --peak-hi -1.5 --veltrack 55" ;;
   small)    ARGS="--layers 2,5,8,10,13,15 --tail 10 --mono --gamma 0.6 --peak-lo -9 --peak-hi -1.5 --veltrack 40" ;;
-  mini)     ARGS="--layers 3,9,15 --tail 8 --gamma 0.75 --peak-lo -14 --peak-hi -1.5 --veltrack 120 --velfilter 2400" ;;
-  *) echo "Unknown preset: $PRESET (standard | soft | lite | small | mini)"; exit 1 ;;
+  *) echo "Unknown preset: $PRESET (standard | soft | lite | small)"; exit 1 ;;
 esac
 
 case "$VERSION" in

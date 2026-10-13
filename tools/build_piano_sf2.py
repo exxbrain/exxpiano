@@ -130,9 +130,6 @@ def main():
     ap.add_argument('--peak-first', type=float, default=None, help='override target peak of the softest layer')
     ap.add_argument('--stretch', type=float, default=1.0, help='scale distance of every layer target below peak-hi')
     ap.add_argument('--veltrack', type=int, default=100, help='velocity->attenuation amount, cB')
-    ap.add_argument('--velfilter', type=int, default=0,
-                    help='soft notes sound darker: lower the low-pass cutoff by up to this many cents at the softest velocity (0 = off). '
-                         'With few velocity layers the same recording then stands for several loudness steps and still sounds soft, not just quiet')
     args = ap.parse_args()
 
     chosen = [int(x) for x in args.layers.split(',')]
@@ -249,7 +246,7 @@ def main():
     igen += g(GEN_REL, tc(0.7)); n_gen += 1
     mods = [
         (0x0502, 48, 0),     # disable default velocity->attenuation
-        (0x0102, 8, -args.velfilter),      # velocity->filter cutoff: off (0), or the softest notes darker by this many cents
+        (0x0102, 8, 0),      # disable default velocity->filter cutoff
         (0x0102, 48, args.veltrack),   # gentle linear velocity->attenuation
     ]
     for src, dest, amt in mods:
