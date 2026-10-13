@@ -48,12 +48,20 @@ jobs:
             --pattern "$DIETPI_IMAGE" --dir build/cache
           printf '%s  %s\n' "$DIETPI_SHA256" "build/cache/$DIETPI_IMAGE" | sha256sum -c -
 
-      - name: Download and verify the official DietPi image for the Raspberry Pi 5
+      - name: Download and verify the DietPi image for the Raspberry Pi 5
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          base=https://dietpi.com/downloads/images
-          curl -fsSL -o build/cache/DietPi_RPi5-ARMv8-Trixie.img.xz "$base/DietPi_RPi5-ARMv8-Trixie.img.xz"
-          curl -fsSL -o build/cache/DietPi_RPi5-ARMv8-Trixie.img.xz.sha256 "$base/DietPi_RPi5-ARMv8-Trixie.img.xz.sha256"
-          (cd build/cache && sha256sum -c DietPi_RPi5-ARMv8-Trixie.img.xz.sha256)
+          # the pinned copy in this repository's pre-release (made by the dietpi-mirror workflow); until it exists, the official download
+          # checked against the checksum DietPi publishes next to it
+          if gh release download "$DIETPI_RPI5_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$DIETPI_RPI5_IMAGE" --dir build/cache; then
+            printf '%s  %s\n' "$DIETPI_RPI5_SHA256" "build/cache/$DIETPI_RPI5_IMAGE" | sha256sum -c -
+          else
+            echo "No pinned pre-release $DIETPI_RPI5_RELEASE_TAG yet: using the official download."
+            curl -fsSL -o "build/cache/$DIETPI_RPI5_IMAGE" "$DIETPI_RPI5_SOURCE_URL"
+            curl -fsSL -o "build/cache/$DIETPI_RPI5_IMAGE.sha256" "$DIETPI_RPI5_SOURCE_URL.sha256"
+            (cd build/cache && sha256sum -c "$DIETPI_RPI5_IMAGE.sha256")
+          fi
 
       - name: Enable ARM64 programs in the image builder
         run: docker run --privileged --rm tonistiigi/binfmt --install arm64
@@ -62,7 +70,7 @@ jobs:
         run: python3 scripts/build-sd-image.py --target rpi234 --dietpi "build/cache/$DIETPI_IMAGE" --country RU --timezone Europe/Moscow
 
       - name: Build and verify the release image for the Raspberry Pi 5
-        run: python3 scripts/build-sd-image.py --target rpi5 --dietpi build/cache/DietPi_RPi5-ARMv8-Trixie.img.xz --country RU --timezone Europe/Moscow
+        run: python3 scripts/build-sd-image.py --target rpi5 --dietpi "build/cache/$DIETPI_RPI5_IMAGE" --country RU --timezone Europe/Moscow
 
       - name: Write release checksums
         working-directory: dist/sd

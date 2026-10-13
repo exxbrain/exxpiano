@@ -1,0 +1,71 @@
+name: dietpi-mirror
+
+# Puts the official DietPi image of a board into this repository as a pre-release (a build input, not a product release), so that a release
+# does not depend on the download service of DietPi. Start it by hand from the Actions tab: choose the target. The tag carries the first eight
+# characters of the pinned SHA-256 from .github/dietpi-image.env; an existing pre-release is never replaced.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which DietPi image to mirror"
+        required: true
+        default: rpi5
+        type: choice
+        options:
+          - rpi5
+          - rpi234
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read the pins of the target
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -eu
+          . .github/dietpi-image.env
+          if [ "$TARGET" = rpi5 ]; then
+            echo "TAG=$DIETPI_RPI5_RELEASE_TAG" >> "$GITHUB_ENV"
+            echo "IMAGE=$DIETPI_RPI5_IMAGE" >> "$GITHUB_ENV"
+            echo "SHA=$DIETPI_RPI5_SHA256" >> "$GITHUB_ENV"
+            echo "URL=$DIETPI_RPI5_SOURCE_URL" >> "$GITHUB_ENV"
+          else
+            echo "TAG=$DIETPI_RELEASE_TAG" >> "$GITHUB_ENV"
+            echo "IMAGE=$DIETPI_IMAGE" >> "$GITHUB_ENV"
+            echo "SHA=$DIETPI_SHA256" >> "$GITHUB_ENV"
+            echo "URL=$DIETPI_SOURCE_URL" >> "$GITHUB_ENV"
+          fi
+
+      - name: Stop when the pre-release already exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "The pre-release $TAG already exists: it is never replaced."
+            exit 1
+          fi
+
+      - name: Download the official image and check it against the pin
+        run: |
+          set -eu
+          mkdir -p mirror
+          curl -fsSL -A "exxpiano-image-builder (+https://github.com/$GITHUB_REPOSITORY)" -o "mirror/$IMAGE" "$URL"
+          printf '%s  %s\n' "$SHA" "mirror/$IMAGE" | sha256sum -c -
+
+      - name: Create the pre-release with the image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" "mirror/$IMAGE" --repo "$GITHUB_REPOSITORY" --prerelease \
+            --title "DietPi build input: $IMAGE" \
+            --notes "The unchanged official DietPi image used as a build input (not a product release). SHA-256: $SHA. Source: $URL"

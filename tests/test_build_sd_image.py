@@ -342,6 +342,26 @@ class DownloadTests(unittest.TestCase):
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_the_pi5_image_is_pinned_mirrored_and_used_by_the_release(self):
+        pins = {}
+        with open(os.path.join(ROOT, '.github', 'dietpi-image.env')) as f:
+            for line in f:
+                key, value = line.rstrip('\n').split('=', 1)
+                pins[key] = value
+        self.assertEqual(pins['DIETPI_RPI5_IMAGE'], bsi.TARGETS['rpi5']['image'])
+        self.assertRegex(pins['DIETPI_RPI5_SHA256'], r'^[0-9a-f]{64}$')
+        self.assertTrue(pins['DIETPI_RPI5_RELEASE_TAG'].endswith(pins['DIETPI_RPI5_SHA256'][:8]))
+        self.assertEqual(pins['DIETPI_RPI5_SOURCE_URL'], bsi.DIETPI_BASE + bsi.TARGETS['rpi5']['image'])
+        with open(os.path.join(ROOT, '.github', 'workflows', 'dietpi-mirror.yml')) as f:
+            mirror = f.read()
+        for needle in ('workflow_dispatch', 'gh release create "$TAG"', '--prerelease', 'sha256sum -c -', 'DIETPI_RPI5_SHA256', 'never replaced'):
+            self.assertIn(needle, mirror)
+        with open(os.path.join(ROOT, '.github', 'workflows', 'release.yml')) as f:
+            release = f.read()
+        self.assertIn('gh release download "$DIETPI_RPI5_RELEASE_TAG"', release)
+        self.assertIn('--target rpi5', release)
+
+
     def test_release_uses_the_pinned_github_dietpi_asset(self):
         metadata = {}
         with open(os.path.join(ROOT, '.github', 'dietpi-image.env')) as f:
