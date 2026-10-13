@@ -1,6 +1,6 @@
 # Building the reusable SD card image
 
-The shipped artifact is a complete bootable image for a clean Raspberry Pi 2/3/4 ARMv8 SD card. It already contains DietPi, exxpiano, the full piano, the smaller `lite` piano for 512 MB boards and the mechanics bank. One ZIP can be flashed to many cards.
+The shipped artifacts are two complete bootable images, each for a clean SD card: one for the Raspberry Pi 2/3/4 (ARMv8, built from `DietPi_RPi234-ARMv8-Trixie.img.xz`) and one for the Raspberry Pi 5 (built from `DietPi_RPi5-ARMv8-Trixie.img.xz`). Each contains DietPi, exxpiano, the full piano and the mechanics bank; the Pi 2/3/4 image also carries the smaller `lite` piano for 512 MB boards. One ZIP can be flashed to many cards.
 
 ## Prerequisites
 
@@ -13,7 +13,11 @@ scripts/make-soundfonts.sh -p lite -o build
 
 The builder defaults to `build/piano-full.sf2` and `build/mech.sf2`. Use `--piano` and `--mech` for controlled replacements.
 
-Before tagging a release add a section `## <VERSION>` to `CHANGELOG.md`: the workflow appends it to the description of the GitHub Release (`scripts/release-notes.py`) and stops without it. Use `--piano` and `--mech` for controlled replacements. An image is never released without both banks. If `build/piano-lite.sf2` exists (`scripts/make-soundfonts.sh -p lite`, or `--piano-lite FILE`) it goes into the image too, and the first start uses it on a board with less than 800 MB of memory (a Pi 3 A+); the release workflow always builds it.
+**The target.** `--target rpi234` (the default) or `--target rpi5`. For the Pi 5 pass the Pi 5 image of DietPi (`--dietpi DietPi_RPi5-ARMv8-Trixie.img.xz`, or `--download`). The target decides the names (`exxpiano-rpi5-v...-sd.zip`, `manifest-rpi5.json`, `README-rpi5.txt`) and two things inside: the Pi 5 image carries no `lite` bank (the board has 2 GB or more) and does not touch the onboard sound settings, because **the Pi 5 has no 3.5 mm jack: it plays only through a USB sound card or audio interface**. Neither Pi 5 image nor its first start has been tried on a real Pi 5.
+
+Before tagging a release add a section `## <VERSION>` to `CHANGELOG.md`: the workflow appends it to the description of the GitHub Release (`scripts/release-notes.py`) and stops without it.
+
+An image is never released without both banks. If `build/piano-lite.sf2` exists (`scripts/make-soundfonts.sh -p lite`, or `--piano-lite FILE`) it goes into the image too, and the first start uses it on a board with less than 800 MB of memory (a Pi 3 A+); the release workflow always builds it.
 
 ## Build
 
@@ -38,8 +42,8 @@ unset SD_PASSWORD SD_AP_PASSWORD
 `--dry-run` validates inputs and prints the plan. The full run writes to `dist/sd/`:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` — the flashable image;
-- `manifest.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
-- `README.txt` — brief instructions for that release.
+- `manifest-<target>.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
+- `README-<target>.txt` — brief instructions for that release.
 
 The product version comes from `VERSION`; the DietPi version comes from `dietpi/.version` in the base image. A release is rejected when that version cannot be read, either required bank is absent, or the smoke check fails.
 
@@ -50,8 +54,8 @@ The product version comes from `VERSION`; the DietPi version comes from `dietpi/
 Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the full and lite banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
-- `manifest.json`;
-- `README.txt`;
+- `manifest-rpi234.json`, `manifest-rpi5.json`;
+- `README-rpi234.txt`, `README-rpi5.txt`;
 - `SHA256SUMS`.
 
 The release title names exxpiano, its version, and the supported Raspberry Pi family. Its English description explains the image contents, flashing and first boot, checksum verification, and why an already-booted card must not be cloned.

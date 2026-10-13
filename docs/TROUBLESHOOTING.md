@@ -21,6 +21,7 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 
 | Symptom | Cause and fix |
 |---|---|
+| `exxpiano: no sound card found` on a Raspberry Pi 5 | The Pi 5 has no 3.5 mm jack: connect a USB sound card or an audio interface (the board plays only through it) |
 | `aplay -l` says "no soundcards found" | Onboard audio is off: `dtparam=audio=on` in `/boot/firmware/config.txt` (the product image sets it; on a system set up by hand: `dietpi-config` -> Audio Options), then `reboot` |
 | `exxpiano` restarts all the time, the restart counter keeps growing | FluidSynth exits at once when its input is closed. Always start it through `/opt/exxpiano/exxpiano-run` (the service does): it keeps a root-only pipe open as FluidSynth's input. Do not use `-s` (server mode): that opens a control port on every network interface |
 | The log shows `Out of memory`, the process is `Killed`; the Monitor section of the web interface lists "out of memory: the kernel killed fluidsynth" | The bank does not fit into memory (a Pi 3 A+ has 512 MB). In the **Piano bank** section of the web interface choose `piano-lite.sf2` (the image carries it and selects it by itself on such a board), or build the `lite` preset. Full detail: `journalctl -k -b \| grep -i oom` |

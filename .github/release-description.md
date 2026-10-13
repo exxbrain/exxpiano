@@ -1,4 +1,4 @@
-Ready-to-flash **exxpiano** digital piano image for a clean Raspberry Pi 2, 3, or 4 SD card (ARMv8).
+Ready-to-flash **exxpiano** digital piano images for a clean SD card: `exxpiano-rpi234-…` for the Raspberry Pi 2, 3 or 4 (ARMv8) and `exxpiano-rpi5-…` for the Raspberry Pi 5 (**not yet tried on a real Pi 5; the Pi 5 has no 3.5 mm jack, so it needs a USB sound card or an audio interface**).
 
 The image already includes:
 
@@ -10,7 +10,7 @@ The image already includes:
 
 ## Installation
 
-1. Download `exxpiano-rpi234-…-sd.zip` from this release's assets.
+1. Download the ZIP for your board from this release's assets: `exxpiano-rpi234-…-sd.zip` or `exxpiano-rpi5-…-sd.zip`.
 2. Flash the ZIP to a clean SD card with Raspberry Pi Imager (`Choose OS` → `Use custom`) or balenaEtcher. Do not extract the ZIP manually.
 3. Insert the card into the Raspberry Pi and power it on. The offline first boot may take several minutes.
 4. If no saved network is available, join `exxpiano-Setup-<ID>` (password `exxpianosetup`, the same for every card) and open `http://10.42.0.1:8080/`.
@@ -20,6 +20,6 @@ On first boot, each installed card automatically creates its own persistent ID.
 
 ## Download verification
 
-`SHA256SUMS` contains checksums for the image, manifest, and instructions. `manifest.json` records the exact product and DietPi versions, included banks, and source-image hash.
+`SHA256SUMS` contains checksums for the image, manifest, and instructions. `manifest-rpi234.json` and `manifest-rpi5.json` record the exact product and DietPi versions, included banks, and source-image hash.
 
 > The same original ZIP can be flashed to multiple clean cards. Do not clone a card after its first boot: doing so would also copy its installation ID.

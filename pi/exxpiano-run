@@ -86,7 +86,7 @@ if [ "$ALSA_DEVICE" = auto ]; then
   while [ "${choice##* }" != usb ] && [ "$waited" -lt "$USB_WAIT" ]; do   # a USB card enumerates late at boot
     sleep 1; waited=$((waited + 1)); choice="$(pick_card)"
   done
-  [ -n "$choice" ] || { echo "exxpiano: no sound card found" >&2; exit 1; }
+  [ -n "$choice" ] || { echo "exxpiano: no sound card found (a Raspberry Pi 5 has no 3.5 mm jack: connect a USB sound card or an audio interface)" >&2; exit 1; }
   DEVICE="plughw:CARD=${choice%% *}"
   if [ "${choice##* }" = usb ]; then Z="$USB_PERIOD_SIZE"; C="$USB_PERIODS"; fi
   echo "exxpiano: audio output $DEVICE (${choice##* }), period $Z x $C" >&2

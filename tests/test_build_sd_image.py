@@ -169,6 +169,35 @@ class PlanTests(Case):
 
 
 class BuildTests(Case):
+    def test_the_pi5_target_has_its_own_names_no_lite_bank_and_no_onboard_audio_setup(self):
+        lite = self.touch('banks/piano-lite.sf2', b'l' * 10)
+        r = self.run_build('--target', 'rpi5', '--piano-lite', lite)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        names = sorted(os.listdir(self.out))
+        self.assertTrue(any(n.startswith('exxpiano-rpi5-v') and n.endswith('-sd.zip') for n in names), names)
+        self.assertIn('manifest-rpi5.json', names)
+        self.assertIn('README-rpi5.txt', names)
+        with open(os.path.join(self.out, 'manifest-rpi5.json'), encoding='utf-8') as f:
+            manifest = json.load(f)
+        self.assertEqual(manifest['target_family'], 'rpi5')
+        self.assertNotIn('piano-lite.sf2', manifest['banks'])                       # 2 GB or more: only the full bank
+        with open(os.path.join(self.out, 'README-rpi5.txt'), encoding='utf-8') as f:
+            text = f.read()
+        self.assertIn('Raspberry Pi 5', text)
+        self.assertIn('no 3.5 mm jack', text)
+        build = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])][-1]
+        args = build['args']
+        self.assertEqual(args[args.index('--onboard-audio') + 1], '0')
+        self.assertNotIn('--piano-lite', args)
+
+    def test_the_default_target_keeps_the_jack_setup_and_the_pi5_download_name(self):
+        r = self.run_build()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        build = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])][-1]['args']
+        self.assertEqual(build[build.index('--onboard-audio') + 1], '1')
+        self.assertEqual(bsi.TARGETS['rpi5']['image'], 'DietPi_RPi5-ARMv8-Trixie.img.xz')
+        self.assertEqual(bsi.TARGETS['rpi234']['image'], 'DietPi_RPi234-ARMv8-Trixie.img.xz')
+
     def test_passwords_default_to_environment_and_arguments_override_them(self):
         r = self.run_build(env={'SD_PASSWORD': 'environment root password',
                                 'SD_AP_PASSWORD': 'environment setup password'})
@@ -197,12 +226,12 @@ class BuildTests(Case):
             self.assertEqual(z.read(stem + '.img'), b'fake image ' * 1000)
         self.assertFalse(os.path.exists(os.path.join(self.out, 'exxpiano.img')))
         self.assertFalse(os.path.exists(os.path.join(self.out, 'sticker')))
-        with open(os.path.join(self.out, 'README.txt'), encoding='utf-8') as f:
+        with open(os.path.join(self.out, 'README-rpi234.txt'), encoding='utf-8') as f:
             text = f.read()
         for needle in ('creates and permanently saves its own 16-character hexadecimal ID', 'exxpiano-Setup-<INSTALLATION-ID>', 'setup password 1',
                        'needs neither Internet nor an Ethernet cable', 'DietPi: 10.7.0'):
             self.assertIn(needle, text)
-        with open(os.path.join(self.out, 'manifest.json'), encoding='utf-8') as f:
+        with open(os.path.join(self.out, 'manifest-rpi234.json'), encoding='utf-8') as f:
             manifest = json.load(f)
         self.assertEqual((manifest['product_version'], manifest['dietpi_version'], manifest['installation_identity'], manifest['image']),
                          (version, '10.7.0', 'generated-at-first-boot', stem + '-sd.zip'))
@@ -434,6 +463,35 @@ class ShellScriptTests(unittest.TestCase):
             self.assertTrue(os.access(os.path.join(root, 'usr/local/sbin/exxpiano-console'), os.X_OK))
             with open(os.path.join(root, 'etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf')) as f:
                 self.assertIn('ExecStart=/usr/local/sbin/exxpiano-console', f.read())
+
+    def test_a_board_without_the_jack_leaves_the_onboard_audio_settings_alone(self):
+        with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:
+            src = f.read()
+        set_start = src.index('set_kv() {')
+        set_end = src.index('\n}\n', set_start) + 3
+        setup_start = src.index('configure_offline_product_boot() {')
+        setup_end = src.index('\n}\n', setup_start) + 3
+        with tempfile.TemporaryDirectory() as d:
+            root, bootdir = os.path.join(d, 'root'), '/boot/firmware'
+            os.makedirs(root + bootdir)
+            os.makedirs(root + '/etc/modprobe.d')
+            with open(root + bootdir + '/dietpi.txt', 'w') as f:
+                f.write('CONFIG_SOUNDCARD=none\n')
+            with open(root + bootdir + '/config.txt', 'w') as f:
+                f.write('dtparam=audio=off\n')
+            blacklist = root + '/etc/modprobe.d/dietpi-disable_rpi_audio.conf'
+            with open(blacklist, 'w') as f:
+                f.write('blacklist snd_bcm2835\n')
+            script = src[set_start:set_end] + src[setup_start:setup_end] + '\nconfigure_offline_product_boot "$ROOT" "$BOOTDIR" 0\n'
+            r = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
+                               env=dict(os.environ, ROOT=root, BOOTDIR=bootdir, HERE=os.path.join(ROOT, 'scripts')))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            with open(root + bootdir + '/dietpi.txt') as f:
+                self.assertIn('CONFIG_SOUNDCARD=none\n', f.read())
+            with open(root + bootdir + '/config.txt') as f:
+                self.assertEqual(f.read(), 'dtparam=audio=off\n')
+            self.assertTrue(os.path.exists(blacklist))
+            self.assertTrue(os.access(os.path.join(root, 'usr/local/sbin/exxpiano-console'), os.X_OK))      # everything else is still done
 
     def test_the_offline_chroot_gets_the_runtime_tmpfs_permissions(self):
         with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:

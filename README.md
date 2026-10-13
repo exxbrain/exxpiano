@@ -143,7 +143,7 @@ python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixi
 unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
-It makes `dist/sd/`: `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`, `manifest.json`, and `README.txt`. Write the zip with **Raspberry Pi
+It makes `dist/sd/`: `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`, `manifest-rpi234.json`, and `README-rpi234.txt`. For a **Raspberry Pi 5** add `--target rpi5` and pass the Pi 5 DietPi image (`DietPi_RPi5-ARMv8-Trixie.img.xz`): the release has a separate `exxpiano-rpi5-…` ZIP. The Pi 5 has no 3.5 mm jack, so it plays only through a USB sound card or audio interface, and its image carries only the full bank. **The Pi 5 image has not been tried on a real Pi 5.** Write the zip with **Raspberry Pi
 Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as it is); there is nothing to unzip onto the card by hand, because a Raspberry Pi card needs
 its partitions, which only an image carries. Switch the Pi on without preparing a network: the product image skips DietPi's online first-run update. The device is
 `http://exxpiano-<id>.local:8080/`; with no Ethernet or saved Wi-Fi it starts its unique setup network (see "Connecting to a new Wi-Fi").

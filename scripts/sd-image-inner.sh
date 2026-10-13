@@ -9,7 +9,7 @@
 # The image is NOT started here: nothing can be tried without a Pi. It is checked by reading it back (the last step).
 set -euo pipefail
 
-IMAGE="" OUT="" DIETPI_VERSION_OUT="" DEB="" PIANO="" PIANO_LITE="" MECH="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
+IMAGE="" OUT="" DIETPI_VERSION_OUT="" DEB="" PIANO="" PIANO_LITE="" ONBOARD_AUDIO=1 MECH="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
 KEYBOARD="us" EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work" NETWORK_IN_CHROOT=1
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -24,6 +24,7 @@ while [ $# -gt 0 ]; do
     --deb) DEB="$2"; shift 2 ;;
     --piano) PIANO="$2"; shift 2 ;;
     --piano-lite) PIANO_LITE="$2"; shift 2 ;;
+    --onboard-audio) ONBOARD_AUDIO="$2"; shift 2 ;;
     --mech) MECH="$2"; shift 2 ;;
     --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
     --password) PASSWORD="$2"; shift 2 ;;
@@ -97,7 +98,7 @@ prepare_chroot_tmp() {   # DietPi mounts a 1777 tmpfs here only at boot; offline
 }
 
 configure_offline_product_boot() {   # mounted root, the boot partition's mount point inside it
-  local root="$1" bootdir="$2" dt
+  local root="$1" bootdir="$2" onboard="${3:-1}" dt
   dt="$root$bootdir/dietpi.txt"
   # exxpiano-wifi is the sole owner of wlan0 and creates the setup AP when no saved network is available.
   set_kv "$dt" AUTO_SETUP_NET_WIFI_ENABLED 0
@@ -108,9 +109,12 @@ configure_offline_product_boot() {   # mounted root, the boot partition's mount 
   # The piano plays through the 3.5 mm jack unless a USB sound card is plugged in. DietPi ships with the onboard sound switched OFF in two places:
   # dtparam=audio=off in config.txt AND a modprobe blacklist of snd_bcm2835 (without the module there is no sound card at all and the synthesizer
   # cannot start). Both are undone here, and DietPi's own record of the choice (CONFIG_SOUNDCARD) says the same.
-  set_kv "$dt" CONFIG_SOUNDCARD rpi-bcm2835-3.5mm
-  [ -f "$root$bootdir/config.txt" ] && set_kv "$root$bootdir/config.txt" dtparam=audio on
-  rm -f "$root/etc/modprobe.d/dietpi-disable_rpi_audio.conf"
+  # A board without the jack (the Pi 5) gets none of this: its sound is a USB sound card, which needs no setting.
+  if [ "$onboard" = 1 ]; then
+    set_kv "$dt" CONFIG_SOUNDCARD rpi-bcm2835-3.5mm
+    [ -f "$root$bootdir/config.txt" ] && set_kv "$root$bootdir/config.txt" dtparam=audio on
+    rm -f "$root/etc/modprobe.d/dietpi-disable_rpi_audio.conf"
+  fi
 
   # Let DietPi apply first-boot hardware/password settings, then skip its online update/install workflow.
   install -d "$root/usr/local/sbin" "$root/etc/systemd/system/dietpi-firstboot.service.d" "$root/etc/systemd/system/getty@tty1.service.d" "$root/var/lib/dietpi/postboot.d"
@@ -194,7 +198,7 @@ set_kv "$DT" AUTO_SETUP_CUSTOM_SCRIPT_EXEC 0
 set_kv "$DT" SURVEY_OPTED_IN 0
 [ -z "$PASSWORD" ] || set_kv "$DT" AUTO_SETUP_GLOBAL_PASSWORD "$PASSWORD"
 install -m 755 "$HERE/../dietpi/Automation_Custom_Script.image.sh" "$MNT$BOOTDIR/Automation_Custom_Script.sh"
-configure_offline_product_boot "$MNT" "$BOOTDIR"
+configure_offline_product_boot "$MNT" "$BOOTDIR" "$ONBOARD_AUDIO"
 
 say "8/9 Reading the image back"
 fail=0
@@ -216,7 +220,7 @@ check "dietpi.txt: automated, host name, offline boot owned by exxpiano" "grep -
 check "the first-start script is on the boot partition" "[ -x '$MNT$BOOTDIR/Automation_Custom_Script.sh' ]"
 check "the pre-installed DietPi handoff is configured" "[ -x '$MNT/usr/local/sbin/exxpiano-dietpi-preinstalled' ] && grep -qx 'ExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled' '$MNT/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf' && [ -x '$MNT/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot' ]"
 check "the console shows a status screen, not a login prompt" "[ -x '$MNT/usr/local/sbin/exxpiano-console' ] && grep -qx 'ExecStart=/usr/local/sbin/exxpiano-console' '$MNT/etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf' && [ ! -e '$MNT/etc/systemd/system/getty@tty1.service.d/dietpi-autologin.conf' ]"
-check "the onboard sound is on: no module blacklist, dtparam=audio=on, DietPi says 3.5 mm" "[ ! -e '$MNT/etc/modprobe.d/dietpi-disable_rpi_audio.conf' ] && grep -qx 'dtparam=audio=on' '$MNT$BOOTDIR/config.txt' && grep -qx 'CONFIG_SOUNDCARD=rpi-bcm2835-3.5mm' '$DT'"
+[ "$ONBOARD_AUDIO" != 1 ] || check "the onboard sound is on: no module blacklist, dtparam=audio=on, DietPi says 3.5 mm" "[ ! -e '$MNT/etc/modprobe.d/dietpi-disable_rpi_audio.conf' ] && grep -qx 'dtparam=audio=on' '$MNT$BOOTDIR/config.txt' && grep -qx 'CONFIG_SOUNDCARD=rpi-bcm2835-3.5mm' '$DT'"
 check "no leftovers (resolver copy, package copy, policy)" "[ ! -e '$MNT/tmp/exxpiano.deb' ] && [ ! -e '$MNT/usr/sbin/policy-rc.d' ]"
 [ "$fail" = 0 ] || die "the checks above failed: the image is not written"
 
