@@ -67,13 +67,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           assets=(dist/sd/*.zip dist/sd/manifest-*.json dist/sd/README-*.txt dist/sd/SHA256SUMS)
+          python3 scripts/release-notes.py "$(tr -d '\n' < VERSION)" > build/release-notes.md
           title="exxpiano ${GITHUB_REF_NAME} — SD card image for Raspberry Pi 2/3/4"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" --title "$title" \
-              --notes-file .github/release-description.md
+              --notes-file build/release-notes.md
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}"
           else
             gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
               --verify-tag --title "$title" \
-              --notes-file .github/release-description.md
+              --notes-file build/release-notes.md
           fi

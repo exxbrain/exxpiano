@@ -12,7 +12,9 @@ scripts/make-soundfonts.sh -p full -o build
 scripts/make-soundfonts.sh -p lite -o build
 ```
 
-По умолчанию сборщик использует `build/piano-standard.sf2` и `build/mech.sf2`. `--variant standard|full` собирает образ с этим роялем (`build/piano-<вариант>.sf2`) и добавляет вариант в имена (`...-full-sd.zip`, `manifest-full.json`, `README-full.txt`); релиз собирает оба. Другие проверенные банки можно передать через `--piano` и `--mech`; образ без любого из двух банков не выпускается. Если есть `build/piano-lite.sf2` (`scripts/make-soundfonts.sh -p lite` или `--piano-lite ФАЙЛ`), он тоже попадает в образ, и первый запуск на плате с памятью меньше 800 МБ (Pi 3 A+) использует его; release-workflow всегда собирает его.
+По умолчанию сборщик использует `build/piano-standard.sf2` и `build/mech.sf2`. `--variant standard|full` собирает образ с этим роялем (`build/piano-<вариант>.sf2`) и добавляет вариант в имена (`...-full-sd.zip`, `manifest-full.json`, `README-full.txt`); релиз собирает оба.
+
+Перед тегом релиза добавьте в `CHANGELOG.md` раздел `## <VERSION>`: workflow добавляет его в описание GitHub Release (`scripts/release-notes.py`) и останавливается, если раздела нет. Другие проверенные банки можно передать через `--piano` и `--mech`; образ без любого из двух банков не выпускается. Если есть `build/piano-lite.sf2` (`scripts/make-soundfonts.sh -p lite` или `--piano-lite ФАЙЛ`), он тоже попадает в образ, и первый запуск на плате с памятью меньше 800 МБ (Pi 3 A+) использует его; release-workflow всегда собирает его.
 
 ## Сборка
 

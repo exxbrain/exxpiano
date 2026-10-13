@@ -12,7 +12,9 @@ scripts/make-soundfonts.sh -p full -o build
 scripts/make-soundfonts.sh -p lite -o build
 ```
 
-The builder defaults to `build/piano-standard.sf2` and `build/mech.sf2`. `--variant standard|full` makes an image with that piano (`build/piano-<variant>.sf2`) and puts the variant into the names (`...-full-sd.zip`, `manifest-full.json`, `README-full.txt`); the release builds both. Use `--piano` and `--mech` for controlled replacements. An image is never released without both banks. If `build/piano-lite.sf2` exists (`scripts/make-soundfonts.sh -p lite`, or `--piano-lite FILE`) it goes into the image too, and the first start uses it on a board with less than 800 MB of memory (a Pi 3 A+); the release workflow always builds it.
+The builder defaults to `build/piano-standard.sf2` and `build/mech.sf2`. `--variant standard|full` makes an image with that piano (`build/piano-<variant>.sf2`) and puts the variant into the names (`...-full-sd.zip`, `manifest-full.json`, `README-full.txt`); the release builds both.
+
+Before tagging a release add a section `## <VERSION>` to `CHANGELOG.md`: the workflow appends it to the description of the GitHub Release (`scripts/release-notes.py`) and stops without it. Use `--piano` and `--mech` for controlled replacements. An image is never released without both banks. If `build/piano-lite.sf2` exists (`scripts/make-soundfonts.sh -p lite`, or `--piano-lite FILE`) it goes into the image too, and the first start uses it on a board with less than 800 MB of memory (a Pi 3 A+); the release workflow always builds it.
 
 ## Build
 

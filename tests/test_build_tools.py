@@ -4,6 +4,7 @@ any folder layout): sample files are found through the paths written in the SFZ,
 The tests make tiny synthetic sets with ffmpeg and are skipped when ffmpeg is not installed.
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+import importlib.util
 import os
 import shutil
 import struct
@@ -93,6 +94,34 @@ class BuilderPackageTests(unittest.TestCase):
                         self.assertEqual(sample_rate, 44100, sample_name)
                         self.assertLessEqual(abs(length - expected), 4, (name, sample_name, length))
                 self.assertEqual({x[3] for x in p}, {21, 24})   # root keys survive the conversion
+
+
+class ReleaseNotesTests(unittest.TestCase):
+    def run_notes(self, version, changelog):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, '.github'))
+            with open(os.path.join(d, 'CHANGELOG.md'), 'w') as f:
+                f.write(changelog)
+            with open(os.path.join(d, '.github', 'release-description.md'), 'w') as f:
+                f.write('Description.\n')
+            spec = importlib.util.spec_from_file_location('release_notes', os.path.join(ROOT, 'scripts', 'release-notes.py'))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod.notes(version, d)
+
+    def test_the_section_of_the_version_is_appended_to_the_description(self):
+        text = self.run_notes('1.2.0', '# Changelog\n\n## 1.2.0\n\n- new\n\n## 1.1.0\n\n- old\n')
+        self.assertIn('Description.', text)
+        self.assertIn('- new', text)
+        self.assertNotIn('- old', text)
+
+    def test_a_missing_or_empty_section_stops_the_release(self):
+        with self.assertRaises(ValueError):
+            self.run_notes('1.3.0', '## 1.2.0\n\n- x\n')
+        with self.assertRaises(ValueError):
+            self.run_notes('1.2.0', '## 1.2.0\n\n## 1.1.0\n\n- x\n')
+        with self.assertRaises(ValueError):
+            self.run_notes('1.2', '## 1.2.0\n\n- x\n')           # 1.2 is not 1.2.0
 
 
 if __name__ == '__main__':
