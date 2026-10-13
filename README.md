@@ -18,7 +18,7 @@ was tested on a Pi.
 
 ## Tested on
 
-- Raspberry Pi 3 Model B (1 GB), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
+- Raspberry Pi 3 Model B (1 GB; a 512 MB Pi 3 A+ needs the smaller `lite` bank, see below), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
   onboard 3.5 mm output;
 - building the banks: macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 
@@ -38,7 +38,7 @@ but this setup was not measured with one.
 
 The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards; a separate package or installer bundle is not a delivery format.
 
-1. Build the standard banks once: `scripts/make-soundfonts.sh -p standard`. This creates the required `build/piano-standard.sf2` and `build/mech.sf2`.
+1. Build the banks once: `scripts/make-soundfonts.sh -p standard` and `scripts/make-soundfonts.sh -p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-standard.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
 2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`.
 3. Flash `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
 4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
@@ -89,12 +89,14 @@ it is not used here because it has no mechanics presets and no layer reduction.
 | `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
 | `small` | ~135 MB | 6 layers, **mono**, 10 s tails | 2.0 | no, only on the Mac |
 
-The whole file is read into RAM, and a Pi 3 has 1 GB. I did not measure the free memory after loading `standard`
-precisely; check yourself (`free -m`, the `available` column). If the Pi runs out of memory or CPU, use `lite` or `small`.
+The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `standard` does not fit there:
+on a real Pi 3 A+ the kernel killed FluidSynth at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
+(237 MB; it should fit in 414 MB next to the 36 MB mechanics bank, but it has **not** been played on such a board yet) or `small`. `lite` against `standard`: 6 velocity layers
+instead of 8, tails of 9 s instead of 11 s, and the softest note is louder (−12 dB instead of −17 dB), so the dynamic range is somewhat smaller. Check the free memory yourself (`free -m`, the `available` column).
 
 ## SD card image for new devices
 
-This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and both required banks. At first boot every installed copy creates a
+This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: `standard` and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself; on larger boards `standard` stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
 persistent random 16-character hexadecimal installation ID. The ID gives it a unique hostname
 `exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 
@@ -237,7 +239,7 @@ glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
-- **Monitor page**: live, once a second. **Errors**: warnings and errors the piano services logged since the boot (for example "no sound card found"). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
+- **Monitor page**: live, once a second. **Errors**: warnings and errors the piano services logged since the boot (for example "no sound card found"), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web page, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
   chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.

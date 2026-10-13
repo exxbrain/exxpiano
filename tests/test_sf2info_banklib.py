@@ -131,13 +131,21 @@ class BankLibTests(unittest.TestCase):
     def test_size_limit_marks_banks_that_do_not_fit(self):
         self.make('big.sf2', sample_bytes=3 << 20)
         self.make('small.sf2', sample_bytes=1000)
-        mem = (400 << 20) + (2 << 20)                       # 402 MB: reserve 400 MB leaves 2 MB
-        banks = {b['id']: b for b in banklib.list_banks(self.dir, mem_total=mem)}
+        mem = (800 << 20) + (2 << 20)                       # a board with 1 GB: the reserve of 400 MB leaves 402 MB
+        banks = {b['id']: b for b in banklib.list_banks(self.dir, mem_total=mem, reserve_mb=800)}
         self.assertTrue(banks['small.sf2']['fits'])
         self.assertFalse(banks['big.sf2']['fits'])
         self.assertIn('too large', banks['big.sf2']['reason'])
         self.assertIsNone(banklib.size_limit(None))
-        self.assertEqual(banklib.size_limit(100 << 20), 0)
+        self.assertEqual(banklib.size_limit(100 << 20, reserve_mb=400), 0)
+
+    def test_a_board_with_512_mb_keeps_less_for_the_system(self):
+        mem = 414 << 20                                     # what a Pi 3 A+ reports
+        mech = 36 << 20
+        limit = banklib.size_limit(mem, mech)
+        self.assertGreater(limit, 248325370)                # the smaller bank fits ...
+        self.assertLess(limit, 387396570)                   # ... the standard one does not
+        self.assertEqual(banklib.size_limit(954 << 20, mech), (954 << 20) - (400 << 20) - mech)    # a 1 GB board is unchanged
 
     def test_resolve_accepts_only_listed_plain_files(self):
         self.make('ok.sf2')

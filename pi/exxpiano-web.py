@@ -42,6 +42,7 @@ MAX_BODY = 4096
 HOSTNAME_RE = wifilib.HOSTNAME_RE
 ERROR_UNITS = ('exxpiano.service', 'exxpiano-fx.service', 'exxpiano-web.service', 'exxpiano-wifi.service')
 ERROR_LIMIT = 40
+OOM_RE = re.compile(r'Out of memory: Killed process \d+ \(([^)]*)\).*?anon-rss:(\d+)kB')
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
 
 class Actions:
@@ -159,7 +160,13 @@ class Actions:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         except (OSError, subprocess.SubprocessError):
             return []
-        return parse_journal_errors(r.stdout)
+        found = parse_journal_errors(r.stdout)
+        try:                                              # the kernel's own log: it says when it killed a program for lack of memory
+            k = subprocess.run(['journalctl', '-k', '-b', '-n', '300', '--no-pager', '-o', 'json'], capture_output=True, text=True, timeout=5)
+            found = sorted(found + parse_oom(k.stdout), key=lambda e: e['t'])[-ERROR_LIMIT:]
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return found
 
     # ---- Wi-Fi (the supervisor exxpiano-wifi does the changes; this only reads its status and sends requests)
     def wifi_status(self):
@@ -258,6 +265,22 @@ class Actions:
         if not last:
             return None
         return dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)))
+
+
+def parse_oom(text):
+    """Kernel log lines (`journalctl -k -o json`) -> one error for every program the kernel killed for lack of memory."""
+    out = []
+    for line in text.splitlines():
+        try:
+            e = json.loads(line)
+            t = int(e['__REALTIME_TIMESTAMP']) // 1000
+        except (ValueError, KeyError, TypeError):
+            continue
+        m = OOM_RE.search(e['MESSAGE']) if isinstance(e.get('MESSAGE'), str) else None
+        if m:
+            out.append(dict(t=t, unit='kernel', level='error',
+                            text='out of memory: the kernel killed %s, which held %d MB. Use a smaller piano bank (the Bank page) or a board with more memory' % (m.group(1), int(m.group(2)) // 1024)))
+    return out
 
 
 def parse_journal_errors(text):

@@ -10,7 +10,7 @@ Use Docker Desktop on macOS or Docker on Linux, the official `DietPi_RPi234-ARMv
 scripts/make-soundfonts.sh -p standard -o build
 ```
 
-The builder defaults to `build/piano-standard.sf2` and `build/mech.sf2`. Use `--piano` and `--mech` for controlled replacements. An image is never released without both banks.
+The builder defaults to `build/piano-standard.sf2` and `build/mech.sf2`. Use `--piano` and `--mech` for controlled replacements. An image is never released without both banks. If `build/piano-lite.sf2` exists (`scripts/make-soundfonts.sh -p lite`, or `--piano-lite FILE`) it goes into the image too, and the first start uses it on a board with less than 800 MB of memory (a Pi 3 A+); the release workflow always builds it.
 
 ## Build
 
@@ -44,7 +44,7 @@ The product version comes from `VERSION`; the DietPi version comes from `dietpi/
 
 ## GitHub Release
 
-Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the standard banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
+Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the standard and the lite banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
 - `manifest.json`;

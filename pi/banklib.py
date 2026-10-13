@@ -12,7 +12,9 @@ import sf2info
 BANK_EXT = ('.sf2', '.sf3')
 NAME_RE = re.compile(r'^[^/\\\x00-\x1f][^/\\\x00-\x1f]{0,119}$')      # a plain file name
 DEFAULT_DIR = '/var/lib/exxpiano/banks'
-RESERVE_MB = 400                  # RAM kept for the system and the rest of the module (the Pi 3 has about 950 MB)
+RESERVE_MB = 400                  # RAM kept for the system and the rest of the module (the Pi 3 B has about 950 MB)
+SMALL_BOARD_MB = 800              # below this (a Pi 3 A+ has 512 MB, about 414 usable) the system needs less than 400 MB: it used about 85 MB there
+SMALL_BOARD_RESERVE = 0.28        # share of the memory kept on such a board
 MECH_PROGRAMS = range(1, 7)       # the mechanics bank answers on bank 0, programs 1..6 (see exxpiano-fx.py: PROGRAMS)
 
 _cache = {}                       # (path, size, mtime_ns) -> sf2info result or error text
@@ -29,11 +31,15 @@ def mem_total_bytes(meminfo='/proc/meminfo'):
     return None
 
 
-def size_limit(mem_total, mech_bytes=0, reserve_mb=RESERVE_MB):
+def size_limit(mem_total, mech_bytes=0, reserve_mb=None):
     """The largest piano bank that fits next to the mechanics bank, or None when the memory size is unknown."""
     if mem_total is None:
         return None
-    return max(0, mem_total - reserve_mb * (1 << 20) - mech_bytes)
+    if reserve_mb is None:
+        reserve = RESERVE_MB * (1 << 20) if mem_total >= SMALL_BOARD_MB * (1 << 20) else int(mem_total * SMALL_BOARD_RESERVE)
+    else:
+        reserve = reserve_mb * (1 << 20)
+    return max(0, mem_total - reserve - mech_bytes)
 
 
 def inspect(path):
@@ -58,7 +64,7 @@ def _same(a, b):
         return False
 
 
-def list_banks(bank_dir, exclude=(), mem_total=None, mech_bytes=0, reserve_mb=RESERVE_MB):
+def list_banks(bank_dir, exclude=(), mem_total=None, mech_bytes=0, reserve_mb=None):
     """[dict(id, size, name, presets, ok, fits, reason)], sorted by file name. Unreadable folders give an empty list."""
     try:
         names = sorted(os.listdir(bank_dir), key=str.lower)

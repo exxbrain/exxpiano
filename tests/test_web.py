@@ -371,7 +371,7 @@ class BankWebTests(ServerCase):
         self.assertEqual(self.actions.restarts, 0)
 
     def test_a_bank_too_big_for_the_memory_is_refused(self):
-        self.actions.mem = (400 << 20) + (1 << 10)        # the 400 MB reserve leaves almost nothing
+        self.actions.mem = 1 << 10                        # almost no memory: not even a small bank fits
         code, r = self.jcall('/api/bank', {'id': 'new.sf2'})
         self.assertEqual(code, 400)
         self.assertIn('too large', r['error'])
@@ -688,6 +688,13 @@ class MonitorEndpointTests(ServerCase):
         code, r = self.jcall('/api/errors')
         self.assertEqual(code, 200)
         self.assertEqual(r['errors'][0]['text'], 'no sound card found')
+
+    def test_the_kernel_log_reports_the_program_killed_for_lack_of_memory(self):
+        import json as j
+        msg = '[  127.7] Out of memory: Killed process 743 (fluidsynth) total-vm:489696kB, anon-rss:370048kB, file-rss:188kB, shmem-rss:0kB, UID:0 pgtables:864kB oom_score_adj:0'
+        text = '\n'.join([j.dumps({'__REALTIME_TIMESTAMP': '5000000', 'MESSAGE': msg}), j.dumps({'__REALTIME_TIMESTAMP': '6000000', 'MESSAGE': 'usb 1-1: new device'}), 'junk'])
+        self.assertEqual(web.parse_oom(text), [dict(t=5000, unit='kernel', level='error', text=web.parse_oom(text)[0]['text'])])
+        self.assertIn('killed fluidsynth, which held 361 MB', web.parse_oom(text)[0]['text'])
 
     def test_journal_lines_become_errors(self):
         import json as j

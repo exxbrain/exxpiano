@@ -17,7 +17,7 @@ USB MIDI-клавиатура ─► exxpiano-fx.py ─► FluidSynth ─► з�
 
 ## Проверено на
 
-- Raspberry Pi 3 Model B (1 ГБ), DietPi (Debian, FluidSynth 2.4.4), клавиатура Arturia KeyLab Essential 49 mk3,
+- Raspberry Pi 3 Model B (1 ГБ; для Pi 3 A+ с 512 МБ нужен уменьшенный банк `lite`, см. ниже), DietPi (Debian, FluidSynth 2.4.4), клавиатура Arturia KeyLab Essential 49 mk3,
   штатный выход 3.5 мм;
 - сборка банков — на macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 
@@ -37,7 +37,7 @@ USB MIDI-клавиатура ─► exxpiano-fx.py ─► FluidSynth ─► з�
 
 Поставляемый продукт — готовое устройство с уже установленным exxpiano. Один полный образ DietPi используется для всех совместимых Raspberry Pi 2/3/4; отдельный пакет или архив-установщик не является форматом поставки.
 
-1. Один раз соберите стандартные банки: `scripts/make-soundfonts.sh -p standard`. Получатся обязательные `build/piano-standard.sf2` и `build/mech.sf2`.
+1. Один раз соберите банки: `scripts/make-soundfonts.sh -p standard` и `scripts/make-soundfonts.sh -p lite` (второй берёт уже скачанные сэмплы). Получатся обязательные `build/piano-standard.sf2` и `build/mech.sf2` и уменьшенный `build/piano-lite.sf2` для плат с 512 МБ.
 2. Соберите универсальный образ: `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`. 
 3. Запишите `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` прямо на чистую SD-карту через Raspberry Pi Imager или balenaEtcher.
 4. Вставьте карту в совместимую Raspberry Pi 2, 3 или 4 и включите питание.
@@ -87,8 +87,10 @@ scripts/make-soundfonts.sh -p standard -v 48k24 -o build     # взять пак
 | `lite` | ~250 МБ | 6 слоёв, стерео, хвосты 9 с | 1.0 | близкий вариант (нагрузка CPU ~30%) |
 | `small` | ~135 МБ | 6 слоёв, **моно**, хвосты 10 с | 2.0 | нет, только на Mac |
 
-Файл целиком читается в оперативную память, а у Pi 3 её 1 ГБ. Свободную память после загрузки `standard` я точно не
-измерял; проверьте сами (`free -m`, столбец `available`). Если Pi не хватает памяти или процессора, берите `lite` или `small`.
+Файл целиком читается в оперативную память. У Pi 3 Model B/B+ её 1 ГБ, а у **Pi 3 Model A+ всего 512 МБ (около 414 МБ доступно)**, и `standard` там не помещается:
+на реальной Pi 3 A+ ядро убивало FluidSynth на 370 МБ (`Out of memory: Killed process (fluidsynth)`), и служба перезапускалась снова и снова. Берите `lite`
+(237 МБ; рядом с механикой в 36 МБ он должен поместиться в 414 МБ, но на такой плате он **ещё не проверен на слух**) или `small`. `lite` против `standard`: 6 слоёв громкости
+вместо 8, хвосты 9 с вместо 11 с, самая тихая нота громче (−12 дБ вместо −17 дБ), поэтому динамический диапазон немного меньше. Свободную память проверьте сами (`free -m`, столбец `available`).
 
 ## Образ SD-карты для новых устройств
 

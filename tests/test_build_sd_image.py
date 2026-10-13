@@ -135,6 +135,13 @@ class PlanTests(Case):
             default_mech = self.touch('build/mech.sf2', b'default mech')
             args = bsi.parse_args(['--dietpi', self.dietpi])
             self.assertEqual(bsi.resolve_inputs(args), dict(dietpi=os.path.abspath(self.dietpi), piano=default_piano, mech=default_mech))
+            lite = self.touch('build/piano-lite.sf2', b'default lite')                 # the smaller bank is taken when it exists, it is not required
+            args = bsi.parse_args(['--dietpi', self.dietpi])
+            self.assertEqual(bsi.resolve_inputs(args)['piano_lite'], lite)
+            os.unlink(lite)
+            args = bsi.parse_args(['--dietpi', self.dietpi, '--piano-lite', os.path.join(self.tmp.name, 'nothing.sf2')])
+            with self.assertRaisesRegex(bsi.BuildError, 'required piano_lite bank'):
+                bsi.resolve_inputs(args)
             args = bsi.parse_args(['--dietpi', self.dietpi, '--piano', self.piano, '--mech', self.mech])
             self.assertEqual((bsi.resolve_inputs(args)['piano'], bsi.resolve_inputs(args)['mech']), (self.piano, self.mech))
         finally:
@@ -204,7 +211,8 @@ class BuildTests(Case):
         self.assertRegex(manifest['dietpi_sha256'], r'^[0-9a-f]{64}$')
         self.assertRegex(manifest['image_sha256'], r'^[0-9a-f]{64}$')
     def test_the_container_gets_read_only_inputs_a_writable_output_and_the_passwords_in_the_environment(self):
-        self.run_build('--password', 'root password 1', '--ap-password', 'setup password 1')
+        lite = self.touch('banks/piano-lite.sf2', b'l' * 10)
+        self.run_build('--password', 'root password 1', '--ap-password', 'setup password 1', '--piano-lite', lite)
         calls = [c for c in self.docker_calls() if c['args'][:1] == ['run']]
         build = [c for c in calls if 'sd-image-inner.sh' in ' '.join(c['args'])][0]
         args = build['args']
@@ -213,7 +221,8 @@ class BuildTests(Case):
         self.assertTrue(any(m.endswith(':/repo:ro') for m in mounts))
         self.assertTrue(any(m.endswith(':/out') for m in mounts))
         inputs = [m for m in mounts if m.endswith(':ro') and '/in/' in m]
-        self.assertEqual(len(inputs), 4)                                                     # the image, the package, both banks
+        self.assertEqual(len(inputs), 5)                                                     # the image, the package, three banks
+        self.assertIn('--piano-lite', args)
         self.assertEqual(args[args.index('--hostname') + 1], 'exxpiano')
         self.assertNotIn('--serial', args)
         self.assertNotIn('--number', args)

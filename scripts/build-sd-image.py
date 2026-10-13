@@ -120,7 +120,10 @@ def resolve_inputs(args):
             raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
     inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-standard.sf2'))
     inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
-    for key in ('piano', 'mech'):
+    lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')      # for boards with 512 MB; optional unless asked for by name
+    if args.piano_lite or os.path.isfile(lite):
+        inputs['piano_lite'] = os.path.abspath(lite)
+    for key in [k for k in ('piano', 'mech', 'piano_lite') if k in inputs]:
         if not os.path.isfile(inputs[key]) or not os.access(inputs[key], os.R_OK):
             raise BuildError('the required %s bank is missing or unreadable: %s (prepare defaults with scripts/make-soundfonts.sh or pass --%s FILE.sf2)'
                              % (key, inputs[key], key))
@@ -149,6 +152,8 @@ def inner_args(plan, path_of):
          '--deb', path_of('deb'), '--hostname', 'exxpiano',
          '--country', plan['country'], '--timezone', plan['timezone'], '--locale', plan['locale'], '--keyboard', plan['keyboard'], '--workdir', '/tmp/piano-sd-work']
     a += ['--piano', path_of('piano'), '--mech', path_of('mech')]
+    if plan.get('has_lite'):
+        a += ['--piano-lite', path_of('piano_lite')]
     return a                                    # the passwords go through the environment (SD_PASSWORD, SD_AP_PASSWORD), not through the arguments
 
 
@@ -199,6 +204,7 @@ def parse_args(argv):
     ap.add_argument('--dietpi', help='DietPi_RPi234-ARMv8-Trixie.img.xz (or an unpacked .img) from dietpi.com')
     ap.add_argument('--download', action='store_true', help='fetch the official DietPi image into build/cache (only when you ask for it)')
     ap.add_argument('--piano', help='the piano bank (.sf2); default build/piano-standard.sf2')
+    ap.add_argument('--piano-lite', help='the smaller piano bank for boards with 512 MB (.sf2); default build/piano-lite.sf2 when it exists. The image picks it at the first start when the memory is under 800 MB')
     ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/mech.sf2')
     ap.add_argument('--password', default=os.environ.get('SD_PASSWORD', ''),
                     help="DietPi's global password (root and dietpi users); default: SD_PASSWORD; without either the DietPi default stays: change it")
@@ -223,8 +229,8 @@ def plan_image(args, inputs):
     if args.ap_password:
         wifilib.validate_passphrase(args.ap_password)
     version = read_version()
-    banks = [os.path.basename(inputs['piano']), os.path.basename(inputs['mech'])]
-    return dict(version=version, out_dir=os.path.abspath(args.out), password=args.password, ap_password=args.ap_password,
+    banks = [os.path.basename(inputs[k]) for k in ('piano', 'piano_lite', 'mech') if k in inputs]
+    return dict(version=version, has_lite='piano_lite' in inputs, banks=banks, out_dir=os.path.abspath(args.out), password=args.password, ap_password=args.ap_password,
                 country=args.country, timezone=args.timezone, locale=args.locale, keyboard=args.keyboard,
                 banks_text=', '.join(banks), when=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
                 out_img_in_builder='/out/exxpiano.img', dietpi_version_out_in_builder='/out/dietpi-version.txt')
@@ -275,7 +281,7 @@ def build_one(args, inputs, plan):
         product_version=plan['version'], dietpi_version=plan['dietpi_version'],
         dietpi_source=os.path.basename(inputs['dietpi']), dietpi_sha256=plan['dietpi_sha256'],
         installation_identity='generated-at-first-boot', setup_ssid_pattern='exxpiano-Setup-<16-hex-installation-id>',
-        hostname_pattern='exxpiano-<16-hex-installation-id-lowercase>', banks=[os.path.basename(inputs['piano']), os.path.basename(inputs['mech'])],
+        hostname_pattern='exxpiano-<16-hex-installation-id-lowercase>', banks=plan['banks'],
         image=zip_name, image_sha256=zip_hash, raw_image_sha256=raw_image_hash, built_at=plan['when']))
     print('\nDone:')
     print('  card image : %s (%.0f MB)' % (zip_path, os.path.getsize(zip_path) / 1e6))
