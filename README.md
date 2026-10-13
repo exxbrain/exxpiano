@@ -85,7 +85,7 @@ it is not used here because it has no mechanics presets and no layer reduction.
 | Preset | Memory on the Pi | What it is | `GAIN` | Tested on a Pi 3 |
 |---|---|---|---|---|
 | `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
-| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | starts and plays on a board with 1 GB and, by the author's ear, sounds better than the earlier 390 MB bank (one listener, not a blind test); the free memory after loading was not recorded, watch `free -m` |
+| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | starts and plays on a board with 1 GB and, by the author's ear, sounds better than the earlier 390 MB bank and significantly better than `lite` (one listener, not a blind test); the free memory after loading was not recorded, watch `free -m` |
 
 The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `full` does not fit there:
 on a real Pi 3 A+ the kernel killed FluidSynth with a 390 MB bank at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
@@ -98,10 +98,10 @@ Salamander Grand Piano V3 is recorded for a computer: 16 velocity layers on ever
 
 So exxpiano does not try to load the original. It builds **reduced SF2 banks** from it: it keeps some of the layers (14 of 16 in `full`, 6 in `lite`), trims the tails with a smooth fade, levels the layers and adds a gentle dependence of volume on touch. The mechanics (hammers, dampers, resonance, pedal) live in a separate small bank, because SF2 cannot express the SFZ rules. The result:
 
-- on a board with **1 GB** `full` (about 700 MB) plays and, by the author's ear, sounds better than the earlier 390 MB bank;
+- on a board with **1 GB** `full` (about 700 MB) plays and, by the author's ear, sounds better than the earlier 390 MB bank and significantly better than `lite`;
 - on the **cheapest Pi 3 A+ with 512 MB** `lite` (about 237 MB) plays, tested on a real board.
 
-The price: fewer velocity layers and shorter tails than the original; `lite` has louder soft notes and a slightly narrower dynamic range. How audible this is has been judged by ear, not measured. We have no comparison of the original against the exxpiano banks.
+The price: fewer velocity layers and shorter tails than the original; `lite` has louder soft notes and a slightly narrower dynamic range. It is audible: by the author's ear `full` sounds significantly better than `lite`, so `lite` is the way to run on a 512 MB board, not a replacement for `full` where 1 GB is available. This was judged by ear, not measured. We have no comparison of the original against the exxpiano banks.
 
 ## Comparison with alternatives
 
