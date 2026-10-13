@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-**Purpose:** a good piano sound on a cheap board with the least effort. Write an image to a card, power the board on, set it up from a phone: no installation, no screen on the board. By the author's estimate it takes a few minutes from writing the card to the first sound (one person, one board, not a timed benchmark).
+**Purpose:** a good piano sound on a cheap board with the least effort. Write an image to a card, power the board on, set it up from a phone: no installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
 
 A digital piano appliance for Raspberry Pi 2/3/4 ARMv8: **Salamander Grand Piano V3** (Yamaha C5) through FluidSynth, plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
@@ -91,7 +91,7 @@ it is not used here because it has no mechanics presets and no layer reduction.
 | Preset | Memory on the Pi | What it is | `GAIN` | Tested on a Pi 3 |
 |---|---|---|---|---|
 | `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
-| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | starts and plays on a board with 1 GB and, by the author's ear, sounds better than the earlier 390 MB bank and significantly better than the ready-made light Salamander SoundFont from the official library (one listener, not a blind test; the exact file was not recorded); the free memory after loading was not recorded, watch `free -m` |
+| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | starts and plays on a board with 1 GB; by ear it sounds better than the earlier 390 MB bank and significantly better than the ready-made light Salamander SoundFont of the official library (one listener, not a blind test); the free memory after loading was not recorded, watch `free -m` |
 
 The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `full` does not fit there:
 on a real Pi 3 A+ the kernel killed FluidSynth with a 390 MB bank at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
@@ -104,10 +104,10 @@ Salamander Grand Piano V3 is recorded for a computer: 16 velocity layers on ever
 
 So exxpiano does not try to load the original. It builds **reduced SF2 banks** from it: it keeps some of the layers (14 of 16 in `full`, 6 in `lite`), trims the tails with a smooth fade, levels the layers and adds a gentle dependence of volume on touch. The mechanics (hammers, dampers, resonance, pedal) live in a separate small bank, because SF2 cannot express the SFZ rules. The result:
 
-- on a board with **1 GB** `full` (about 700 MB) plays and, by the author's ear, sounds better than the earlier 390 MB bank and significantly better than the ready-made light Salamander SoundFont from the official library;
+- on a board with **1 GB** `full` (about 700 MB) plays; by ear it sounds better than the earlier 390 MB bank and significantly better than the ready-made light Salamander SoundFont of the official library;
 - on the **cheapest Pi 3 A+ with 512 MB** `lite` (about 237 MB) plays, tested on a real board.
 
-The price: fewer velocity layers and shorter tails than the original; `lite` has louder soft notes and a slightly narrower dynamic range. How audible this is has been judged by ear, not measured. The author compared `full` with the ready-made light Salamander SoundFont of the official library and found `full` significantly better; `full` has not been compared with the original, and our `lite` has not been compared with `full` or with that SoundFont. We have no comparison of the original against the exxpiano banks.
+The price: fewer velocity layers and shorter tails than the original; `lite` has louder soft notes and a slightly narrower dynamic range. How audible this is has been judged by ear, not measured. `full` was compared by ear with the ready-made light Salamander SoundFont of the official library and sounds significantly better; `full` has not been compared with the original, and our `lite` has not been compared with `full` or with that SoundFont. We have no comparison of the original against the exxpiano banks.
 
 ## Comparison with alternatives
 
@@ -119,17 +119,17 @@ This comparison comes from project descriptions and reviews, not from my own mea
 | Software price | free, open source (scripts MIT, sounds CC-BY) | a paid licence | the software is open; the ready Zynthian 5 kit with a screen and knobs is about €490 plus VAT without a Raspberry Pi, about €570 with one (from a review) | free |
 | Hardware | Raspberry Pi 2/3/4, a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official v5.1 kit on a Raspberry Pi 5 with a screen and a control board; Pi 4, 3 and 3B+ are also supported and Pi 4 or better is recommended (a Pi 3 copes worse with several engines at once); the Pi 3 A+ and a minimum amount of memory are not mentioned in the documentation, a forum post says ZynthianOS takes almost 1 GB; a Pi 2 is not supported by the image | any board that runs FluidSynth (Pi Zero and up) |
 | Ready image | yes, one ZIP that works from the first power-on with no monitor | no, installed by hand | yes, the ZynthianOS image: about 7 GB compressed and about 16 GB unpacked, a card of 32 GB or more; a lighter variant with a reduced SoundFont library exists | no, usually a guide and scripts |
-| Settings from a phone | yes: touch curve, mechanics, banks, audio output, Wi-Fi, monitor | no single page; settings are in the program | a screen and knobs on the device, a web interface exists | at best a simple page to choose a bank |
+| Settings from a phone | yes: touch curve, mechanics, banks, audio output, Wi-Fi, monitor | no single web interface; settings are in the program | a screen and knobs on the device, a web interface exists | at best a simple interface to choose a bank |
 | Piano mechanics | yes, a separate bank and a bridge | part of the physical model | depends on the chosen engine | none |
 | Changing the sound | banks can be swapped (any `.sf2`), mechanics and touch are tunable | many model parameters | depends on the engine | only swapping the SoundFont |
 
-Where exxpiano is weaker: no physical modelling (the sound is limited by recorded layers and the memory of the board, and on a cheap 512 MB board the `lite` bank is simpler than the full one), no screen or knobs on the body (everything from a phone), no built-in synthesizers besides the piano, and the latency is not measured yet. Where it is stronger: free open code, a ready image, work on the cheapest board with no monitor, a clear settings page and a separate piano mechanics.
+Where exxpiano is weaker: no physical modelling (the sound is limited by recorded layers and the memory of the board, and on a cheap 512 MB board the `lite` bank is simpler than the full one), no screen or knobs on the body (everything from a phone), no built-in synthesizers besides the piano, and the latency is not measured yet. Where it is stronger: free open code, a ready image, work on the cheapest board with no monitor, a clear settings web interface and a separate piano mechanics.
 
-Sources: [Modartt forum on Pianoteq for ARM](https://forum.modartt.com/viewtopic.php?id=7220), [Zynthian Software page](https://wiki.zynthian.org/index.php/Zynthian_Software), [Zynthian Hardware page](https://wiki.zynthian.org/index.php/Zynthian_Hardware), [forum on memory](https://discourse.zynthian.org/t/how-much-ram-4-vs-8-gb/6109), [Zynthian 5 (review)](https://www.yahoo.com/entertainment/zynthian-5-standalone-open-source-110034729.html), [FluidPi](https://github.com/schollz/FluidPi), [PiPiano](https://jpralves.net/post/2020/03/05/pipiano.html).
+Sources: [Modartt forum on Pianoteq for ARM](https://forum.modartt.com/viewtopic.php?id=7220), [Zynthian Software documentation](https://wiki.zynthian.org/index.php/Zynthian_Software), [Zynthian Hardware documentation](https://wiki.zynthian.org/index.php/Zynthian_Hardware), [forum on memory](https://discourse.zynthian.org/t/how-much-ram-4-vs-8-gb/6109), [Zynthian 5 (review)](https://www.yahoo.com/entertainment/zynthian-5-standalone-open-source-110034729.html), [FluidPi](https://github.com/schollz/FluidPi), [PiPiano](https://jpralves.net/post/2020/03/05/pipiano.html).
 
 ## SD card image for new devices
 
-This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: the piano (`full`, about 700 MB, installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards the piano of the image stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
+This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: the piano (`full`, about 700 MB, installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards the piano of the image stays and `lite` can be chosen in the **Piano bank** section of the web interface. At first boot every installed copy creates a
 persistent random 16-character hexadecimal installation ID. The ID gives it a unique hostname
 `exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 
@@ -158,7 +158,7 @@ its partitions, which only an image carries. Switch the Pi on without preparing 
   has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
   test changes to the builder without a Pi.
 
-**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the control page, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH (user `root`, DietPi's password).
+**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the web interface, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH (user `root`, DietPi's password).
 
 ## Upgrading a running Pi
 
@@ -199,7 +199,7 @@ and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A lo
 
 - **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/firmware/config.txt`; on a system you set up by hand: `dietpi-config` -> Audio Options), device
   `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
-  30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The default `PERIOD_SIZE=64` x `PERIODS=3` (the smallest value FluidSynth accepts, the driver rounds it up) played without clicks on a Pi 3; raise `PERIOD_SIZE` on the web page if you hear any. The output is somewhat noisy.
+  30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The default `PERIOD_SIZE=64` x `PERIODS=3` (the smallest value FluidSynth accepts, the driver rounds it up) played without clicks on a Pi 3; raise `PERIOD_SIZE` in the web interface if you hear any. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
   uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (64 frames = 1.45 ms per period, ~4.4 ms of buffering; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
   matters: many interfaces accept only 24/32-bit audio or 4 channels, and opening them directly (`hw:`) fails with
@@ -235,14 +235,14 @@ Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart ex
 
 ## Choosing the piano bank
 
-The page has a **Piano bank** card that lists the sound banks (`*.sf2`, `*.sf3`) found in `BANK_DIR` (default `/opt/exxpiano/soundfonts`; the
+The web interface has a **Piano bank** card that lists the sound banks (`*.sf2`, `*.sf3`) found in `BANK_DIR` (default `/opt/exxpiano/soundfonts`; the
 mechanics bank is never offered). **Use** switches the piano: the synthesizer reloads (about a minute of silence). If the new bank does not come
-up, the previous one is put back automatically and the page says so. A bank is refused, with the reason shown, when it is damaged or too large
+up, the previous one is put back automatically and the web interface says so. A bank is refused, with the reason shown, when it is damaged or too large
 for the device's memory (on a Pi 3: about 500 MB). If the bank has several presets the card also offers a **Preset** drop-down (applied at once);
 bank 0 programs 1-6 are not offered because the mechanics bank answers there.
 
 If the chosen bank is later missing or damaged (a deleted file), the module starts with `PIANO_SF2_LAST_GOOD`, the last bank that worked,
-instead of staying silent. Only file names that the library folder lists can be chosen: the page never sends a path.
+instead of staying silent. Only file names that the library folder lists can be chosen: the web interface never sends a path.
 
 **Settings follow the instrument.** The touch curve, master volume, mechanics levels, randomness and the preset are remembered **per bank** (in
 `/var/lib/exxpiano/profiles.json`, keyed by the bank's file name, so renaming a file starts it afresh). Change a slider and it is stored for the bank
@@ -252,73 +252,73 @@ for every bank. If a switch fails, the old bank and its settings are restored.
 
 To add a bank, copy a `.sf2` into `BANK_DIR` (for example `scp -O my.sf2 root@<Pi>:/opt/exxpiano/soundfonts/`).
 
-## Look at the page without a Raspberry Pi
+## Look at the web interface without a Raspberry Pi
 
 ```bash
 python3 scripts/demo-web.py --open            # http://127.0.0.1:8080/
 ```
 
-The real page and the real server code run on your computer against a **simulated device** (services, CPU and temperature that move, Wi-Fi networks, three banks, the audio
+The real web interface and the real server code run on your computer against a **simulated device** (services, CPU and temperature that move, Wi-Fi networks, three banks, the audio
 interface). Change the sliders, switch the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" does not connect, "Cafe" is open), scan the QR codes. Options:
 `--mode ap` (setup mode: the device with no network), `--installation-id 0123456789ABCDEF`, `--hostname NAME`, `--throttled`,
 `--bind 0.0.0.0` (to look from a phone on the same network), `--token SECRET`. Nothing is written outside a temporary folder.
 
-## Web interface
+## Interface for controlling the instrument and monitoring the device
 
-Open `http://<device>:8080/` from a phone or a computer on the same network (the address is shown on the device's HDMI screen and in your router's list of clients; the name is `exxpiano-<ID>`). The **menu** (the ☰ button) opens the pages: **Home** (the status of the services, what is playing, the volume, and a
+This is the web interface for controlling the instrument and monitoring the device: instrument banks, touch and mechanics, audio output, Wi-Fi, and the state of the board (processor, temperature, power, memory, errors). It opens in a browser, so no program is needed on the phone. Open `http://<device>:8080/` from a phone or a computer on the same network (the address is shown on the device's HDMI screen and in your router's list of clients; the name is `exxpiano-<ID>`). The **menu** (the ☰ button) opens the sections: **Home** (the status of the services, what is playing, the volume, and a
 glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch and mechanics**, **Audio output**, **Monitor** and **Wi-Fi**. An address like
-`http://<device>:8080/#/wifi` opens a page directly (Back works, bookmarks work). The pages have:
+`http://<device>:8080/#/wifi` opens a section directly (Back works, bookmarks work). The sections have:
 
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
-- **Monitor page**: live, once a second. **Errors**: warnings and errors the piano services logged since the boot (for example "no sound card found"), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
-  temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web page, and charts of the last 2.5 minutes. Below it, the
+- **Monitor section**: live, once a second. **Errors**: warnings and errors the piano services logged since the boot (for example "no sound card found"), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
+  temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web interface, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
   chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
-- **Wi-Fi page**: the connection (network, address, signal), the saved networks (with *Forget*), and **Connect to a network**: pick one from the scan (or type a
+- **Wi-Fi section**: the connection (network, address, signal), the saved networks (with *Forget*), and **Connect to a network**: pick one from the scan (or type a
   hidden network's name), type the password, press *Connect*. The Pi tries the network for up to a minute and keeps the previous settings if it does not work.
   See *Connecting to a new Wi-Fi* below.
 - **Audio output**: the output card, the buffer (size and number) of the selected interface, reverb and polyphony. The buffers are remembered **per audio interface**
-  (`/var/lib/exxpiano/devices.json`, keyed by the `ALSA_DEVICE` value): choose another interface and the page fills in the buffers it was
+  (`/var/lib/exxpiano/devices.json`, keyed by the `ALSA_DEVICE` value): choose another interface and the web interface fills in the buffers it was
   last used with; an interface never used before keeps the current ones. These need a restart of the synthesizer (~45 s), so they are
   applied with a separate button.
 - the status of the services and of the chosen output.
 
-Everything is stored in `/etc/exxpiano.conf`, so the page and the file always agree. The page changes only the whitelisted
+Everything is stored in `/etc/exxpiano.conf`, so the web interface and the file always agree. The web interface changes only the whitelisted
 settings, each within a fixed range. **There is no password by default**: anybody on your network can change these settings
 (nothing else, there is no shell access). Set `WEB_TOKEN=<secret>` in the config to require it, or `WEB_BIND=127.0.0.1` to
-reach the page only from the device itself. The service runs as root because it writes `/etc/exxpiano.conf` and restarts
+reach the web interface only from the device itself. The service runs as root because it writes `/etc/exxpiano.conf` and restarts
 the synthesizer; hardening that is a task for a real product.
 
 ## Several devices
 
 At first boot every installation gets a persistent random ID such as `0123456789ABCDEF`. Cards flashed from the same ZIP therefore get different setup networks
-`exxpiano-Setup-0123456789ABCDEF` and hostnames `exxpiano-0123456789abcdef`. The ID appears in the menu and page QR code; the page warns if a QR code belongs to another installation. The **Device name** box may set a friendlier hostname.
+`exxpiano-Setup-0123456789ABCDEF` and hostnames `exxpiano-0123456789abcdef`. The ID appears in the menu and the QR code of the web interface; the web interface warns if a QR code belongs to another installation. The **Device name** box may set a friendlier hostname.
 
 ## Connecting to a new Wi-Fi
 
 When the Pi has **no network** (no Ethernet cable and no Wi-Fi it knows: a new device, a new router, you moved) it starts **its own Wi-Fi network** and waits:
 
 1. On a phone join **`exxpiano-Setup-<16-character ID>`**, password **`exxpianosetup`**, or scan the first QR code shown by the web UI.
-2. The phone shows its "sign in to network" window with the page; if not, scan the second QR code or open `http://10.42.0.1:8080/#/wifi`. The **Wi-Fi** page opens by itself.
+2. The phone shows its "sign in to network" window with the web interface; if not, scan the second QR code or open `http://10.42.0.1:8080/#/wifi`. The **Wi-Fi** section opens by itself.
 3. Pick your home network, type its password, press **Connect**. The setup network disappears; join your own Wi-Fi again and open
-   `http://<host name>.local:8080/` (the host name is shown on the page; `avahi-daemon` provides it) or find the address in the router's client list.
+   `http://<host name>.local:8080/` (the host name is shown in the web interface; `avahi-daemon` provides it) or find the address in the router's client list.
 
-If the network or the password is wrong, the Pi puts the previous settings back; in setup mode it starts its setup network again and the page says why it failed.
+If the network or the password is wrong, the Pi puts the previous settings back; in setup mode it starts its setup network again and the web interface says why it failed.
 Good to know:
 
-- **The password of the setup network.** It is `exxpianosetup` unless you set another one, and it is the same for every device (only the network name is unique: it ends with the installation ID). Set your own with `WIFI_AP_PASSWORD=...` in `/etc/exxpiano.conf` (8 to 63 ordinary characters; an unusable value is replaced by the default and logged), or for a whole image with `--ap-password` / `SD_AP_PASSWORD` when it is built (see `docs/BUILD-IMAGE.md`). The Wi-Fi page shows the current name and password with the QR code that joins it, so a sticker printed from the page is always right.
+- **The password of the setup network.** It is `exxpianosetup` unless you set another one, and it is the same for every device (only the network name is unique: it ends with the installation ID). Set your own with `WIFI_AP_PASSWORD=...` in `/etc/exxpiano.conf` (8 to 63 ordinary characters; an unusable value is replaced by the default and logged), or for a whole image with `--ap-password` / `SD_AP_PASSWORD` when it is built (see `docs/BUILD-IMAGE.md`). The Wi-Fi section shows the current name and password with the QR code that joins it, so a sticker printed from the web interface is always right.
 - The Pi waits before starting its network: 10 s if it has no saved network, **150 s** if it has some (after a power cut it boots faster than the router).
   With saved networks, an unused setup network is left every 2 minutes to look for them again; a phone connected to it is never thrown out.
 - Plugging in an Ethernet cable closes the setup network. Change the name, the password and the times with `WIFI_AP_SSID`, `WIFI_AP_PASSWORD`, `WIFI_GRACE_*`
   in `/etc/exxpiano.conf`; `WIFI_SETUP=0` turns the feature off. **Change the default password before you give a device to somebody**: it protects the
   Wi-Fi password typed during the setup.
 - The password of the home network is turned into a key before it is saved (as `wpa_passphrase` does) and is never logged.
-- This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the Wi-Fi page says so; use `sudo nmtui` there.
-- **QR codes.** The Wi-Fi page shows a code for the unique setup network, one for the setup page, and one for the current page, with a **Print** button and **Download PNG / SVG** links for each (file names contain the installation ID). **The codes exist only there**: the ID is created at the first start, so the image build makes no QR codes or stickers; take them from the page of the device they belong to and print a sticker. The join code works whenever the setup network is on, so a sticker printed in advance stays valid. The built-in `pi/qrlib.py` creates them without internet or extra packages.
+- This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the Wi-Fi section says so; use `sudo nmtui` there.
+- **QR codes.** The Wi-Fi section shows a code for the unique setup network, one for the web interface in the setup network, and one for the current address, with a **Print** button and **Download PNG / SVG** links for each (file names contain the installation ID). **The codes exist only there**: the ID is created at the first start, so the image build makes no QR codes or stickers; take them from the web interface of the device they belong to and print a sticker. The join code works whenever the setup network is on, so a sticker printed in advance stays valid. The built-in `pi/qrlib.py` creates them without internet or extra packages.
 - The setup network starts **10 s** after the Pi finds itself without a network (immediately after you remove the last saved network and no cable is plugged
-  in). The **Start the setup network for 5 minutes** button on the Wi-Fi page does it by hand and the Pi comes back to its network by itself. The only network in use
+  in). The **Start the setup network for 5 minutes** button in the Wi-Fi section does it by hand and the Pi comes back to its network by itself. The only network in use
   cannot be forgotten while it is the only way to reach the Pi (no cable, no other saved network).
 - Test without risk: `sudo python3 /opt/exxpiano/exxpiano-wifi.py ap-test 120` starts the setup network for 2 minutes and then returns to the normal one by itself.
   (An SSH session over Wi-Fi is cut for that time.)
