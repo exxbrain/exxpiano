@@ -105,9 +105,12 @@ configure_offline_product_boot() {   # mounted root, the boot partition's mount 
   set_kv "$dt" CONFIG_CHECK_APT_UPDATES 0
 
   # Let DietPi apply first-boot hardware/password settings, then skip its online update/install workflow.
-  install -d "$root/usr/local/sbin" "$root/etc/systemd/system/dietpi-firstboot.service.d" "$root/var/lib/dietpi/postboot.d"
+  install -d "$root/usr/local/sbin" "$root/etc/systemd/system/dietpi-firstboot.service.d" "$root/etc/systemd/system/getty@tty1.service.d" "$root/var/lib/dietpi/postboot.d"
   install -m 755 "$HERE/../dietpi/exxpiano-dietpi-preinstalled.sh" "$root/usr/local/sbin/exxpiano-dietpi-preinstalled"
   install -m 644 "$HERE/../dietpi/dietpi-firstboot-exxpiano.conf" "$root/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf"
+  # the HDMI console shows a status screen: no login prompt that asks for a password on a device nobody logs in to
+  install -m 755 "$HERE/../dietpi/exxpiano-console.sh" "$root/usr/local/sbin/exxpiano-console"
+  install -m 644 "$HERE/../dietpi/getty-tty1-exxpiano.conf" "$root/etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf"
   install -m 755 "$HERE/../dietpi/Automation_Custom_Script.image.sh" "$root/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot"
 }
 
@@ -203,6 +206,7 @@ check "the host name is set" "[ \"\$(cat '$MNT/etc/hostname')\" = '$HOSTNAME_NEW
 check "dietpi.txt: automated, host name, offline boot owned by exxpiano" "grep -qx 'AUTO_SETUP_AUTOMATED=1' '$DT' && grep -qx 'AUTO_SETUP_NET_HOSTNAME=$HOSTNAME_NEW' '$DT' && grep -qx 'AUTO_SETUP_NET_WIFI_ENABLED=0' '$DT' && grep -qx 'AUTO_SETUP_BOOT_WAIT_FOR_NETWORK=0' '$DT' && grep -qx 'CONFIG_CHECK_DIETPI_UPDATES=0' '$DT' && grep -qx 'CONFIG_CHECK_APT_UPDATES=0' '$DT'"
 check "the first-start script is on the boot partition" "[ -x '$MNT$BOOTDIR/Automation_Custom_Script.sh' ]"
 check "the pre-installed DietPi handoff is configured" "[ -x '$MNT/usr/local/sbin/exxpiano-dietpi-preinstalled' ] && grep -qx 'ExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled' '$MNT/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf' && [ -x '$MNT/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot' ]"
+check "the console shows a status screen, not a login prompt" "[ -x '$MNT/usr/local/sbin/exxpiano-console' ] && grep -qx 'ExecStart=/usr/local/sbin/exxpiano-console' '$MNT/etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf' && [ ! -e '$MNT/etc/systemd/system/getty@tty1.service.d/dietpi-autologin.conf' ]"
 check "no leftovers (resolver copy, package copy, policy)" "[ ! -e '$MNT/tmp/exxpiano.deb' ] && [ ! -e '$MNT/usr/sbin/policy-rc.d' ]"
 [ "$fail" = 0 ] || die "the checks above failed: the image is not written"
 

@@ -81,11 +81,14 @@ class DeployTests(unittest.TestCase):
         with open(self.copy_id_log) as f:
             self.assertEqual(len(f.read().strip().split('\n')), 1)
 
-    def test_when_the_key_cannot_be_installed_nothing_is_deployed(self):
+    def test_when_the_key_cannot_be_installed_it_falls_back_to_the_password_login(self):
         r = self.run_deploy('192.168.1.95', FAKE_KEY='0', FAKE_COPY_ID_FAILS='1')
-        self.assertEqual(r.returncode, 1)
-        self.assertIn('Could not install the key', r.stderr)
-        self.assertFalse(os.path.exists(self.stdin_file))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('logging in with the password instead', r.stderr)
+        args = self.ssh_args()
+        self.assertNotIn('BatchMode=yes', args)                                   # plain ssh: the password is asked once
+        self.assertIn('upgrade-on-pi.sh', args[args.index('root@192.168.1.95') + 1])
+        self.assertEqual(self.sent_files(), sorted(['exxpiano_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
 
     def test_no_host_prints_usage(self):
         r = self.run_deploy()

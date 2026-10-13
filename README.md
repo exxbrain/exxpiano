@@ -92,6 +92,8 @@ it is not used here because it has no mechanics presets and no layer reduction.
 The whole file is read into RAM, and a Pi 3 has 1 GB. I did not measure the free memory after loading `standard`
 precisely; check yourself (`free -m`, the `available` column). If the Pi runs out of memory or CPU, use `lite` or `small`.
 
+**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the control page, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH (user `root`, DietPi's password).
+
 ## SD card image for new devices
 
 This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and both required banks. At first boot every installed copy creates a
@@ -123,6 +125,8 @@ its partitions, which only an image carries. Switch the Pi on without preparing 
   has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
   test changes to the builder without a Pi.
 
+**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the control page, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH (user `root`, DietPi's password).
+
 ## Upgrading a running Pi
 
 ```bash
@@ -133,7 +137,7 @@ It builds the package, sends it to the Pi and upgrades it there: it keeps `/etc/
 the synthesizer and the bridge come back, and rolls back by itself if they do not (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`).
 The sound banks are not touched.
 
-**No passwords during an upgrade.** The script logs in with your SSH key and never asks for a password or a host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs it with `ssh-copy-id`: the password is asked **that one time**, never again. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
+**No passwords during an upgrade.** The script logs in with your SSH key and never asks for a password or a host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs it with `ssh-copy-id`: the password is asked **that one time**, never again. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). If the key cannot be installed, the script falls back to a plain password login (asked once) rather than stopping: nothing is ever asked on the device itself, which has no monitor. DietPi's password is `dietpi` unless the image was built with `--password`. A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
 
 ## Where things live
 

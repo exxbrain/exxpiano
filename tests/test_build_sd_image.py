@@ -321,6 +321,46 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn('build-sd-image.py --download', workflow)
 
 
+class ConsoleScreenTests(unittest.TestCase):
+    """The HDMI console shows a status screen: nothing is asked there, and no password or login prompt appears."""
+
+    def screen(self, ids=None, ips='192.168.1.95'):
+        with tempfile.TemporaryDirectory() as d:
+            id_path = os.path.join(d, 'installation-id')
+            if ids:
+                with open(id_path, 'w') as f:
+                    f.write(ids + '\n')
+            env = dict(os.environ, EXXPIANO_CONSOLE_ONCE='1', EXXPIANO_INSTALLATION_ID_PATH=id_path, EXXPIANO_IPS=ips)
+            r = subprocess.run(['bash', os.path.join(ROOT, 'dietpi', 'exxpiano-console.sh')], capture_output=True, text=True, env=env, timeout=10)
+        self.assertEqual((r.returncode, r.stderr), (0, ''))
+        return r.stdout
+
+    def test_it_shows_the_id_the_addresses_and_that_nothing_is_asked(self):
+        out = self.screen('0123456789ABCDEF', '192.168.1.95 fe80::1')
+        for needle in ('0123456789ABCDEF', 'http://192.168.1.95:8080/', 'http://fe80::1:8080/', '.local:8080/', 'no login on this screen', 'ssh root@'):
+            self.assertIn(needle, out)
+        self.assertNotIn('login:', out.lower())
+        self.assertNotIn('password', out.lower())                       # no prompt, and no secret on a screen anybody can see
+
+    def test_without_a_network_it_names_the_setup_wifi_of_this_installation(self):
+        out = self.screen('0123456789ABCDEF', '')
+        self.assertIn('exxpiano-Setup-0123456789ABCDEF', out)
+        self.assertIn('http://10.42.0.1:8080/', out)
+        self.assertNotIn('http://:8080', out)
+
+    def test_before_the_id_exists_it_says_so(self):
+        self.assertIn('is being created', self.screen(None, ''))
+
+    def test_the_unit_replaces_the_login_prompt_and_nothing_re_enables_autologin(self):
+        with open(os.path.join(ROOT, 'dietpi', 'getty-tty1-exxpiano.conf')) as f:
+            unit = f.read()
+        self.assertIn('ExecStart=\nExecStart=/usr/local/sbin/exxpiano-console', unit)       # the empty line clears the agetty of getty@.service
+        active = [l for l in unit.splitlines() if l.strip() and not l.lstrip().startswith('#')]            # the comment may mention agetty
+        self.assertFalse([l for l in active if 'agetty' in l or 'autologin' in l.lower()])
+        with open(os.path.join(ROOT, 'dietpi', 'exxpiano-dietpi-preinstalled.sh')) as f:
+            self.assertIn('dietpi-autologin.conf', f.read())                                   # the autologin DietPi creates for its online setup is removed
+
+
 class ConfQuotingTests(unittest.TestCase):
     def test_a_tricky_password_comes_back_unchanged_through_the_programs_parser(self):
         sys.path.insert(0, os.path.join(ROOT, 'pi'))
@@ -372,6 +412,9 @@ class ShellScriptTests(unittest.TestCase):
                 self.assertIn('ExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled', f.read())
             self.assertTrue(os.access(os.path.join(root, 'usr/local/sbin/exxpiano-dietpi-preinstalled'), os.X_OK))
             self.assertTrue(os.access(os.path.join(root, 'var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot'), os.X_OK))
+            self.assertTrue(os.access(os.path.join(root, 'usr/local/sbin/exxpiano-console'), os.X_OK))
+            with open(os.path.join(root, 'etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf')) as f:
+                self.assertIn('ExecStart=/usr/local/sbin/exxpiano-console', f.read())
 
     def test_the_offline_chroot_gets_the_runtime_tmpfs_permissions(self):
         with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:
@@ -407,7 +450,7 @@ class ShellScriptTests(unittest.TestCase):
         for name in ('sd-image-inner.sh', 'sd-fake-dietpi.sh', 'sd-smoke-test.sh'):
             r = subprocess.run(['bash', '-n', os.path.join(ROOT, 'scripts', name)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, name + r.stderr)
-        for name in ('Automation_Custom_Script.image.sh', 'exxpiano-dietpi-preinstalled.sh'):
+        for name in ('Automation_Custom_Script.image.sh', 'exxpiano-dietpi-preinstalled.sh', 'exxpiano-console.sh'):
             r = subprocess.run(['bash', '-n', os.path.join(ROOT, 'dietpi', name)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, name + r.stderr)
         # set_kv is copied out of the script and tried on a file (awk is on every machine)
@@ -467,6 +510,8 @@ class ShellScriptTests(unittest.TestCase):
                 os.path.join(root, 'etc', 'systemd', 'system', 'dietpi-firstboot.service.d', 'exxpiano-preinstalled.conf'):
                     '[Service]\nExecStartPost=/usr/local/sbin/exxpiano-dietpi-preinstalled\n',
                 os.path.join(root, 'var', 'lib', 'dietpi', 'postboot.d', '10-exxpiano-image-firstboot'): '#!/bin/sh\n',
+                os.path.join(root, 'usr', 'local', 'sbin', 'exxpiano-console'): '#!/bin/sh\n',
+                os.path.join(root, 'etc', 'systemd', 'system', 'getty@tty1.service.d', 'exxpiano-console.conf'): '[Service]\nExecStart=\nExecStart=/usr/local/sbin/exxpiano-console\n',
                 os.path.join(root, 'opt', 'exxpiano', 'exxpiano-web.py'): '#!/usr/bin/python3\n',
                 os.path.join(root, 'opt', 'exxpiano', 'exxpiano-wifi.py'): '#!/usr/bin/python3\n',
                 os.path.join(root, 'lib', 'systemd', 'system', 'exxpiano.service'): '[Service]\n',
@@ -479,7 +524,7 @@ class ShellScriptTests(unittest.TestCase):
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, 'w') as f:
                     f.write(content)
-                if path.endswith(('.sh', '.py', 'exxpiano-dietpi-preinstalled', '10-exxpiano-image-firstboot')):
+                if path.endswith(('.sh', '.py', 'exxpiano-dietpi-preinstalled', '10-exxpiano-image-firstboot', 'exxpiano-console')):
                     os.chmod(path, 0o755)
             return root, boot, files
 
@@ -502,6 +547,7 @@ class ShellScriptTests(unittest.TestCase):
                     'root/usr/local/sbin/exxpiano-dietpi-preinstalled',
                     'root/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf',
                     'root/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot',
+                    'root/usr/local/sbin/exxpiano-console', 'root/etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf',
                     'root/opt/exxpiano/exxpiano-web.py', 'root/lib/systemd/system/exxpiano.service',
                     'root/opt/exxpiano/soundfonts/piano.sf2', 'root/opt/exxpiano/soundfonts/mech.sf2',
                     'root/etc/exxpiano.conf'):
