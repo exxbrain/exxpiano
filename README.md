@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-**Purpose:** a good piano sound on a cheap board with the least effort. Write an image to a card, power the board on, set it up from a phone: no installation, no screen on the board. By the author's estimate the whole thing takes about 5 minutes (one person, one board, not a timed benchmark).
+**Purpose:** a good piano sound on a cheap board with the least effort. Write an image to a card, power the board on, set it up from a phone: no installation, no screen on the board. By the author's estimate it takes about 5 minutes from writing the card to the first sound (one person, one board, not a timed benchmark).
 
 A digital piano appliance for Raspberry Pi 2/3/4 ARMv8: **Salamander Grand Piano V3** (Yamaha C5) through FluidSynth, plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
