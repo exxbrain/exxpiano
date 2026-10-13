@@ -2,6 +2,10 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.13
+
+- **Import of banks from a USB drive:** put `.sf2` / `.sf3` files into the folder `piano-banks/` of a FAT32, exFAT or ext4 drive, plug it in and press **Import** in the **Piano bank** section; the bank is copied into the device's own library and stays after the drive is taken out. The drive is mounted read only, the copy is transactional (a drive pulled out or a full card leaves no half-copied bank), and the bank in use cannot be deleted. **Not tried on a real Raspberry Pi yet:** mounting the drives, the udev rule, pulling a drive out during the copy, and the load of a big copy on playing and power.
+
 ## 1.10.12
 
 - **Wi-Fi scan:** when `iw` cannot scan, the list is now also asked from `wpa_supplicant` (`wpa_cli`), and when the list stays empty the Wi-Fi section says why (radio busy, Wi-Fi blocked by rfkill, no adapter, no `iw`).
