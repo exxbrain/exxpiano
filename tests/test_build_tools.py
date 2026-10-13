@@ -93,6 +93,18 @@ class BuilderPackageTests(unittest.TestCase):
                         self.assertEqual(sample_rate, 44100, sample_name)
                         self.assertLessEqual(abs(length - expected), 4, (name, sample_name, length))
                 self.assertEqual({x[3] for x in p}, {21, 24})   # root keys survive the conversion
+                with open(piano, 'rb') as f:
+                    self.assertNotIn(struct.pack('<HHhHH', 0x0102, 8, -2400, 0, 0), f.read())    # the filter by velocity is off unless asked for
+
+    def test_velocity_filter_makes_soft_notes_darker(self):
+        name, folder, sep, ext, codec, rate = self.CASES[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_set(tmp, folder, sep, ext, codec, rate)
+            piano = os.path.join(tmp, 'p.sf2')
+            subprocess.run([sys.executable, '-I', os.path.join(ROOT, 'tools', 'build_piano_sf2.py'), tmp, piano,
+                            '--layers', '2', '--tail', '8', '--velfilter', '2400'], check=True, capture_output=True)
+            with open(piano, 'rb') as f:
+                self.assertIn(struct.pack('<HHhHH', 0x0102, 8, -2400, 0, 0), f.read())
 
 
 if __name__ == '__main__':

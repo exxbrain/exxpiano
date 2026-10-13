@@ -88,6 +88,7 @@ it is not used here because it has no mechanics presets and no layer reduction.
 | `soft` | ~390 MB | same, but soft notes are noticeably quieter (wider dynamics) | 1.0 | no, only on the Mac |
 | `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
 | `small` | ~135 MB | 6 layers, **mono**, 10 s tails | 2.0 | no, only on the Mac |
+| `mini` | ~110 MB | 3 layers (soft, medium, loud), stereo, 8 s tails; the same recording serves a wide range of loudness: it is played quieter by velocity and, for soft notes, with a low-pass filter (darker). The idea is to save memory without the harshness of a plain quiet loud note | 1.0 | no: built, but **not heard** on any device; judge the sound yourself |
 
 The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `standard` does not fit there:
 on a real Pi 3 A+ the kernel killed FluidSynth at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
