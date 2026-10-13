@@ -37,8 +37,8 @@ unset SD_PASSWORD SD_AP_PASSWORD
 `--dry-run` validates inputs and prints the plan. The full run writes to `dist/sd/`:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` — the flashable image;
-- `manifest.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
-- `README.txt` — brief instructions for that release.
+- `manifest-<variant>.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
+- `README-<variant>.txt` — brief instructions for that release.
 
 The product version comes from `VERSION`; the DietPi version comes from `dietpi/.version` in the base image. A release is rejected when that version cannot be read, either required bank is absent, or the smoke check fails.
 
@@ -49,8 +49,8 @@ The product version comes from `VERSION`; the DietPi version comes from `dietpi/
 Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the standard, full and lite banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
-- `manifest.json`;
-- `README.txt`;
+- `manifest-standard.json`, `manifest-full.json`;
+- `README-standard.txt`, `README-full.txt`;
 - `SHA256SUMS`.
 
 The release title names exxpiano, its version, and the supported Raspberry Pi family. Its English description explains the image contents, flashing and first boot, checksum verification, and why an already-booted card must not be cloned.

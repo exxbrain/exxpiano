@@ -20,6 +20,6 @@ On first boot, each installed card automatically creates its own persistent ID.
 
 ## Download verification
 
-`SHA256SUMS` contains checksums for the image, manifest, and instructions. `manifest.json` records the exact product and DietPi versions, included banks, and source-image hash.
+`SHA256SUMS` contains checksums for the image, manifest, and instructions. `manifest-standard.json` and `manifest-full.json` record the exact product and DietPi versions, included banks, and source-image hash.
 
 > The same original ZIP can be flashed to multiple clean cards. Do not clone a card after its first boot: doing so would also copy its installation ID.
