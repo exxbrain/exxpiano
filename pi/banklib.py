@@ -4,7 +4,9 @@ A bank is identified by its plain file name inside the library folder. The web i
 it only if the folder itself lists it, so a path can never be smuggled in (no `..`, no absolute paths, no symlinks).
 """
 import os
+import json
 import re
+import shutil
 import stat
 
 import sf2info
@@ -12,6 +14,8 @@ import sf2info
 BANK_EXT = ('.sf2', '.sf3')
 NAME_RE = re.compile(r'^[^/\\\x00-\x1f][^/\\\x00-\x1f]{0,119}$')      # a plain file name
 DEFAULT_DIR = '/var/lib/exxpiano/banks'
+IMPORT_DIR = '/var/lib/exxpiano/banks'      # banks imported from a USB drive: one folder <id>/ with bank.sf2 and meta.json each
+IMPORT_ID_RE = re.compile(r'^i-[0-9a-f]{16}$')
 RESERVE_MB = 200                  # RAM kept for the system and the rest of the module on a board with 1 GB (the Pi 3 B has about 950 MB); the system itself took about 85 MB on a 512 MB board. Lowered from 400 for the 700 MB bank; not measured on a 1 GB board
 SMALL_BOARD_MB = 800              # below this (a Pi 3 A+ has 512 MB, about 414 usable) the system needs less than 400 MB: it used about 85 MB there
 SMALL_BOARD_RESERVE = 0.28        # share of the memory kept on such a board
@@ -159,3 +163,72 @@ if __name__ == '__main__':       # used by exxpiano-run:  banklib.py PIANO MECH 
         found = fitting_replacement(sys.argv[1], sys.argv[2], sys.argv[3], mem_total_bytes(meminfo) if meminfo else None)
         if found:
             print(found)
+
+
+# ---- imported banks (the managed library next to the installed ones)
+def _import_entry(import_dir, bank_id):
+    """(path, meta) of a complete imported bank, or (None, None) when anything is missing or does not agree."""
+    if not isinstance(bank_id, str) or not IMPORT_ID_RE.match(bank_id):
+        return None, None
+    folder = os.path.join(import_dir, bank_id)
+    try:
+        if os.path.islink(folder) or not os.path.isdir(folder):
+            return None, None
+        with open(os.path.join(folder, 'meta.json'), encoding='utf-8') as f:
+            meta = json.load(f)
+        name = meta.get('file')
+        if meta.get('id') != bank_id or name not in ('bank.sf2', 'bank.sf3'):
+            return None, None
+        path = os.path.join(folder, name)
+        st = os.lstat(path)
+        if not stat.S_ISREG(st.st_mode) or st.st_size != meta.get('size'):
+            return None, None
+        return path, meta
+    except (OSError, ValueError, AttributeError):
+        return None, None
+
+
+def list_imports(import_dir, mem_total=None, mech_bytes=0, reserve_mb=None):
+    """Imported banks in the same shape as list_banks, with source='imported' and the name the user saw on the drive."""
+    try:
+        names = sorted(os.listdir(import_dir))
+    except OSError:
+        return []
+    limit = size_limit(mem_total, mech_bytes, reserve_mb)
+    out = []
+    for name in names:
+        path, meta = _import_entry(import_dir, name)
+        if not path:
+            continue
+        info, error = inspect(path)
+        size = meta['size']
+        fits = limit is None or size <= limit
+        reason = error
+        if reason is None and not fits:
+            reason = 'too large for this device: %d MB, at most %d MB fit in memory' % (size >> 20, limit >> 20)
+        out.append(dict(id=name, size=size, name=(info or {}).get('name') or meta.get('name') or name, original_name=meta.get('original_name'),
+                        presets=len((info or {}).get('presets', [])), ok=error is None, fits=fits, reason=reason, source='imported'))
+    return out
+
+
+def resolve_any(bank_dir, import_dir, bank_id):
+    """The path of an installed bank (a plain file name) or of an imported one (i-<16 hex>); ValueError otherwise."""
+    if isinstance(bank_id, str) and IMPORT_ID_RE.match(bank_id):
+        path, _ = _import_entry(import_dir, bank_id)
+        if not path:
+            raise ValueError('no such bank in the library')
+        return path
+    return resolve(bank_dir, bank_id)
+
+
+def delete_import(import_dir, bank_id, keep_paths=()):
+    """Remove an imported bank unless it is one of `keep_paths` (the current and the last good bank). ValueError with a reason otherwise."""
+    path, _ = _import_entry(import_dir, bank_id)
+    if not path:
+        raise ValueError('no such imported bank')
+    if any(_same(path, k) for k in keep_paths if k):
+        raise ValueError('this bank is in use: choose another working bank first')
+    folder = os.path.join(import_dir, bank_id)
+    gone = os.path.join(import_dir, '.deleting-' + bank_id)
+    os.rename(folder, gone)                                   # out of the catalog first, then the files
+    shutil.rmtree(gone, ignore_errors=True)

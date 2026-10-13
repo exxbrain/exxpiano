@@ -6,6 +6,8 @@
   POST /api/settings       {"velocity_curve": 0.8, ...}  - validated, stored in /etc/exxpiano.conf, applied
   POST /api/restart        restart exxpiano (needed after changing audio output / buffer / reverb / polyphony)
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
+  GET  /api/usb            the USB drive (label, state, the SoundFont files of piano-banks/) and the state of the import
+  POST /api/usb            {"action": "import", "name": "<file listed on the drive>"} | {"action": "delete", "id": "i-<16 hex>"}  - copy a bank from the drive / remove an imported one
   GET  /api/wifi           Wi-Fi: link, saved networks, scan results, access point (the setup mode), result of the last change
   POST /api/device         {"name": "piano-kitchen"}  - rename the device (its network name, http://<name>.local:8080/); useful with several devices
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
@@ -29,12 +31,14 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
+import bankimport
 import banklib
 import exxpianoconf
 import profiles
 import base64
 import qrlib
 import sysmon
+import usblib
 import wifilib
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
@@ -402,6 +406,53 @@ class Switcher:
                                            else 'the previous bank could not be restored either, check the device'))
 
 
+class ImportJob:
+    """One import at a time, in a thread; the browser polls `snapshot()`. The states: idle, copying, verifying, done, failed."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._state = dict(state='idle', done=0, total=0, error=None, bank_id=None, name=None, op=0, already=False)
+
+    def snapshot(self):
+        with self._lock:
+            return dict(self._state)
+
+    def busy(self):
+        with self._lock:
+            return self._state['state'] in ('copying', 'verifying')
+
+    def start(self, name, work):
+        """`work(progress)` returns (bank id, already there) or raises bankimport.ImportFailed. Busy when one is running."""
+        with self._lock:
+            if self._state['state'] in ('copying', 'verifying'):
+                raise Busy()
+            op = self._state['op'] + 1
+            self._state = dict(state='copying', done=0, total=0, error=None, bank_id=None, name=name, op=op, already=False)
+
+        def progress(done, total, phase):
+            with self._lock:
+                if self._state['op'] == op:
+                    self._state.update(state=phase if phase in ('copying', 'verifying') else self._state['state'], done=max(self._state['done'], done), total=total)
+
+        def run():
+            try:
+                bank_id, already = work(progress)
+                result = dict(state='done', bank_id=bank_id, already=already, error=None)
+            except bankimport.ImportFailed as exc:
+                result = dict(state='failed', error=str(exc))
+            except Exception as exc:                          # noqa: BLE001 - the user gets a safe sentence, the journal gets the cause
+                print('bank import failed:', exc, file=sys.stderr)
+                result = dict(state='failed', error='the import failed')
+            with self._lock:
+                if self._state['op'] == op:
+                    self._state.update(result)
+                    if result['state'] == 'done':
+                        self._state['done'] = self._state['total']
+
+        threading.Thread(target=run, daemon=True).start()
+        return op
+
+
 class App:
     def __init__(self, conf_path=None, actions=None):
         self.conf_path = conf_path or exxpianoconf.CONF_PATH
@@ -411,6 +462,10 @@ class App:
         self.profile_path = conf.get('PROFILE_FILE') or profiles.DEFAULT_PATH
         self.devices_path = conf.get('DEVICE_PROFILE_FILE') or os.path.join(os.path.dirname(self.profile_path), 'devices.json')
         self.switcher = Switcher(self)
+        self.import_dir = conf.get('IMPORT_DIR') or banklib.IMPORT_DIR
+        self.usb_status_path = conf.get('USB_STATUS') or usblib.STATUS_FILE
+        self.importer = ImportJob()
+        bankimport.stale_cleanup(self.import_dir)
 
     def spec(self):
         return {n: {k: v for k, v in s.items() if k in ('kind', 'lo', 'hi', 'default', 'scope')}
@@ -560,9 +615,12 @@ class App:
     def banks_state(self):
         bank_dir, current, mech, mech_bytes = self._bank_context()
         banks = banklib.list_banks(bank_dir, exclude=[mech], mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
+        for b in banks:
+            b['source'] = 'installed'
+        banks += banklib.list_imports(self.import_dir, mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
         current_id = None
         for b in banks:
-            if current and banklib._same(os.path.join(bank_dir, b['id']), current):
+            if current and banklib._same(self._bank_path(bank_dir, b['id']), current):
                 current_id = b['id']
         external = None
         if current and current_id is None:
@@ -575,9 +633,58 @@ class App:
                     presets=banklib.presets_of(current) if current else [],
                     preset=dict(bank=s['piano_bank'], program=s['piano_prog']), switch=self.switcher.status)
 
+    def _bank_path(self, bank_dir, bank_id):
+        try:
+            return banklib.resolve_any(bank_dir, self.import_dir, bank_id)
+        except (ValueError, OSError):
+            return os.path.join(bank_dir, bank_id)
+
+    # ---- USB drive: list and import, delete an imported bank
+    def usb_state(self):
+        drives = [usblib.drive_state(d) for d in usblib.read_status(self.usb_status_path)['drives']]
+        return dict(drives=drives, importing=self.importer.snapshot())
+
+    def usb_action(self, body):
+        if not isinstance(body, dict):
+            raise ValueError('expected an object')
+        action = body.get('action')
+        if action == 'import':
+            return self._usb_import(body.get('name'), body.get('drive'))
+        if action == 'delete':
+            return self._usb_delete(body.get('id'))
+        raise ValueError('unknown action')
+
+    def _usb_import(self, name, drive_id):
+        if self.switcher.busy():
+            raise Busy()
+        source = None
+        for d in usblib.read_status(self.usb_status_path)['drives']:
+            state = usblib.drive_state(d)
+            if state['ready'] and (drive_id in (None, state['id'])):
+                try:
+                    source = usblib.resolve_candidate(d['mountpoint'], name)
+                    break
+                except ValueError:
+                    continue
+        if source is None:
+            raise ValueError('that file is not on a connected drive')
+        _, _, _, mech_bytes = self._bank_context()
+        limit = banklib.size_limit(self.actions.mem_total(), mech_bytes)
+        import_dir = self.import_dir
+        self.importer.start(name, lambda progress: bankimport.import_bank(source, name, import_dir, mem_limit=limit, progress=progress))
+        return dict(started=True)
+
+    def _usb_delete(self, bank_id):
+        if self.importer.busy() or self.switcher.busy():
+            raise Busy()
+        conf = exxpianoconf.parse_conf(self.conf_path)
+        keep = [conf.get('PIANO_SF2'), conf.get('PIANO_SF2_LAST_GOOD')]
+        banklib.delete_import(self.import_dir, bank_id, keep_paths=keep)
+        return dict(deleted=True)
+
     def switch_bank(self, bank_id):
         bank_dir, current, mech, mech_bytes = self._bank_context()
-        path = banklib.resolve(bank_dir, bank_id)                          # ValueError -> 400
+        path = banklib.resolve_any(bank_dir, self.import_dir, bank_id)       # ValueError -> 400
         if current and banklib._same(path, current):
             return dict(started=False, message='This bank is already in use')
         info, error = banklib.inspect(path)
@@ -651,7 +758,7 @@ def make_handler(app):
 
         def log_request(self, code='-', size='-'):
             # the page polls the state and the monitor all the time: successful polls would only fill the journal with noise
-            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/wifi', '/api/qr', '/api/ping'):
+            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/usb', '/api/wifi', '/api/qr', '/api/ping'):
                 return
             super().log_request(code, size)
 
@@ -700,6 +807,10 @@ def make_handler(app):
                     return self._send(200, app.qr(parse_qs(url.query), self.headers.get('Host', '')))
                 except (ValueError, qrlib.QrError) as exc:
                     return self._send(400, dict(error=str(exc)))
+            if url.path == '/api/usb':
+                if not self._authorised():
+                    return self._send(401, dict(error='token required'))
+                return self._send(200, app.usb_state())
             if url.path == '/api/wifi':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
@@ -728,6 +839,8 @@ def make_handler(app):
                 if self.path == '/api/restart':
                     app.actions.restart_synth()
                     return self._send(200, dict(ok=True))
+                if self.path == '/api/usb':
+                    return self._send(200, app.usb_action(self._body()))
                 if self.path == '/api/wifi':
                     return self._send(200, app.wifi_action(self._body()))
                 if self.path == '/api/device':

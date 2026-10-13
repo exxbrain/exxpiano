@@ -46,6 +46,9 @@ install -m 755 "$HERE/exxpiano-run" "$PREFIX/exxpiano-run"
 install -m 644 "$HERE/exxpianoconf.py" "$PREFIX/exxpianoconf.py"
 install -m 755 "$HERE/sf2info.py" "$PREFIX/sf2info.py"
 install -m 644 "$HERE/banklib.py" "$PREFIX/banklib.py"
+install -m 644 "$HERE/bankimport.py" "$PREFIX/bankimport.py"
+install -m 644 "$HERE/usblib.py" "$PREFIX/usblib.py"
+install -m 755 "$HERE/exxpiano-usb.py" "$PREFIX/exxpiano-usb.py"
 install -m 644 "$HERE/profiles.py" "$PREFIX/profiles.py"
 install -m 644 "$HERE/sysmon.py" "$PREFIX/sysmon.py"
 install -m 644 "$HERE/wifilib.py" "$PREFIX/wifilib.py"
@@ -81,6 +84,7 @@ install -m 644 "$HERE/exxpiano.service" /etc/systemd/system/exxpiano.service
 install -m 644 "$HERE/exxpiano-fx.service"    /etc/systemd/system/exxpiano-fx.service
 install -m 644 "$HERE/exxpiano-web.service"   /etc/systemd/system/exxpiano-web.service
 install -m 644 "$HERE/exxpiano-wifi.service"  /etc/systemd/system/exxpiano-wifi.service
+install -m 644 "$HERE/exxpiano-usb@.service"  /etc/systemd/system/exxpiano-usb@.service
 install -m 644 "$HERE/90-exxpiano.rules" /etc/udev/rules.d/90-exxpiano.rules
 udevadm control --reload 2>/dev/null || true
 systemctl daemon-reload

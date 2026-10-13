@@ -5,7 +5,7 @@
   python3 scripts/demo-web.py --mode ap          # the device in setup mode (its own Wi-Fi), the page opens on the Wi-Fi tab
   python3 scripts/demo-web.py --installation-id 0123456789ABCDEF --open
 
-Everything works as on the device: move the sliders, change the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" in it does not connect;
+Everything works as on the device (a USB drive with two banks is "plugged in": import one on the Piano bank page): move the sliders, change the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" in it does not connect;
 "Cafe" is open), start the setup network, scan the QR codes. Nothing is written outside a temporary folder and nothing is sent anywhere.
 It runs the real code of exxpiano-web.py and the real page; only what touches the machine (systemctl, ALSA, /proc, Wi-Fi) is simulated.
 """
@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tests'))
 spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'exxpiano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
+import usblib  # noqa: E402
 from sf2fixture import make_sf2  # noqa: E402
 
 
@@ -186,10 +187,18 @@ def main():
     make_sf2(os.path.join(banks, 'mech.sf2'), presets=[('Hammer', 0, 1)], name='Mechanics', sample_bytes=2000)
     make_sf2(os.path.join(banks, 'Salamander Grand.sf2'), presets=[('Grand Piano', 0, 0), ('Bright', 0, 5), ('Felt', 3, 0)], name='Salamander Grand Piano', sample_bytes=900000)
     make_sf2(os.path.join(banks, 'Upright.sf2'), presets=[('Upright', 0, 0)], name='Upright piano', sample_bytes=300000)
+    # a simulated USB drive with two banks in piano-banks/ (the import works for real: it copies into a temporary library)
+    drive = os.path.join(tmp, 'usb-drive')
+    os.makedirs(os.path.join(drive, 'piano-banks'))
+    make_sf2(os.path.join(drive, 'piano-banks', 'Kawai Grand.sf2'), presets=[('Kawai Grand', 0, 0)], name='Kawai Grand', sample_bytes=600000)
+    make_sf2(os.path.join(drive, 'piano-banks', 'Electric Piano.sf2'), presets=[('Electric', 0, 4)], name='Electric Piano', sample_bytes=250000)
+    usb_status = os.path.join(tmp, 'usb-status.json')
+    usblib._write_json(usb_status, dict(drives=[dict(id='/dev/sda1', label='PIANO-BANKS', fs='vfat', mounted=True, mountpoint=drive, reason=None)]))
     conf = os.path.join(tmp, 'exxpiano.conf')
     lines = ['PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'), 'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'), 'BANK_DIR=%s' % banks, 'ALSA_DEVICE=auto',
              'GAIN=1.0', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--hammer-boost 0 --hammer-exp 0.8 --random 1"',
-             'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'WEB_PORT=%d' % args.port]
+             'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'WEB_PORT=%d' % args.port,
+             'IMPORT_DIR=%s' % os.path.join(tmp, 'library'), 'USB_STATUS=%s' % usb_status]
     if args.token:
         lines.append('WEB_TOKEN=%s' % args.token)
     with open(conf, 'w') as f:

@@ -41,7 +41,7 @@ chroot "$W/mnt" dpkg -s exxpiano 2>/dev/null | grep -q '^Status: install ok inst
 cp /etc/resolv.conf "$W/resolv" 2>/dev/null || true
 chroot "$W/mnt" python3 -c "
 import sys; sys.path.insert(0, '/opt/exxpiano')
-import wifilib, qrlib, exxpianoconf, banklib, profiles, sysmon
+import wifilib, qrlib, exxpianoconf, banklib, bankimport, usblib, profiles, sysmon
 print('modules import: ok')
 " && ok "the Python modules import in the image" || bad "the Python modules do not import"
 # the web service from the image (read only: no configuration file, so its defaults and port 8080; the builder has no curl: Python asks)

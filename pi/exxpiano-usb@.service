@@ -1,0 +1,10 @@
+[Unit]
+Description=exxpiano: USB drive %I (read only)
+BindsTo=dev-%i.device
+After=dev-%i.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /opt/exxpiano/exxpiano-usb.py add /dev/%I
+ExecStop=/usr/bin/python3 /opt/exxpiano/exxpiano-usb.py remove /dev/%I

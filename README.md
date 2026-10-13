@@ -252,6 +252,14 @@ for every bank. If a switch fails, the old bank and its settings are restored.
 
 To add a bank, copy a `.sf2` into `BANK_DIR` (for example `scp -O my.sf2 root@<Pi>:/opt/exxpiano/soundfonts/`).
 
+### Importing banks from a USB drive
+
+You do not need SSH to add a bank. Put SoundFont files (`.sf2`, `.sf3`) into the folder `piano-banks/` in the root of a USB drive (FAT32, exFAT or ext4), plug the drive into the Pi and open the **Piano bank** section of the web interface: the card **Banks from a USB drive** lists the files. **Import** copies the chosen file into the device's own library (`/var/lib/exxpiano/banks/`); the copy starts only when you press the button, never by itself. The drive is not needed afterwards: the imported bank stays after unplugging and rebooting, shows up in the list marked "imported" and can be removed with **Delete** (the bank in use and the last working bank cannot be deleted).
+
+How it is kept safe: the drive is mounted read only (`ro,nosuid,nodev,noexec`) and its files are never executed; only plain files of `piano-banks/` are offered (no links, no sub-folders, no hidden files, no `mech.sf2`); the browser never sends a path, only the name of a file the drive has just listed; the copy goes to a temporary folder, is checked (the SoundFont, the size against the memory of the board, the free space) and only then published in one step, so a drive pulled out in the middle or a full card leaves no half-copied bank. One import runs at a time.
+
+**What is tested and what is not.** The logic (listing, safety of names, the transaction, errors, the API, the interface in the demo `scripts/demo-web.py`) is covered by automatic tests. **Not tried on a real Raspberry Pi:** mounting FAT32, exFAT and ext4 drives, the udev rule (`90-exxpiano.rules`) and the unit `exxpiano-usb@.service`, pulling a drive out during the copy, and what a 400 MB copy does to playing and to the power supply (watch the Monitor section; use a powered hub if it shows under-voltage). Do not play while a big bank is being copied. If a drive is not offered, look at `journalctl -u 'exxpiano-usb@*'` and check that the file system is one of the three. NTFS is not supported. `bank.json` (author and licence of a bank) is not read yet.
+
 ## Look at the web interface without a Raspberry Pi
 
 ```bash

@@ -38,6 +38,16 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 - Latency: `PERIODS=2` on the onboard output, or better a USB sound card.
 - Load: `htop` (if the `fluidsynth` thread sits at 100%, use `lite`, lower `POLYPHONY`, keep `REVERB=0`).
 
+## A USB drive is not offered for the bank import
+
+| Symptom | Cause and fix |
+|---|---|
+| The card "Banks from a USB drive" says no drive is connected | The drive was not mounted: look at `journalctl -u 'exxpiano-usb@*' -b` and `lsblk -f`. The file system must be FAT32, exFAT or ext4 (not NTFS); the Pi must be able to power the drive (a powered hub helps) |
+| The drive is listed but "no folder piano-banks" | The folder must be in the root of the drive and named exactly `piano-banks` |
+| The folder is empty | Only plain `.sf2` / `.sf3` files are offered (no `mech.sf2`, no `.sfz`, no links, no hidden files or sub-folders) |
+| The import fails | The message says why: not a usable SoundFont, too large for the memory, not enough space on the card, the drive was removed |
+| The rule does not fire | Run by hand: `sudo python3 /opt/exxpiano/exxpiano-usb.py add /dev/sda1` (the partition name is in `lsblk`). The udev rule is untested on real hardware |
+
 ## Network and SSH during installation
 
 | Symptom | Fix |

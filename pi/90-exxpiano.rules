@@ -8,3 +8,7 @@
 ACTION=="add", SUBSYSTEM=="sound", KERNEL=="card*", SUBSYSTEMS=="usb", RUN+="/bin/systemctl --no-block try-restart exxpiano.service"
 # remove: sysfs is already gone, so rely on the path id stored in the udev database (e.g. platform-...usb-usb-0:1.4:1.0).
 ACTION=="remove", SUBSYSTEM=="sound", KERNEL=="card*", ENV{ID_PATH}=="*usb*", RUN+="/bin/systemctl --no-block try-restart exxpiano.service"
+
+# A USB drive with a file system (a partition, or a whole drive without a partition table): mount it read only for the bank import.
+# systemd starts exxpiano-usb@<device>.service, which unmounts it when the device disappears. UNTESTED on real hardware.
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", ENV{ID_FS_USAGE}=="filesystem", TAG+="systemd", ENV{SYSTEMD_WANTS}+="exxpiano-usb@%k.service"
