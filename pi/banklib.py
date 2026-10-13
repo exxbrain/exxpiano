@@ -12,7 +12,7 @@ import sf2info
 BANK_EXT = ('.sf2', '.sf3')
 NAME_RE = re.compile(r'^[^/\\\x00-\x1f][^/\\\x00-\x1f]{0,119}$')      # a plain file name
 DEFAULT_DIR = '/var/lib/exxpiano/banks'
-RESERVE_MB = 400                  # RAM kept for the system and the rest of the module (the Pi 3 B has about 950 MB)
+RESERVE_MB = 200                  # RAM kept for the system and the rest of the module on a board with 1 GB (the Pi 3 B has about 950 MB); the system itself took about 85 MB on a 512 MB board. Lowered from 400 for the 700 MB bank; not measured on a 1 GB board
 SMALL_BOARD_MB = 800              # below this (a Pi 3 A+ has 512 MB, about 414 usable) the system needs less than 400 MB: it used about 85 MB there
 SMALL_BOARD_RESERVE = 0.28        # share of the memory kept on such a board
 MECH_PROGRAMS = range(1, 7)       # the mechanics bank answers on bank 0, programs 1..6 (see exxpiano-fx.py: PROGRAMS)

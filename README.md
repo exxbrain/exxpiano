@@ -87,6 +87,7 @@ it is not used here because it has no mechanics presets and no layer reduction.
 | `standard` | ~390 MB | 8 velocity layers, stereo, 11 s tails | 1.0 | yes, works |
 | `soft` | ~390 MB | same, but soft notes are noticeably quieter (wider dynamics) | 1.0 | no, only on the Mac |
 | `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
+| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | no: built, not heard and not loaded on a real 1 GB board yet; watch `free -m` after loading it |
 | `small` | ~135 MB | 6 layers, **mono**, 10 s tails | 2.0 | no, only on the Mac |
 
 The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `standard` does not fit there:
