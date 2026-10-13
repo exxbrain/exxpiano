@@ -521,6 +521,28 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(dead.scan(), [])
         self.assertEqual(dead.scan_error, 'the iw program is not installed')
 
+    def test_a_scan_on_an_interface_that_is_down_brings_it_up_and_tries_again(self):
+        calls = []
+        state = {'up': False}
+
+        def run(cmd, timeout):
+            calls.append(cmd[:3])
+            if cmd[:3] == ['ip', 'link', 'set']:
+                state['up'] = True
+                return 0, ''
+            if cmd[0] == 'iw':
+                if state['up']:
+                    return 0, 'BSS aa:bb:cc:dd:ee:ff(on wlan0)\n\tsignal: -40.0 dBm\n\tSSID: Home\n\tRSN:\t * x\n'
+                return 240, 'command failed: Network is down (-100)'
+            return 1, ''
+        found, error = pw.wifilib.scan_networks(run, 'wlan0', sleep=lambda x: None)
+        self.assertEqual(([n['ssid'] for n in found], error), (['Home'], None))
+        self.assertIn(['ip', 'link', 'set'], calls)
+        stuck = lambda cmd, timeout: (240, 'command failed: Network is down (-100)') if cmd[0] == 'iw' else (1, 'RF-kill')   # noqa: E731
+        found, error = pw.wifilib.scan_networks(stuck, 'wlan0', sleep=lambda x: None)
+        self.assertIsNone(found)
+        self.assertIn('interface is down', error)
+
     def test_failure_reasons_are_short_and_readable(self):
         for rc, out, word in ((1, 'command failed: Operation not possible due to RF-kill (-132)', 'rfkill'),
                               (1, 'command failed: Device or resource busy (-16)', 'busy'),

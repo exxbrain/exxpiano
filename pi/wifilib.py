@@ -226,6 +226,8 @@ def scan_failure_reason(rc, out):
         return 'the radio is busy (connecting or scanning); try again in a moment'
     if 'not permitted' in text or 'permission' in text:
         return 'not permitted: the service must run as root'
+    if 'network is down' in text or '(-100)' in text:
+        return 'the Wi-Fi interface is down (it could not be brought up: check rfkill and the Wi-Fi country)'
     if 'no such device' in text or 'nodev' in text:
         return 'the Wi-Fi adapter was not found'
     return ('the scan failed: %s' % (out or '').strip().splitlines()[-1][:100]) if (out or '').strip() else 'the scan failed'
@@ -239,6 +241,9 @@ def scan_networks(run, iface, tries=3, pause=1.5, sleep=time.sleep):
         if rc == 0:
             return parse_scan(out), None
         reason = scan_failure_reason(rc, out)
+        if 'network is down' in (out or '').lower() or '(-100)' in (out or ''):    # the interface is down (after the setup network, say): bring it up
+            run(['ip', 'link', 'set', iface, 'up'], 10)
+            sleep(2)
         if i + 1 < tries:
             sleep(pause)
     rc, out = run(['wpa_cli', '-i', iface, 'scan'], 10)
