@@ -119,7 +119,7 @@ class DemoActions(web.Actions):
     def errors(self):
         now = int(time.time() * 1000)
         return [dict(t=now - 90000, unit='exxpiano-wifi', level='warning', text="could not connect to 'Dacha', restoring the previous settings"),
-                dict(t=now - 20000, unit='exxpiano', level='error', text='exxpiano: no sound card found')]
+                dict(t=now - 20000, unit='exxpiano', level='error', text='no sound card found: connect a USB sound card or use the 3.5 mm jack')]
 
     # ---- Wi-Fi: a small state machine that answers the requests of the page
     def _tick(self):
@@ -181,7 +181,7 @@ def main():
     ap.add_argument('--open', action='store_true', help='open the page in the browser')
     args = ap.parse_args()
 
-    tmp = tempfile.mkdtemp(prefix='piano-demo-')
+    tmp = tempfile.mkdtemp(prefix='piano-demo-', dir='/tmp' if os.path.isdir('/tmp') else None)
     banks = os.path.join(tmp, 'banks')
     os.makedirs(banks)
     make_sf2(os.path.join(banks, 'mech.sf2'), presets=[('Hammer', 0, 1)], name='Mechanics', sample_bytes=2000)

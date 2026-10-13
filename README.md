@@ -277,6 +277,17 @@ This is the web interface for controlling the instrument and monitoring the devi
 glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch and mechanics**, **Audio output**, **Monitor** and **Wi-Fi**. An address like
 `http://<device>:8080/#/wifi` opens a section directly (Back works, bookmarks work). The sections have:
 
+| Home | Piano bank (and the USB import) | Touch and mechanics |
+|---|---|---|
+| ![Home](docs/images/ui-home.png) | ![Piano bank](docs/images/ui-bank.png) | ![Touch and mechanics](docs/images/ui-sound.png) |
+
+| Monitor | Wi-Fi |
+|---|---|
+| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) |
+
+*The pictures are taken from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the USB drive are made up), at the width of a phone.*
+
+
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
