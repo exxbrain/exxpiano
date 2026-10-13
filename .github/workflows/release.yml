@@ -33,8 +33,7 @@ jobs:
 
       - name: Build the sound banks
         run: |
-          scripts/make-soundfonts.sh -p standard -o build
-          scripts/make-soundfonts.sh -p full -o build            # about 700 MB, for the second image (boards with 1 GB)
+          scripts/make-soundfonts.sh -p full -o build            # about 700 MB: the piano of the image
           scripts/make-soundfonts.sh -p lite -o build          # the same downloaded samples; the image uses it on boards with 512 MB
 
       - name: Read the pinned DietPi image metadata
@@ -52,21 +51,18 @@ jobs:
       - name: Enable ARM64 programs in the image builder
         run: docker run --privileged --rm tonistiigi/binfmt --install arm64
 
-      - name: Build and verify the standard release image
-        run: python3 scripts/build-sd-image.py --dietpi "build/cache/$DIETPI_IMAGE" --variant standard --country RU --timezone Europe/Moscow
-
-      - name: Build and verify the full release image
-        run: python3 scripts/build-sd-image.py --dietpi "build/cache/$DIETPI_IMAGE" --variant full --country RU --timezone Europe/Moscow
+      - name: Build and verify the release image
+        run: python3 scripts/build-sd-image.py --dietpi "build/cache/$DIETPI_IMAGE" --country RU --timezone Europe/Moscow
 
       - name: Write release checksums
         working-directory: dist/sd
-        run: sha256sum ./*.zip manifest-*.json README-*.txt > SHA256SUMS
+        run: sha256sum ./*.zip manifest.json README.txt > SHA256SUMS
 
       - name: Create the GitHub Release and upload the image
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          assets=(dist/sd/*.zip dist/sd/manifest-*.json dist/sd/README-*.txt dist/sd/SHA256SUMS)
+          assets=(dist/sd/*.zip dist/sd/manifest.json dist/sd/README.txt dist/sd/SHA256SUMS)
           python3 scripts/release-notes.py "$(tr -d '\n' < VERSION)" > build/release-notes.md
           title="exxpiano ${GITHUB_REF_NAME} — SD card image for Raspberry Pi 2/3/4"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then

@@ -65,12 +65,8 @@ def read_dietpi_version(path):
     return version
 
 
-def variant_suffix(plan):
-    return '-' + plan['variant'] if plan.get('variant') else ''
-
-
 def artifact_stem(plan, dietpi_version):
-    return 'exxpiano-%s-v%s-dietpi-%s%s' % (TARGET_FAMILY, plan['version'], dietpi_version, variant_suffix(plan))
+    return 'exxpiano-%s-v%s-dietpi-%s' % (TARGET_FAMILY, plan['version'], dietpi_version)
 
 
 def write_json(path, data):
@@ -122,7 +118,7 @@ def resolve_inputs(args):
     if not args.download or args.dietpi:
         if not os.path.isfile(inputs['dietpi']):
             raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
-    inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-%s.sf2' % (args.variant or 'standard')))
+    inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-full.sf2'))
     inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
     lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')      # for boards with 512 MB; optional unless asked for by name
     if args.piano_lite or os.path.isfile(lite):
@@ -207,11 +203,8 @@ def parse_args(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--dietpi', help='DietPi_RPi234-ARMv8-Trixie.img.xz (or an unpacked .img) from dietpi.com')
     ap.add_argument('--download', action='store_true', help='fetch the official DietPi image into build/cache (only when you ask for it)')
-    ap.add_argument('--piano', help='the piano bank (.sf2); default build/piano-standard.sf2, or build/piano-<VARIANT>.sf2')
+    ap.add_argument('--piano', help='the piano bank (.sf2); default build/piano-full.sf2')
     ap.add_argument('--piano-lite', help='the smaller piano bank for boards with 512 MB (.sf2); default build/piano-lite.sf2 when it exists. The image picks it at the first start when the memory is under 800 MB')
-    ap.add_argument('--variant', choices=('standard', 'full'),
-                    help='an image with this piano bank next to the smaller one: standard (about 390 MB) or full (about 700 MB, needs a board with 1 GB). '
-                         'The name of the ZIP, README and manifest get the variant; without --variant the names stay as they were')
     ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/mech.sf2')
     ap.add_argument('--password', default=os.environ.get('SD_PASSWORD', ''),
                     help="DietPi's global password (root and dietpi users); default: SD_PASSWORD; without either the DietPi default stays: change it")
@@ -237,7 +230,7 @@ def plan_image(args, inputs):
         wifilib.validate_passphrase(args.ap_password)
     version = read_version()
     banks = [os.path.basename(inputs[k]) for k in ('piano', 'piano_lite', 'mech') if k in inputs]
-    return dict(version=version, variant=args.variant or '', has_lite='piano_lite' in inputs, banks=banks, out_dir=os.path.abspath(args.out), password=args.password, ap_password=args.ap_password,
+    return dict(version=version, has_lite='piano_lite' in inputs, banks=banks, out_dir=os.path.abspath(args.out), password=args.password, ap_password=args.ap_password,
                 country=args.country, timezone=args.timezone, locale=args.locale, keyboard=args.keyboard,
                 banks_text=', '.join(banks), when=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
                 out_img_in_builder='/out/exxpiano.img', dietpi_version_out_in_builder='/out/dietpi-version.txt')
@@ -280,10 +273,10 @@ def build_one(args, inputs, plan):
     zip_hash = sha256_of(zip_path)
     if not args.keep_image:
         os.unlink(img)
-    readme_name = 'README%s.txt' % variant_suffix(plan)
+    readme_name = 'README.txt'
     with open(os.path.join(out_dir, readme_name), 'w', encoding='utf-8') as f:
         f.write(readme(plan, zip_name))
-    manifest_name = 'manifest%s.json' % variant_suffix(plan)
+    manifest_name = 'manifest.json'
     write_json(os.path.join(out_dir, manifest_name), dict(
         schema_version=2, product='exxpiano', target_family=TARGET_FAMILY,
         product_version=plan['version'], dietpi_version=plan['dietpi_version'],

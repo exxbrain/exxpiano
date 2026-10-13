@@ -4,10 +4,9 @@
 #   scripts/make-soundfonts.sh [-p PRESET] [-v SAMPLES] [-o OUTPUT_DIR] [-s SALAMANDER_DIR] [-u URL] [-n SFZ_NAME]
 #
 # -p  Preset of the piano bank (size = memory the bank takes on a Pi 3):
-#       standard  ~390 MB  8 layers, stereo, 11 s tails. The main one (gain 1.0)
-#       soft      ~390 MB  same, but soft notes are quieter (wider dynamics) (gain 1.0)
+#       full      ~700 MB  14 layers, stereo, 12 s tails. The main one, for boards with 1 GB or more (gain 1.0)
+#       soft      ~390 MB  8 layers, stereo, 11 s tails; soft notes are quieter (wider dynamics) (gain 1.0)
 #       lite      ~250 MB  6 layers, stereo, 9 s tails (gain 1.0)
-#       full      ~700 MB  14 layers, stereo, 12 s tails. For boards with 1 GB or more; NOT for a 512 MB board (gain 1.0)
 #       small     ~135 MB  6 layers, MONO, 10 s tails (gain 2.0)
 #
 # -v  Which published Salamander package to take the samples from (all CC-BY, from freepats.zenvoid.org):
@@ -23,7 +22,7 @@
 # Needs: python3, ffmpeg (with ffprobe), curl, tar with xz/gzip support.
 set -euo pipefail
 
-PRESET=standard
+PRESET=full
 VERSION=44k16
 OUT=./build
 SRC=""
@@ -45,12 +44,11 @@ while getopts "p:v:o:s:u:n:h" opt; do
 done
 
 case "$PRESET" in
-  standard) ARGS="--layers 1,2,4,6,8,10,12,15 --tail 11 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
   soft)     ARGS="--layers 1,2,4,6,8,10,12,15 --tail 11 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --stretch 1.6 --veltrack 55" ;;
   lite)     ARGS="--layers 2,5,8,10,13,15 --tail 9 --gamma 0.7 --peak-lo -12 --peak-hi -1.5 --veltrack 55" ;;
   full)     ARGS="--layers 1,2,4,5,6,7,8,9,10,11,12,13,15,16 --tail 12 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
   small)    ARGS="--layers 2,5,8,10,13,15 --tail 10 --mono --gamma 0.6 --peak-lo -9 --peak-hi -1.5 --veltrack 40" ;;
-  *) echo "Unknown preset: $PRESET (standard | soft | lite | small | full)"; exit 1 ;;
+  *) echo "Unknown preset: $PRESET (full | soft | lite | small)"; exit 1 ;;
 esac
 
 case "$VERSION" in

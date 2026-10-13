@@ -131,7 +131,7 @@ class PlanTests(Case):
         old_root = bsi.ROOT
         try:
             bsi.ROOT = self.tmp.name
-            default_piano = self.touch('build/piano-standard.sf2', b'default piano')
+            default_piano = self.touch('build/piano-full.sf2', b'default piano')
             default_mech = self.touch('build/mech.sf2', b'default mech')
             args = bsi.parse_args(['--dietpi', self.dietpi])
             self.assertEqual(bsi.resolve_inputs(args), dict(dietpi=os.path.abspath(self.dietpi), piano=default_piano, mech=default_mech))
@@ -152,10 +152,10 @@ class PlanTests(Case):
         try:
             bsi.ROOT = self.tmp.name
             args = bsi.parse_args(['--dietpi', self.dietpi])
-            for present, missing in (('mech.sf2', 'piano'), ('piano-standard.sf2', 'mech')):
+            for present, missing in (('mech.sf2', 'piano'), ('piano-full.sf2', 'mech')):
                 build = os.path.join(self.tmp.name, 'build')
                 os.makedirs(build, exist_ok=True)
-                for name in ('piano-standard.sf2', 'mech.sf2'):
+                for name in ('piano-full.sf2', 'mech.sf2'):
                     path = os.path.join(build, name)
                     if os.path.exists(path):
                         os.unlink(path)
@@ -169,34 +169,6 @@ class PlanTests(Case):
 
 
 class BuildTests(Case):
-    def test_two_variants_build_into_one_folder_with_their_own_names(self):
-        for variant in ('standard', 'full'):
-            r = self.run_build('--variant', variant)
-            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        names = sorted(os.listdir(self.out))
-        zips = [n for n in names if n.endswith('-sd.zip')]
-        self.assertEqual(len(zips), 2, names)
-        self.assertTrue(zips[0].endswith('-full-sd.zip') and zips[1].endswith('-standard-sd.zip'), zips)
-        for variant in ('standard', 'full'):
-            self.assertIn('manifest-%s.json' % variant, names)
-            self.assertIn('README-%s.txt' % variant, names)
-            with open(os.path.join(self.out, 'manifest-%s.json' % variant), encoding='utf-8') as f:
-                manifest = json.load(f)
-            self.assertTrue(manifest['image'].endswith('-%s-sd.zip' % variant))
-        self.assertNotIn('manifest.json', names)
-
-    def test_a_variant_takes_its_own_default_piano_bank(self):
-        old_root = bsi.ROOT
-        try:
-            bsi.ROOT = self.tmp.name
-            self.touch('build/mech.sf2', b'm')
-            full = self.touch('build/piano-full.sf2', b'full')
-            self.touch('build/piano-standard.sf2', b'standard')
-            args = bsi.parse_args(['--dietpi', self.dietpi, '--variant', 'full'])
-            self.assertEqual(bsi.resolve_inputs(args)['piano'], full)
-        finally:
-            bsi.ROOT = old_root
-
     def test_passwords_default_to_environment_and_arguments_override_them(self):
         r = self.run_build(env={'SD_PASSWORD': 'environment root password',
                                 'SD_AP_PASSWORD': 'environment setup password'})

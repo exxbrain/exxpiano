@@ -38,9 +38,7 @@ but this setup was not measured with one.
 
 The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards; a separate package or installer bundle is not a delivery format.
 
-Two images are published for each release: **standard** (the verified bank, for a Pi 3 B/B+ and the like) and **full** (the 700 MB bank for boards with 1 GB or more, not tested on a real board yet). Both carry the smaller `lite` bank for 512 MB boards.
-
-1. Build the banks once: `scripts/make-soundfonts.sh -p standard`, `-p full` and `-p lite` (they reuse the samples downloaded by the first). This creates the required `build/piano-standard.sf2`, `build/piano-full.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
+1. Build the banks once: `scripts/make-soundfonts.sh -p full` and `-p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-full.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
 2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`.
 3. Flash `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
 4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
@@ -56,7 +54,7 @@ The banks themselves are not stored in the repository (hundreds of megabytes, an
 [NOTICE.md](NOTICE.md)). A script makes them from the original archive:
 
 ```bash
-scripts/make-soundfonts.sh -p standard -o build      # downloads ~412 MB and builds
+scripts/make-soundfonts.sh -p full -o build          # downloads ~412 MB and builds
 ```
 
 If you already have Salamander unpacked (a folder with `SalamanderGrandPianoV3Retuned.sfz`), point to it: `-s /path/to/folder`.
@@ -71,7 +69,7 @@ resulting banks have the same size whichever package you take; the source only c
 and how much you download.
 
 ```bash
-scripts/make-soundfonts.sh -p standard -v 48k24 -o build     # take the 48 kHz / 24 bit WAV package
+scripts/make-soundfonts.sh -p full -v 48k24 -o build     # take the 48 kHz / 24 bit WAV package
 ```
 
 | `-v` | Package | Download | Status |
@@ -86,20 +84,37 @@ it is not used here because it has no mechanics presets and no layer reduction.
 
 | Preset | Memory on the Pi | What it is | `GAIN` | Tested on a Pi 3 |
 |---|---|---|---|---|
-| `standard` | ~390 MB | 8 velocity layers, stereo, 11 s tails | 1.0 | yes, works |
 | `soft` | ~390 MB | same, but soft notes are noticeably quieter (wider dynamics) | 1.0 | no, only on the Mac |
 | `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
-| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | no: built, not heard and not loaded on a real 1 GB board yet; watch `free -m` after loading it |
+| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | starts and plays on a board with 1 GB and, by the author's ear, sounds better than the earlier 390 MB bank (one listener, not a blind test); the free memory after loading was not recorded, watch `free -m` |
 | `small` | ~135 MB | 6 layers, **mono**, 10 s tails | 2.0 | no, only on the Mac |
 
-The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `standard` does not fit there:
-on a real Pi 3 A+ the kernel killed FluidSynth at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
-(237 MB; **played on a real Pi 3 A+, it works**, including the automatic choice at the first start) or `small`. `lite` against `standard`: 6 velocity layers
-instead of 8, tails of 9 s instead of 11 s, and the softest note is louder (−12 dB instead of −17 dB), so the dynamic range is somewhat smaller. Check the free memory yourself (`free -m`, the `available` column).
+The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `full` does not fit there:
+on a real Pi 3 A+ the kernel killed FluidSynth with a 390 MB bank at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
+(237 MB; **played on a real Pi 3 A+, it works**, including the automatic choice at the first start) or `small`. `lite` against `full`: 6 velocity layers
+instead of 14, tails of 9 s instead of 12 s, and the softest note is louder (−12 dB instead of −17 dB), so the dynamic range is somewhat smaller. Check the free memory yourself (`free -m`, the `available` column).
+
+## Comparison with alternatives
+
+This comparison comes from project descriptions and reviews, not from my own measurements: I did not measure the sound, latency or resource use of the others. Prices change, check the current ones on the vendors' sites.
+
+| | exxpiano | Pianoteq on a Raspberry Pi | Zynthian | A hand-made FluidSynth on a Pi (FluidPi, PiPiano and the like) |
+|---|---|---|---|---|
+| Sound | samples of Salamander Grand Piano V3 (CC-BY) through FluidSynth plus a separate mechanics bank (hammers, dampers, resonance, pedal) | physical modelling (Modartt); little memory, the sound is computed live | many engines (piano, electric piano, synths, SoundFont and more) | any SoundFont; no piano mechanics |
+| Software price | free, open source (scripts MIT, sounds CC-BY) | a paid licence | the software is open; the ready Zynthian 5 kit with a screen and knobs is about €490 plus VAT without a Raspberry Pi, about €570 with one (from a review) | free |
+| Hardware | Raspberry Pi 2/3/4, a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | a Pi 4 and a special case with a screen and knobs | any board that runs FluidSynth (Pi Zero and up) |
+| Ready image | yes, one ZIP that works from the first power-on with no monitor | no, installed by hand | yes, an image and a kit | no, usually a guide and scripts |
+| Settings from a phone | yes: touch curve, mechanics, banks, audio output, Wi-Fi, monitor | no single page; settings are in the program | a screen and knobs on the device, a web interface exists | at best a simple page to choose a bank |
+| Piano mechanics | yes, a separate bank and a bridge | part of the physical model | depends on the chosen engine | none |
+| Changing the sound | banks can be swapped (any `.sf2`), mechanics and touch are tunable | many model parameters | depends on the engine | only swapping the SoundFont |
+
+Where exxpiano is weaker: no physical modelling (the sound is limited by recorded layers and the memory of the board, and on a cheap 512 MB board the `lite` bank is simpler than the full one), no screen or knobs on the body (everything from a phone), no built-in synthesizers besides the piano, and the latency is not measured yet. Where it is stronger: free open code, a ready image, work on the cheapest board with no monitor, a clear settings page and a separate piano mechanics.
+
+Sources: [Modartt forum on Pianoteq for ARM](https://forum.modartt.com/viewtopic.php?id=7220), [Zynthian 5 (review)](https://www.yahoo.com/entertainment/zynthian-5-standalone-open-source-110034729.html), [FluidPi](https://github.com/schollz/FluidPi), [PiPiano](https://jpralves.net/post/2020/03/05/pipiano.html).
 
 ## SD card image for new devices
 
-This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: the piano (`standard`, about 390 MB, in the `standard` image; `full`, about 700 MB, in the `full` image; either one is installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards the piano of the image stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
+This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: the piano (`full`, about 700 MB, installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards the piano of the image stays and `lite` can be chosen on the **Piano bank** page. At first boot every installed copy creates a
 persistent random 16-character hexadecimal installation ID. The ID gives it a unique hostname
 `exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 

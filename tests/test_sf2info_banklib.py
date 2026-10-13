@@ -144,7 +144,7 @@ class BankLibTests(unittest.TestCase):
         mech = 36 << 20
         limit = banklib.size_limit(mem, mech)
         self.assertGreater(limit, 248325370)                # the smaller bank fits ...
-        self.assertLess(limit, 387396570)                   # ... the standard one does not
+        self.assertLess(limit, 387396570)                   # ... a 390 MB bank does not
         self.assertEqual(banklib.size_limit(954 << 20, mech), (954 << 20) - (200 << 20) - mech)    # a 1 GB board keeps 200 MB
         self.assertGreater(banklib.size_limit(954 << 20, mech), 700 << 20)         # the 695 MB bank `full` fits
 

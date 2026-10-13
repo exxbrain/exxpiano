@@ -1,18 +1,17 @@
 # Building the reusable SD card image
 
-The shipped artifact is a complete bootable image for a clean Raspberry Pi 2/3/4 ARMv8 SD card. It already contains DietPi, exxpiano, the standard piano and the mechanics bank. One ZIP can be flashed to many cards.
+The shipped artifact is a complete bootable image for a clean Raspberry Pi 2/3/4 ARMv8 SD card. It already contains DietPi, exxpiano, the full piano, the smaller `lite` piano for 512 MB boards and the mechanics bank. One ZIP can be flashed to many cards.
 
 ## Prerequisites
 
 Use Docker Desktop on macOS or Docker on Linux, the official `DietPi_RPi234-ARMv8-Trixie.img.xz`, and prepare the banks:
 
 ```bash
-scripts/make-soundfonts.sh -p standard -o build
 scripts/make-soundfonts.sh -p full -o build
 scripts/make-soundfonts.sh -p lite -o build
 ```
 
-The builder defaults to `build/piano-standard.sf2` and `build/mech.sf2`. `--variant standard|full` makes an image with that piano (`build/piano-<variant>.sf2`) and puts the variant into the names (`...-full-sd.zip`, `manifest-full.json`, `README-full.txt`); the release builds both.
+The builder defaults to `build/piano-full.sf2` and `build/mech.sf2`. Use `--piano` and `--mech` for controlled replacements.
 
 Before tagging a release add a section `## <VERSION>` to `CHANGELOG.md`: the workflow appends it to the description of the GitHub Release (`scripts/release-notes.py`) and stops without it. Use `--piano` and `--mech` for controlled replacements. An image is never released without both banks. If `build/piano-lite.sf2` exists (`scripts/make-soundfonts.sh -p lite`, or `--piano-lite FILE`) it goes into the image too, and the first start uses it on a board with less than 800 MB of memory (a Pi 3 A+); the release workflow always builds it.
 
@@ -39,8 +38,8 @@ unset SD_PASSWORD SD_AP_PASSWORD
 `--dry-run` validates inputs and prints the plan. The full run writes to `dist/sd/`:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` — the flashable image;
-- `manifest-<variant>.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
-- `README-<variant>.txt` — brief instructions for that release.
+- `manifest.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
+- `README.txt` — brief instructions for that release.
 
 The product version comes from `VERSION`; the DietPi version comes from `dietpi/.version` in the base image. A release is rejected when that version cannot be read, either required bank is absent, or the smoke check fails.
 
@@ -48,11 +47,11 @@ The product version comes from `VERSION`; the DietPi version comes from `dietpi/
 
 ## GitHub Release
 
-Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the standard, full and lite banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
+Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the full and lite banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
-- `manifest-standard.json`, `manifest-full.json`;
-- `README-standard.txt`, `README-full.txt`;
+- `manifest.json`;
+- `README.txt`;
 - `SHA256SUMS`.
 
 The release title names exxpiano, its version, and the supported Raspberry Pi family. Its English description explains the image contents, flashing and first boot, checksum verification, and why an already-booted card must not be cloned.

@@ -7,12 +7,11 @@
 Нужны Docker Desktop на macOS либо Linux с Docker, официальный `DietPi_RPi234-ARMv8-Trixie.img.xz` и банки:
 
 ```bash
-scripts/make-soundfonts.sh -p standard -o build
 scripts/make-soundfonts.sh -p full -o build
 scripts/make-soundfonts.sh -p lite -o build
 ```
 
-По умолчанию сборщик использует `build/piano-standard.sf2` и `build/mech.sf2`. `--variant standard|full` собирает образ с этим роялем (`build/piano-<вариант>.sf2`) и добавляет вариант в имена (`...-full-sd.zip`, `manifest-full.json`, `README-full.txt`); релиз собирает оба.
+По умолчанию сборщик использует `build/piano-full.sf2` и `build/mech.sf2`. Другие банки передаются через `--piano` и `--mech`.
 
 Перед тегом релиза добавьте в `CHANGELOG.md` раздел `## <VERSION>`: workflow добавляет его в описание GitHub Release (`scripts/release-notes.py`) и останавливается, если раздела нет. Другие проверенные банки можно передать через `--piano` и `--mech`; образ без любого из двух банков не выпускается. Если есть `build/piano-lite.sf2` (`scripts/make-soundfonts.sh -p lite` или `--piano-lite ФАЙЛ`), он тоже попадает в образ, и первый запуск на плате с памятью меньше 800 МБ (Pi 3 A+) использует его; release-workflow всегда собирает его.
 
@@ -39,8 +38,8 @@ unset SD_PASSWORD SD_AP_PASSWORD
 `--dry-run` только проверяет входные файлы и показывает план. Полная сборка создаёт в `dist/sd/`:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` — образ для записи;
-- `manifest-<вариант>.json` — версии, SHA-256 основы и результата, банки и схема идентичности;
-- `README-<вариант>.txt` — краткая инструкция для конкретного выпуска.
+- `manifest.json` — версии, SHA-256 основы и результата, банки и схема идентичности;
+- `README.txt` — краткая инструкция для конкретного выпуска.
 
 Версия продукта берётся из `VERSION`, версия DietPi — из `dietpi/.version` базового образа. Если версия DietPi не читается, обязательный банк отсутствует или smoke-проверка завершается ошибкой, готовый ZIP не считается выпущенным.
 
@@ -48,11 +47,11 @@ unset SD_PASSWORD SD_AP_PASSWORD
 
 ## GitHub Release
 
-Публикация тега `v<VERSION>` запускает `.github/workflows/release.yml`. Workflow проверяет точное совпадение тега с `VERSION`, запускает быстрые тесты, собирает standard-, full- и lite-банки, скачивает закреплённую основу DietPi RPi 2/3/4 ARMv8 из отдельного prerelease этого репозитория, проверяет SHA-256 из `.github/dietpi-image.env`, собирает и проверяет образ, а затем создаёт продуктовый GitHub Release. Поэтому выпуск не зависит от доступности upstream-сервиса скачивания, но использует точную копию официального входного образа. К продуктовому выпуску прикладываются:
+Публикация тега `v<VERSION>` запускает `.github/workflows/release.yml`. Workflow проверяет точное совпадение тега с `VERSION`, запускает быстрые тесты, собирает full- и lite-банки, скачивает закреплённую основу DietPi RPi 2/3/4 ARMv8 из отдельного prerelease этого репозитория, проверяет SHA-256 из `.github/dietpi-image.env`, собирает и проверяет образ, а затем создаёт продуктовый GitHub Release. Поэтому выпуск не зависит от доступности upstream-сервиса скачивания, но использует точную копию официального входного образа. К продуктовому выпуску прикладываются:
 
 - `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
-- `manifest-standard.json`, `manifest-full.json`;
-- `README-standard.txt`, `README-full.txt`;
+- `manifest.json`;
+- `README.txt`;
 - `SHA256SUMS`.
 
 Заголовок релиза содержит название exxpiano, версию и семейство поддерживаемых Raspberry Pi. Английское описание объясняет состав образа, запись и первый запуск, проверку контрольных сумм и запрет клонирования уже запускавшейся карты.
