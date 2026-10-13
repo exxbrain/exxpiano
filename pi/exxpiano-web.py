@@ -11,6 +11,7 @@
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
   GET  /api/qr             ?kind=join|setup|page  - {text, svg}: a QR code to join the setup network, to open its page, to open this page (the
                            page codes carry ?d=<installation ID>: the page warns when it is a different installation)
+  GET  /api/errors                 - warnings and errors of the piano services since the boot (newest last)
   GET  /api/monitor        ?since=<ms>  - CPU, temperature, frequency, memory, throttling, load of the piano services, chart points since <ms>
 
 Settings that can be changed are whitelisted with ranges in exxpianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
@@ -39,6 +40,8 @@ import wifilib
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 MAX_BODY = 4096
 HOSTNAME_RE = wifilib.HOSTNAME_RE
+ERROR_UNITS = ('exxpiano.service', 'exxpiano-fx.service', 'exxpiano-web.service', 'exxpiano-wifi.service')
+ERROR_LIMIT = 40
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
 
 class Actions:
@@ -144,6 +147,20 @@ class Actions:
     def monitor(self, since=0):
         return self._monitor.get(since)
 
+    def errors(self):
+        """Warnings and errors the piano services logged since the boot: [{t (ms), unit, level, text}], newest last."""
+        return self._cached('errors', 5, self._errors)
+
+    def _errors(self):
+        cmd = ['journalctl', '-b', '-p', 'warning', '-n', str(ERROR_LIMIT), '--no-pager', '-o', 'json']
+        for unit in ERROR_UNITS:
+            cmd += ['-u', unit]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return []
+        return parse_journal_errors(r.stdout)
+
     # ---- Wi-Fi (the supervisor exxpiano-wifi does the changes; this only reads its status and sends requests)
     def wifi_status(self):
         st = wifilib.read_status(self.wifi_run_dir)
@@ -241,6 +258,26 @@ class Actions:
         if not last:
             return None
         return dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)))
+
+
+def parse_journal_errors(text):
+    """`journalctl -o json` lines -> [{t, unit, level, text}]; lines that are not JSON are skipped."""
+    out = []
+    for line in text.splitlines():
+        try:
+            e = json.loads(line)
+            t = int(e['__REALTIME_TIMESTAMP']) // 1000
+            prio = int(e.get('PRIORITY', 4))
+        except (ValueError, KeyError, TypeError):
+            continue
+        msg = e.get('MESSAGE')
+        if isinstance(msg, list):                      # journald stores binary messages as byte lists
+            msg = bytes(b & 255 for b in msg).decode('utf-8', 'replace')
+        if not isinstance(msg, str) or not msg.strip():
+            continue
+        unit = str(e.get('_SYSTEMD_UNIT', '')).replace('.service', '')
+        out.append(dict(t=t, unit=unit, level='error' if prio <= 3 else 'warning', text=msg.strip()[:300]))
+    return out[-ERROR_LIMIT:]
 
 
 class WifiBusy(Exception):
@@ -578,7 +615,7 @@ def make_handler(app):
 
         def log_request(self, code='-', size='-'):
             # the page polls the state and the monitor all the time: successful polls would only fill the journal with noise
-            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/wifi', '/api/qr', '/api/ping'):
+            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/wifi', '/api/qr', '/api/ping'):
                 return
             super().log_request(code, size)
 
@@ -631,6 +668,10 @@ def make_handler(app):
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
                 return self._send(200, app.wifi())
+            if url.path == '/api/errors':
+                if not self._authorised():
+                    return self._send(401, dict(error='token required'))
+                return self._send(200, dict(errors=app.actions.errors()))
             if url.path == '/api/monitor':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))

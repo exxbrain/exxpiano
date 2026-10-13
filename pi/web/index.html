@@ -105,6 +105,8 @@
   .net button { padding: 6px 12px; font-size: .9rem; }
   .wform input[type=text], .wform input[type=password] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line);
          background: var(--bg); color: var(--text); font-size: 1rem; }
+  .errs { font-size: .88rem; max-height: 14em; overflow-y: auto; }
+  .errs p { margin: 0 0 6px; overflow-wrap: anywhere; } .errs p.error { color: var(--bad); } .errs p.warning { color: var(--warn); } .errs time { opacity: .7; }
   .thr { font-size: .95rem; }
   .thr p { margin: 0 0 6px; } .thr p:last-child { margin: 0; }
   .thr .ok { color: var(--ok); } .thr .warn { color: var(--warn); } .thr .bad { color: var(--bad); font-weight: 600; }
@@ -262,6 +264,7 @@
 
   <div id="paneMon" hidden>
     <div class="card"><h2 data-t="m_throttle">Power and throttling</h2><div class="thr" id="thr"></div></div>
+    <div class="card"><h2 data-t="e_title">Errors</h2><p class="hint" data-t="e_hint">Warnings and errors of the piano services since the boot.</p><div class="errs" id="mErrors"></div></div>
     <div class="card"><h2 data-t="a_title">Audio interface</h2><p class="hint" data-t="a_hint">What the driver really negotiated for the stream that is playing now, not what was asked for.</p><div id="mAudio"></div></div>
     <div class="card">
       <div class="tiles">
@@ -313,6 +316,7 @@ const T = {
     w_ok: "Connected to {ssid}.", w_failed: "Could not connect to {ssid}: {error}.", w_forgot: "Forgot {ssid}.", w_ap_failed: "The setup network could not start.",
     w_nm: "This system uses NetworkManager. Connect with the command sudo nmtui; this page cannot change the network here.",
     w_off: "The Wi-Fi service is not running (systemctl status exxpiano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
+    e_title: "Errors", e_hint: "Warnings and errors of the piano services since the boot.", e_none: "No errors since the boot.",
     m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
     m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
     m_procs_hint: "Share of one core; a service with several threads can pass 100 %.", m_load: "load {a} · {b} · {c}", m_max: "of {n} MHz", m_of: "of {n} MB",
@@ -369,6 +373,7 @@ const T = {
     w_ok: "Подключено к {ssid}.", w_failed: "Не удалось подключиться к {ssid}: {error}.", w_forgot: "Сеть {ssid} забыта.", w_ap_failed: "Сеть настройки не запустилась.",
     w_nm: "В этой системе сетью управляет NetworkManager. Подключайтесь командой sudo nmtui; отсюда сеть изменить нельзя.",
     w_off: "Служба Wi-Fi не запущена (systemctl status exxpiano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
+    e_title: "Ошибки", e_hint: "Предупреждения и ошибки служб рояля с момента включения.", e_none: "С момента включения ошибок не было.",
     m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
     m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
     m_procs_hint: "Доля одного ядра; служба с несколькими потоками может превысить 100 %.", m_load: "нагрузка {a} · {b} · {c}", m_max: "из {n} МГц", m_of: "из {n} МБ",
@@ -715,6 +720,19 @@ function renderMon(n) {
   for (const k of ["synth", "bridge", "web"]) procs.append(bar(tr("m_" + k), n.procs ? n.procs[k] : null, 70, 90));
   renderMonCharts();
 }
+function renderErrors(list) {
+  const box = $("mErrors"); box.textContent = "";
+  if (!list.length) { const p = document.createElement("p"); p.className = "ok"; p.textContent = tr("e_none"); box.append(p); return; }
+  for (const e of list.slice().reverse()) {                              // newest first
+    const p = document.createElement("p"); p.className = e.level;
+    const t = document.createElement("time"); t.textContent = new Date(e.t).toLocaleTimeString() + " ";
+    p.append(t, document.createTextNode(e.unit + ": " + e.text)); box.append(p);
+  }
+}
+let errTick = 0;
+async function pollErrors() {
+  try { renderErrors((await api("/api/errors")).errors); } catch (e) { /* the next time */ }
+}
 async function pollMon() {
   if (mon.busy || $("paneMon").hidden || document.hidden) return;
   mon.busy = true;
@@ -725,6 +743,7 @@ async function pollMon() {
     if (mon.points.length > MON_POINTS) mon.points.splice(0, mon.points.length - MON_POINTS);
     mon.since = mon.points.length ? mon.points[mon.points.length - 1].t : 0;
     renderMon(r.now);
+    if (errTick++ % 5 === 0) pollErrors();                                 // the errors change slowly: every 5th tick
   } catch (e) { /* the next tick tries again */ } finally { mon.busy = false; }
 }
 // ---- pages and the menu: the address (#/wifi, #/bank ...) says which page is open, so Back, a bookmark and a link all work

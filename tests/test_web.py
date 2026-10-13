@@ -90,6 +90,9 @@ class FakeActions:
     def audio_output(self):
         return dict(device='plughw:CARD=U24', kind='usb', period=64, periods=3)
 
+    def errors(self):
+        return [dict(t=1000, unit='exxpiano', level='error', text='no sound card found')]
+
     def monitor(self, since=0):
         self.monitor_calls.append(since)
         return self.monitor_answer
@@ -680,6 +683,22 @@ class QrApiTests(ServerCase):
 
 
 class MonitorEndpointTests(ServerCase):
+    def test_the_errors_endpoint_lists_what_the_services_logged(self):
+        self.start()
+        code, r = self.jcall('/api/errors')
+        self.assertEqual(code, 200)
+        self.assertEqual(r['errors'][0]['text'], 'no sound card found')
+
+    def test_journal_lines_become_errors(self):
+        import json as j
+        lines = '\n'.join([
+            j.dumps({'__REALTIME_TIMESTAMP': '1700000000123456', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '3', 'MESSAGE': 'exxpiano: no sound card found'}),
+            j.dumps({'__REALTIME_TIMESTAMP': '1700000001000000', '_SYSTEMD_UNIT': 'exxpiano-web.service', 'PRIORITY': '4', 'MESSAGE': [104, 105]}),
+            'not json', j.dumps({'PRIORITY': '3', 'MESSAGE': 'no time'}), j.dumps({'__REALTIME_TIMESTAMP': '1', 'MESSAGE': '  '})])
+        got = web.parse_journal_errors(lines)
+        self.assertEqual(got, [dict(t=1700000000123, unit='exxpiano', level='error', text='exxpiano: no sound card found'),
+                               dict(t=1700000001000, unit='exxpiano-web', level='warning', text='hi')])
+
     def test_the_monitor_endpoint_returns_the_sample_and_the_points(self):
         self.start()
         code, r = self.jcall('/api/monitor')

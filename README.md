@@ -237,7 +237,7 @@ glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
-- **Monitor page**: live, once a second. Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
+- **Monitor page**: live, once a second. **Errors**: warnings and errors the piano services logged since the boot (for example "no sound card found"). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web page, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
   chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.

@@ -115,6 +115,11 @@ class DemoActions(web.Actions):
                                 usb=dict(sync='ASYNC', rates=[44100, 48000, 88200, 96000], bits=24, momentary=44100, status='Running'))])
         return dict(now=snap, points=[p for p in self.history if p['t'] > since])
 
+    def errors(self):
+        now = int(time.time() * 1000)
+        return [dict(t=now - 90000, unit='exxpiano-wifi', level='warning', text="could not connect to 'Dacha', restoring the previous settings"),
+                dict(t=now - 20000, unit='exxpiano', level='error', text='exxpiano: no sound card found')]
+
     # ---- Wi-Fi: a small state machine that answers the requests of the page
     def _tick(self):
         now = time.time()
