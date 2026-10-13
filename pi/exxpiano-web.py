@@ -54,6 +54,7 @@ class Actions:
         self.wifi_run_dir = os.environ.get('EXXPIANO_WIFI_RUN', wifilib.RUN_DIR)
         self.wifi_iface = os.environ.get('WIFI_IFACE', 'wlan0')
         self.wpa_conf = os.environ.get('WIFI_WPA_CONF', '/etc/wpa_supplicant/wpa_supplicant.conf')
+        self.scan_error = None                 # why the last scan of the page failed
         self._cache = {}                       # key -> (when, value): the page asks every few seconds, programs are started at most this often
         self._cache_lock = threading.Lock()
 
@@ -181,11 +182,14 @@ class Actions:
             return []
 
     def wifi_scan(self):
-        try:
-            r = subprocess.run(['iw', 'dev', self.wifi_iface, 'scan'], capture_output=True, text=True, timeout=20)
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return wifilib.parse_scan(r.stdout) if r.returncode == 0 else None
+        def run(cmd, timeout):
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+                return r.returncode, r.stdout + r.stderr
+            except (OSError, subprocess.SubprocessError) as exc:
+                return 127, str(exc)
+        found, self.scan_error = wifilib.scan_networks(run, self.wifi_iface, tries=2, pause=1.0)
+        return found
 
     def wifi_request(self, request):
         return wifilib.post_request(self.wifi_run_dir, request)
@@ -457,7 +461,7 @@ class App:
             return dict(supported=False, reason='networkmanager' if a.network_manager_active() else 'not_running', saved=saved, networks=[],
                         link=None, mode=None, busy=None)
         return dict(supported=True, mode=st.get('mode'), busy=st.get('busy'), link=st.get('link'), hostname=st.get('hostname'), ap=st.get('ap'),
-                    saved=saved, networks=st.get('scan') or [], scanned_at=st.get('scanned_at'), last_result=st.get('last_result'),
+                    saved=saved, networks=st.get('scan') or [], scan_error=st.get('scan_error'), scanned_at=st.get('scanned_at'), last_result=st.get('last_result'),
                     now=st.get('updated'), cable=bool(st.get('cable')))
 
     def wifi_action(self, body):
@@ -472,7 +476,7 @@ class App:
                 return dict(networks=state['networks'], scanned_at=state['scanned_at'], cached=True)   # the radio is serving or busy
             found = self.actions.wifi_scan()
             if found is None:
-                raise ValueError('the scan failed, try again in a moment')
+                raise ValueError(getattr(self.actions, 'scan_error', None) or 'the scan failed, try again in a moment')
             return dict(networks=found, scanned_at=int(time.time()), cached=False)
         if state['busy']:
             raise WifiBusy()

@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import tempfile
+import time
 
 SSID_MAX_BYTES = 32
 CHANNELS_2G = (1, 6, 11)
@@ -192,6 +193,64 @@ def parse_scan(text):
         if ssid not in best or entry['signal'] > best[ssid]['signal']:
             best[ssid] = entry
     return sorted(best.values(), key=lambda e: -e['signal'])
+
+
+def parse_wpa_scan(text):
+    """`wpa_cli scan_results` (bssid, frequency, signal, flags, ssid; tab separated) -> the same list as parse_scan."""
+    best = {}
+    for line in (text or '').splitlines():
+        parts = line.split('\t')
+        if len(parts) < 5 or not re.fullmatch(r'[0-9a-fA-F:]{17}', parts[0].strip()):
+            continue
+        ssid = _unescape_iw(parts[4].strip())
+        if not ssid or all(c == '\x00' for c in ssid):
+            continue
+        try:
+            signal, freq = int(parts[2]), int(parts[1])
+        except ValueError:
+            signal, freq = -100, None
+        entry = dict(ssid=ssid, signal=signal, secure=bool(re.search(r'WPA|RSN|WEP', parts[3])), freq=freq)
+        if ssid not in best or entry['signal'] > best[ssid]['signal']:
+            best[ssid] = entry
+    return sorted(best.values(), key=lambda e: -e['signal'])
+
+
+def scan_failure_reason(rc, out):
+    """A short human reason for a failed scan, from the exit code and the text of `iw`."""
+    text = (out or '').lower()
+    if rc == 127 or 'no such file' in text or 'not found' in text:
+        return 'the iw program is not installed'
+    if 'rf-kill' in text or 'rfkill' in text:
+        return 'Wi-Fi is blocked (rfkill): check the Wi-Fi country and run rfkill unblock wifi'
+    if 'resource busy' in text or '-16' in text:
+        return 'the radio is busy (connecting or scanning); try again in a moment'
+    if 'not permitted' in text or 'permission' in text:
+        return 'not permitted: the service must run as root'
+    if 'no such device' in text or 'nodev' in text:
+        return 'the Wi-Fi adapter was not found'
+    return ('the scan failed: %s' % (out or '').strip().splitlines()[-1][:100]) if (out or '').strip() else 'the scan failed'
+
+
+def scan_networks(run, iface, tries=3, pause=1.5, sleep=time.sleep):
+    """Scan with `iw`; when that keeps failing, ask wpa_supplicant (`wpa_cli`), which works while it is connecting. -> (networks or None, reason or None)"""
+    reason = None
+    for i in range(tries):
+        rc, out = run(['iw', 'dev', iface, 'scan'], 20)
+        if rc == 0:
+            return parse_scan(out), None
+        reason = scan_failure_reason(rc, out)
+        if i + 1 < tries:
+            sleep(pause)
+    rc, out = run(['wpa_cli', '-i', iface, 'scan'], 10)
+    if rc == 0:
+        sleep(4)
+        rc2, out2 = run(['wpa_cli', '-i', iface, 'scan_results'], 10)
+        if rc2 == 0:
+            found = parse_wpa_scan(out2)
+            if found:
+                return found, None
+            reason = reason or 'no networks were found'
+    return None, reason
 
 
 # ---- access point

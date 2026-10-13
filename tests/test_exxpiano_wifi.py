@@ -497,6 +497,40 @@ class SystemTests(unittest.TestCase):
         self.assertEqual([n['ssid'] for n in s.scan()], ['Home'])
 
 
+    def test_scan_falls_back_to_wpa_cli_and_explains_a_failure(self):
+        calls = []
+
+        def run(cmd, timeout):
+            calls.append(cmd[0])
+            if cmd[0] == 'iw':
+                return 1, 'command failed: Device or resource busy (-16)'
+            if cmd[:4] == ['wpa_cli', '-i', 'wlan0', 'scan']:
+                return 0, 'OK'
+            return 0, 'bssid / frequency / signal level / flags / ssid\naa:bb:cc:dd:ee:ff\t2437\t-45\t[WPA2-PSK-CCMP][ESS]\tHome\n11:22:33:44:55:66\t2412\t-70\t[ESS]\tCafe\n'
+        s = pw.System('wlan0', '/tmp/none', '/tmp/none.conf', run)
+        real = pw.time.sleep
+        pw.time.sleep = lambda x: None
+        self.addCleanup(setattr, pw.time, 'sleep', real)
+        wl_sleep = pw.wifilib.time.sleep
+        pw.wifilib.time.sleep = lambda x: None
+        self.addCleanup(setattr, pw.wifilib.time, 'sleep', wl_sleep)
+        self.assertEqual([(n['ssid'], n['secure']) for n in s.scan()], [('Home', True), ('Cafe', False)])
+        self.assertIsNone(s.scan_error)
+        self.assertEqual(calls.count('iw'), 3)
+        dead = pw.System('wlan0', '/tmp/none', '/tmp/none.conf', lambda cmd, timeout: (127, 'no such file'))
+        self.assertEqual(dead.scan(), [])
+        self.assertEqual(dead.scan_error, 'the iw program is not installed')
+
+    def test_failure_reasons_are_short_and_readable(self):
+        for rc, out, word in ((1, 'command failed: Operation not possible due to RF-kill (-132)', 'rfkill'),
+                              (1, 'command failed: Device or resource busy (-16)', 'busy'),
+                              (1, 'command failed: Operation not permitted (-1)', 'root'),
+                              (1, 'command failed: No such device (-19)', 'adapter'),
+                              (1, 'weird', 'weird')):
+            self.assertIn(word, pw.wifilib.scan_failure_reason(rc, out))
+        self.assertEqual(pw.wifilib.parse_wpa_scan('junk\n'), [])
+
+
 class ConfigTests(unittest.TestCase):
     def test_defaults(self):
         c = pw.config_from_env({})

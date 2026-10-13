@@ -307,7 +307,7 @@ const T = {
     q_join: "1. Join the setup network", q_setup: "2. Open the setup page", q_page: "Open this page on a phone", q_print: "Print", q_png: "Download PNG", q_svg: "SVG",
     w_title: "Wi-Fi", w_add: "Connect to a network", w_network: "Network", w_name: "Network name", w_password: "Password", w_show: "Show the password",
     w_add_hint: "Choose the network and type its password. The Pi tries it for up to a minute and keeps the previous settings if it does not work.",
-    w_connect: "Connect", w_scan: "Scan again", w_saved: "Saved networks", w_forget: "Forget", w_other: "Another network (type the name)…", w_none_saved: "No saved networks.",
+    w_connect: "Connect", w_scan: "Scan again", w_scan_err: "No networks listed", w_saved: "Saved networks", w_forget: "Forget", w_other: "Another network (type the name)…", w_none_saved: "No saved networks.",
     w_open: "open", w_secured: "password", w_hidden: "hidden", w_scanning: "Scanning…", w_cached: "The radio is serving the setup network, so this is the list from before it started.",
     w_confirm_forget: "Forget {ssid}? If it is the network in use, the Pi disconnects from it.", w_need_name: "Type the network name.", w_need_pass: "This network needs a password.",
     w_connected: "Connected to {ssid}", w_ip: "address {ip}", w_signal: "signal {dbm} dBm", w_find: "Open it at http://{ip}:8080/ (the address can change) or at http://{host}.local:8080/; the router's list of clients shows it too.",
@@ -364,7 +364,7 @@ const T = {
     q_join: "1. Подключиться к сети настройки", q_setup: "2. Открыть страницу настройки", q_page: "Открыть эту страницу на телефоне", q_print: "Печать", q_png: "Скачать PNG", q_svg: "SVG",
     w_title: "Wi-Fi", w_add: "Подключение к сети", w_network: "Сеть", w_name: "Имя сети", w_password: "Пароль", w_show: "Показать пароль",
     w_add_hint: "Выберите сеть и введите пароль. Pi пробует подключиться до минуты и при неудаче оставляет прежние настройки.",
-    w_connect: "Подключить", w_scan: "Обновить список", w_saved: "Сохранённые сети", w_forget: "Забыть", w_other: "Другая сеть (ввести имя)…", w_none_saved: "Сохранённых сетей нет.",
+    w_connect: "Подключить", w_scan: "Обновить список", w_scan_err: "Список сетей пуст", w_saved: "Сохранённые сети", w_forget: "Забыть", w_other: "Другая сеть (ввести имя)…", w_none_saved: "Сохранённых сетей нет.",
     w_open: "открытая", w_secured: "с паролем", w_hidden: "скрытая", w_scanning: "Поиск сетей…", w_cached: "Радио занято сетью настройки, поэтому показан список, снятый до её запуска.",
     w_confirm_forget: "Забыть {ssid}? Если это текущая сеть, Pi от неё отключится.", w_need_name: "Введите имя сети.", w_need_pass: "Для этой сети нужен пароль.",
     w_connected: "Подключено к {ssid}", w_ip: "адрес {ip}", w_signal: "сигнал {dbm} дБм", w_find: "Откройте http://{ip}:8080/ (адрес может измениться) или http://{host}.local:8080/; адрес есть и в списке клиентов роутера.",
@@ -840,6 +840,7 @@ function renderWifi() {
   $("wSetupRow").hidden = !(d.supported && d.mode === "client" && !d.busy);
   renderSaved(d);
   if (d.supported && !wifi.scanned) { wifi.scanned = true; fillNetworks(d.networks); }
+  if (d.supported && !(d.networks || []).length && d.scan_error) wText($("wResult"), "warn", tr("w_scan_err") + ": " + d.scan_error);
 }
 function renderSaved(d) {
   const box = $("wSaved"); box.textContent = "";

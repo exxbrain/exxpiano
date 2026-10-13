@@ -64,6 +64,7 @@ class System:
         self.iface, self.run_dir, self.wpa_conf = iface, run_dir, wpa_conf
         self._run = run or self._real_run
         self.procs = []
+        self.scan_error = None                          # why the last scan found nothing, or None
 
     @staticmethod
     def _real_run(cmd, timeout=15):
@@ -120,12 +121,8 @@ class System:
         return link
 
     def scan(self):
-        for _ in range(3):
-            rc, out = self.run(['iw', 'dev', self.iface, 'scan'], 20)
-            if rc == 0:
-                return wifilib.parse_scan(out)
-            time.sleep(1.5)
-        return []
+        found, self.scan_error = wifilib.scan_networks(self.run, self.iface, sleep=time.sleep)
+        return found or []
 
     def stations(self):
         rc, out = self.run(['iw', 'dev', self.iface, 'station', 'dump'], 5)
@@ -270,7 +267,7 @@ class Supervisor:
         link = link if link is not None else (self.sys.link() if self.mode == 'client' else None)
         wifilib.write_status(self.run_dir, dict(
             pid=os.getpid(), mode=self.mode, busy=self.busy, link=link, cable=self.sys.has_cable_route(), hostname=self.sys.hostname(), ap=dict(ssid=self.ap_ssid) if self.mode == 'ap' else None,
-            scan=self.scan_result, scanned_at=self.scanned_at, last_result=self.last_result, updated=int(self.wall())))
+            scan=self.scan_result, scan_error=getattr(self.sys, 'scan_error', None), scanned_at=self.scanned_at, last_result=self.last_result, updated=int(self.wall())))
         self._last_status = self.clock()
 
     def _result(self, ok, kind, ssid=None, error=None):
