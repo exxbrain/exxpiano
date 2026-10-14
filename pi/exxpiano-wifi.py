@@ -28,7 +28,6 @@ import wifilib  # noqa: E402
 IFACE = os.environ.get('WIFI_IFACE', 'wlan0')
 WPA_CONF = os.environ.get('WIFI_WPA_CONF', '/etc/wpa_supplicant/wpa_supplicant.conf')
 TICK = 3.0
-AP_VIRTUAL = 'uap0'            # the setup network next to a network the radio joins (the chips of the Pi 3 B+/3 A+/4/5 can, on one channel)
 
 
 def log(*parts):
@@ -54,7 +53,7 @@ def config_from_env(env=None):
                 grace_new=num('WIFI_GRACE_NEW', 10, 5, 3600), grace_known=num('WIFI_GRACE_KNOWN', 150, 5, 3600),
                 retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600), retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
                 connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300), web_port=num('WEB_PORT', 8080, 1, 65535),
-                enabled=env.get('WIFI_SETUP', '1') != '0', concurrent=env.get('WIFI_CONCURRENT', '0') == '1')
+                enabled=env.get('WIFI_SETUP', '1') != '0')
 
 
 # ---------------------------------------------------------------- the real system
@@ -66,8 +65,6 @@ class System:
         self._run = run or self._real_run
         self.procs = []
         self.scan_error = None                          # why the last scan found nothing, or None
-        self.ap_iface = iface                           # the interface of the access point: the radio itself, or a virtual one next to it
-        self._concurrent = None
 
     @staticmethod
     def _real_run(cmd, timeout=15):
@@ -127,15 +124,8 @@ class System:
         found, self.scan_error = wifilib.scan_networks(self.run, self.iface, sleep=time.sleep)
         return found or []
 
-    def concurrent_supported(self):
-        """Can the radio serve an access point and join a network at the same time (the chip says so in `iw list`)? Asked once."""
-        if self._concurrent is None:
-            rc, out = self.run(['iw', 'list'], 10)
-            self._concurrent = rc == 0 and wifilib.concurrent_ap_sta(out)
-        return self._concurrent
-
     def stations(self):
-        rc, out = self.run(['iw', 'dev', self.ap_iface, 'station', 'dump'], 5)
+        rc, out = self.run(['iw', 'dev', self.iface, 'station', 'dump'], 5)
         return len(re.findall(r'(?m)^Station ', out)) if rc == 0 else 0
 
     # -- client mode (ifupdown starts wpa_supplicant and dhclient)
@@ -153,39 +143,28 @@ class System:
         self.run(['wpa_cli', '-i', self.iface, 'reconfigure'], 5)
 
     # -- access point
-    def ap_start(self, ssid, passphrase, channel, country, concurrent=False):
-        """Start the setup network. `concurrent`: on a virtual interface next to the radio's own, which stays free to join a network."""
+    def ap_start(self, ssid, passphrase, channel, country):
         os.makedirs(self.run_dir, mode=0o700, exist_ok=True)
-        if concurrent:
-            self.run(['iw', 'dev', AP_VIRTUAL, 'del'], 5)                    # a leftover of an earlier run
-            rc, out = self.run(['iw', 'dev', self.iface, 'interface', 'add', AP_VIRTUAL, 'type', '__ap'], 10)
-            if rc != 0:
-                raise RuntimeError('the virtual interface could not be made: ' + out.strip()[-200:])
-            self.ap_iface = AP_VIRTUAL
-        else:
-            self.ap_iface = self.iface
         ctrl = os.path.join(self.run_dir, 'hostapd')
         hostapd_conf = os.path.join(self.run_dir, 'hostapd.conf')
         dnsmasq_conf = os.path.join(self.run_dir, 'dnsmasq.conf')
-        ap = self.ap_iface
-        wifilib.write_secret(hostapd_conf, wifilib.hostapd_conf(ap, ssid, passphrase, channel, country, ctrl))
-        wifilib.write_secret(dnsmasq_conf, wifilib.dnsmasq_conf(ap, self.run_dir))
-        if not concurrent:
-            self.client_down()
-        self.run(['ip', 'addr', 'flush', 'dev', ap], 5)
-        self.run(['ip', 'link', 'set', ap, 'up'], 5)
+        wifilib.write_secret(hostapd_conf, wifilib.hostapd_conf(self.iface, ssid, passphrase, channel, country, ctrl))
+        wifilib.write_secret(dnsmasq_conf, wifilib.dnsmasq_conf(self.iface, self.run_dir))
+        self.client_down()
+        self.run(['ip', 'addr', 'flush', 'dev', self.iface], 5)
+        self.run(['ip', 'link', 'set', self.iface, 'up'], 5)
         hostapd = subprocess.Popen(['hostapd', hostapd_conf], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         self.procs.append(hostapd)
         for _ in range(20):                                         # up to 10 s for the radio to switch to AP mode
             time.sleep(0.5)
             if hostapd.poll() is not None:
                 raise RuntimeError('hostapd stopped: ' + (hostapd.stdout.read() or '')[-300:])
-            rc, out = self.run(['iw', 'dev', ap, 'info'], 5)
+            rc, out = self.run(['iw', 'dev', self.iface, 'info'], 5)
             if rc == 0 and re.search(r'type AP', out):
                 break
         else:
             raise RuntimeError('the radio did not switch to access point mode')
-        self.run(['ip', 'addr', 'add', wifilib.AP_ADDRESS + '/24', 'dev', ap], 5)
+        self.run(['ip', 'addr', 'add', wifilib.AP_ADDRESS + '/24', 'dev', self.iface], 5)
         dnsmasq = subprocess.Popen(['dnsmasq', '--conf-file=' + dnsmasq_conf, '--keep-in-foreground'], stdout=subprocess.DEVNULL,
                                    stderr=subprocess.PIPE, text=True)
         self.procs.append(dnsmasq)
@@ -204,12 +183,8 @@ class System:
                 except OSError:
                     pass
         self.procs = []
-        self.run(['ip', 'addr', 'flush', 'dev', self.ap_iface], 5)
-        if self.ap_iface != self.iface:
-            self.run(['iw', 'dev', self.ap_iface, 'del'], 5)                   # the virtual interface goes; the radio's own stays as it is
-            self.ap_iface = self.iface
-        else:
-            self.run(['ip', 'link', 'set', self.iface, 'down'], 5)
+        self.run(['ip', 'addr', 'flush', 'dev', self.iface], 5)
+        self.run(['ip', 'link', 'set', self.iface, 'down'], 5)
         for name in ('hostapd.conf', 'dnsmasq.conf'):                # they hold the access point password
             try:
                 os.unlink(os.path.join(self.run_dir, name))
@@ -272,7 +247,6 @@ class Supervisor:
         self.busy = None
         self.next_ap_attempt = 0.0
         self.ap_failures = 0
-        self.ap_concurrent = False                       # the setup network runs next to a free radio interface
         self._last_status = 0.0
 
     # -- files
@@ -293,7 +267,7 @@ class Supervisor:
         link = link if link is not None else (self.sys.link() if self.mode == 'client' else None)
         wifilib.write_status(self.run_dir, dict(
             pid=os.getpid(), mode=self.mode, busy=self.busy, link=link, cable=self.sys.has_cable_route(), hostname=self.sys.hostname(), ap=dict(ssid=self.ap_ssid) if self.mode == 'ap' else None,
-            scan=self.scan_result, scan_error=getattr(self.sys, 'scan_error', None), ap_concurrent=self.ap_concurrent, scanned_at=self.scanned_at, last_result=self.last_result, updated=int(self.wall())))
+            scan=self.scan_result, scan_error=getattr(self.sys, 'scan_error', None), scanned_at=self.scanned_at, last_result=self.last_result, updated=int(self.wall())))
         self._last_status = self.clock()
 
     def _result(self, ok, kind, ssid=None, error=None):
@@ -308,17 +282,8 @@ class Supervisor:
             self.scan_result, self.scanned_at = self.sys.scan(), int(self.wall())
         wpa = self._read_wpa()
         self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.installation_id)
-        self.ap_concurrent = False
         try:
-            if self.cfg.get('concurrent') and self.sys.concurrent_supported():
-                try:
-                    self.sys.ap_start(self.ap_ssid, self.cfg['ap_password'], self.cfg['channel'], wifilib.country(wpa), concurrent=True)
-                    self.ap_concurrent = True
-                except Exception as exc:                            # noqa: BLE001 - the plain setup network is the way that is known to work
-                    log('the setup network next to the radio did not start (%s): trying the plain one' % str(exc)[-120:])
-                    self.sys.ap_stop()
-            if not self.ap_concurrent:
-                self.sys.ap_start(self.ap_ssid, self.cfg['ap_password'], self.cfg['channel'], wifilib.country(wpa))
+            self.sys.ap_start(self.ap_ssid, self.cfg['ap_password'], self.cfg['channel'], wifilib.country(wpa))
         except Exception as exc:                                    # noqa: BLE001 - any failure must end with the normal network back
             log('the access point did not start:', exc)
             self.sys.ap_stop()
@@ -339,16 +304,13 @@ class Supervisor:
         self.publish(link=None)
         return True
 
-    def leave_ap(self, reconnect=True):
-        """Stop the setup network. `reconnect=False` when the radio has just joined a network: it must not be restarted."""
+    def leave_ap(self):
         if self.portal:
             self.portal.stop()
         self.sys.ap_stop()
         self.mode = 'client'
         self.ap_until = None
-        self.ap_concurrent = False
-        if reconnect:
-            self.sys.client_up()
+        self.sys.client_up()
 
     def wait_online(self, ssid=None, timeout=45):
         """True when the Wi-Fi is associated (with `ssid` when given) and has an address and a route."""
@@ -396,17 +358,11 @@ class Supervisor:
             return
         log('connecting to %r' % ssid)
         was_ap = self.mode == 'ap'
-        keep_ap = was_ap and self._can_keep_ap(ssid, bool(req.get('hidden')))
-        if keep_ap:
-            log('the setup network stays up while %r is tried' % ssid)
-            self.sys.client_up()                                   # the radio's own interface joins; the phone keeps its connection to the setup network
-        elif was_ap:
+        if was_ap:
             self.leave_ap()
         else:
             self.sys.client_up()
         if self.wait_online(ssid, self.cfg['connect_wait']):
-            if keep_ap:
-                self.leave_ap(reconnect=False)                     # only now the setup network goes: the home network is there
             self.busy = None
             self._result(True, 'connect', ssid)
             log('connected to %r' % ssid)
@@ -417,25 +373,11 @@ class Supervisor:
         self._write_wpa(before)
         self.busy = None
         self._result(False, 'connect', ssid, 'wrong password, or the network is out of range')
-        if keep_ap:
-            self.sys.client_down()                                 # the attempt is over; the setup network never went away and shows the reason
-            self.publish(link=None)
-        elif was_ap:
+        if was_ap:
             self.enter_ap()
         else:
             self.sys.client_up()
             self.publish()
-
-    def _can_keep_ap(self, ssid, hidden):
-        """Can the setup network stay while `ssid` is tried? Only when it runs next to a free radio interface and the network is on the
-        channel of the setup network (the radio has one channel); a hidden network has no known channel. Otherwise the old way: the setup
-        network goes first and comes back when the attempt fails."""
-        if not self.ap_concurrent or hidden:
-            return False
-        for n in self.scan_result or []:
-            if n.get('ssid') == ssid:
-                return wifilib.channel_of(n.get('freq')) == self.cfg['channel']
-        return False
 
     def only_way_in(self, ssid):
         """True when forgetting `ssid` would cut the connection in use with nothing else to fall back on."""

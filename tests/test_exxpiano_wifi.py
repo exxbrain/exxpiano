@@ -49,10 +49,6 @@ class FakeSystem:
         self.ap_fails = False
         self.exists_ = True
         self.nm = False
-        self.concurrent_ok = False             # the chip can serve the setup network and join a network at the same time
-        self.concurrent_ap_fails = False
-        self.ap_on = False                     # the setup network is running (also next to the client)
-        self.ap_next_to_client = False
 
     def read_wpa(self):
         with open(self.wpa_path) as f:
@@ -110,22 +106,16 @@ class FakeSystem:
     def reload_wpa(self):
         self.calls.append('reload_wpa')
 
-    def concurrent_supported(self):
-        return self.concurrent_ok
-
     # access point
-    def ap_start(self, ssid, passphrase, channel, country, concurrent=False):
-        self.calls.append('ap_start_concurrent' if concurrent else 'ap_start')
-        if self.ap_fails or (concurrent and self.concurrent_ap_fails):
+    def ap_start(self, ssid, passphrase, channel, country):
+        self.calls.append('ap_start')
+        if self.ap_fails:
             raise RuntimeError('hostapd stopped')
         self.ap_args = (ssid, passphrase, channel, country)
-        self.ap_on, self.ap_next_to_client = True, concurrent
-        if not concurrent:
-            self.state, self.connected = 'ap', None
+        self.state, self.connected = 'ap', None
 
     def ap_stop(self):
         self.calls.append('ap_stop')
-        self.ap_on, self.ap_next_to_client = False, False
         if self.state == 'ap':
             self.state = 'down'
 
@@ -249,72 +239,6 @@ class ConnectTests(SupervisorCase):
         self.assertEqual((st['last_result']['ok'], st['last_result']['ssid'], st['busy']), (True, 'Home', None))
         self.assertEqual(st['link']['ssid'], 'Home')
         self.assertEqual(st['hostname'], 'exxpiano')
-
-    def concurrent_ap(self):
-        self.cfg['concurrent'] = True
-        self.system.concurrent_ok = True
-        self.to_ap()
-        self.assertTrue(self.sup.ap_concurrent)
-        self.assertIn('ap_start_concurrent', self.system.calls)
-
-    def test_the_setup_network_stays_until_the_home_network_is_joined(self):
-        self.concurrent_ap()
-        self.system.reachable = {'Home': HOME_PSK}                                      # Home is on channel 6, the channel of the setup network
-        self.request(action='connect', ssid='Home', psk=HOME_PSK)
-        self.advance(3)
-        calls = self.system.calls
-        self.assertEqual(self.sup.mode, 'client')
-        self.assertEqual(self.system.connected, 'Home')
-        self.assertLess(calls.index('client_up'), len(calls) - 1 - calls[::-1].index('ap_stop'))     # the client came up first, the setup network went afterwards
-        self.assertEqual(calls.count('client_up'), 1)                                   # and the radio was not restarted when the setup network left
-        self.assertFalse(self.portal.running)
-        self.assertTrue(self.status()['last_result']['ok'])
-
-    def test_a_failed_attempt_never_takes_the_setup_network_away(self):
-        self.concurrent_ap()
-        before = self.system.read_wpa()
-        self.system.reachable = {'Home': HOME_PSK}
-        calls_before = len(self.system.calls)
-        self.request(action='connect', ssid='Home', psk=OTHER_PSK)
-        self.advance(3)
-        self.assertEqual(self.sup.mode, 'ap')
-        self.assertTrue(self.portal.running)
-        self.assertTrue(self.system.ap_on)
-        self.assertNotIn('ap_stop', self.system.calls[calls_before:])                   # it never went away
-        self.assertNotIn('ap_start', self.system.calls[calls_before:])                  # so it did not have to come back
-        self.assertEqual(self.system.read_wpa(), before)
-        r = self.status()['last_result']
-        self.assertEqual((r['ok'], r['ssid']), (False, 'Home'))
-        self.assertTrue(self.status()['ap_concurrent'])
-
-    def test_a_network_on_another_channel_takes_the_old_way(self):
-        self.concurrent_ap()
-        self.system.reachable = {'Cafe': None}                                          # Cafe is on channel 1, the radio has one channel
-        calls_before = len(self.system.calls)
-        self.request(action='connect', ssid='Cafe', psk=None)
-        self.advance(3)
-        calls = self.system.calls[calls_before:]
-        self.assertEqual(self.sup.mode, 'client')
-        self.assertLess(calls.index('ap_stop'), calls.index('client_up'))               # the setup network goes first, as it always did
-
-    def test_a_hidden_network_has_no_known_channel_and_takes_the_old_way(self):
-        self.concurrent_ap()
-        self.system.reachable = {'Hidden': HOME_PSK}
-        calls_before = len(self.system.calls)
-        self.request(action='connect', ssid='Hidden', psk=HOME_PSK, hidden=True)
-        self.advance(3)
-        self.assertIn('ap_stop', self.system.calls[calls_before:])
-
-    def test_it_is_off_unless_asked_for_and_falls_back_when_the_virtual_interface_fails(self):
-        self.system.concurrent_ok = True
-        self.to_ap()                                                                    # WIFI_CONCURRENT is not set: the plain setup network
-        self.assertEqual((self.sup.ap_concurrent, 'ap_start_concurrent' in self.system.calls), (False, False))
-        self.sup.leave_ap()
-        self.cfg['concurrent'] = True
-        self.system.concurrent_ap_fails = True
-        self.sup.enter_ap()
-        self.assertEqual((self.sup.mode, self.sup.ap_concurrent), ('ap', False))        # the plain way took over
-        self.assertEqual(self.system.calls.count('ap_start'), 2)
 
     def test_a_wrong_password_restores_the_file_and_brings_the_access_point_back(self):
         self.to_ap()

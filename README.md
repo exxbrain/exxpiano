@@ -370,8 +370,6 @@ Good to know:
 - Test without risk: `sudo python3 /opt/exxpiano/exxpiano-wifi.py ap-test 120` starts the setup network for 2 minutes and then returns to the normal one by itself.
   (An SSH session over Wi-Fi is cut for that time.)
 
-**Keeping the setup network while the home network is tried (experimental).** By default, pressing **Connect** in the setup network switches the setup network off first (the radio cannot do both), waits up to 45 seconds and brings the setup network back if the attempt fails; the phone loses the page in the meantime. With `WIFI_CONCURRENT=1` in `/etc/exxpiano.conf` the Pi starts the setup network on a virtual interface next to the radio's own one (the chips of the Pi 3 B+/3 A+/4/5 report that they can serve an access point and join a network at the same time, on one channel), tries the home network on the radio and takes the setup network away **only after the connection is made**; a failed attempt never takes it away, and the page shows the reason. This works when the home network is on the same 2.4 GHz channel as the setup network (`WIFI_AP_CHANNEL`, 6 by default; set it to the channel of your router), for a network that is not hidden; for any other network the Pi does as it did before. If the virtual interface cannot be made, the plain setup network starts. **Not tried on a real Raspberry Pi**: the radio's behaviour with two interfaces on one channel (some phones may still notice a short glitch when the home network is joined) is the open question.
-
 ## How it works
 
 In the SFZ original the mechanics are triggered by `trigger=release` (a key is released) and `on_locc64` (the pedal) rules.
