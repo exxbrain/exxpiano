@@ -31,6 +31,8 @@ TICK = 3.0
 NET_DIR = '/etc/network'
 DIETPI_TXT = ('/boot/firmware/dietpi.txt', '/boot/dietpi.txt')
 CTRL_LINE = 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev'
+SYS_NET = '/sys/class/net'
+WIRED_RE = re.compile(r'^(eth\d+|en[a-z0-9]+)$')
 
 
 def log(*parts):
@@ -63,9 +65,10 @@ def config_from_env(env=None):
 class System:
     """Everything that touches the machine; the tests replace it."""
 
-    def __init__(self, iface=IFACE, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, run=None, net_dir=NET_DIR, dietpi_txt=DIETPI_TXT):
+    def __init__(self, iface=IFACE, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, run=None, net_dir=NET_DIR, dietpi_txt=DIETPI_TXT, sys_net=SYS_NET):
         self.iface, self.run_dir, self.wpa_conf = iface, run_dir, wpa_conf
-        self.net_dir, self.dietpi_txt = net_dir, dietpi_txt
+        self.net_dir, self.dietpi_txt, self.sys_net = net_dir, dietpi_txt, sys_net
+        self._wired = {}                                # wired interface -> True while a DHCP client was started for the cable that is plugged in
         self._run = run or self._real_run
         self.procs = []
         self.scan_error = None                          # why the last scan found nothing, or None
@@ -153,15 +156,47 @@ class System:
             pass
         return files
 
-    def _has_stanza(self):
+    def _has_stanza(self, name=None):
+        name = name or self.iface
         for path in self._interfaces_files():
             try:
                 with open(path, encoding='utf-8', errors='replace') as f:
-                    if re.search(r'(?m)^\s*iface\s+%s\s' % re.escape(self.iface), f.read()):
+                    if re.search(r'(?m)^\s*iface\s+%s\s' % re.escape(name), f.read()):
                         return True
             except OSError:
                 continue
         return False
+
+    def ensure_wired(self):
+        """A wired interface that nothing configures (a USB Ethernet adapter or a USB hub with a network port: ifupdown knows only eth0) gets
+        an address by DHCP when a cable is plugged in, so that the Pi can be reached and the setup network can give way to the cable.
+        One DHCP client per plugged cable; an interface with a stanza, or that already has an address, is left to its owner."""
+        try:
+            names = sorted(os.listdir(self.sys_net))
+        except OSError:
+            return
+        for name in names:
+            if not WIRED_RE.match(name) or not os.path.isdir(os.path.join(self.sys_net, name, 'device')) or self._has_stanza(name):
+                continue
+            self.run(['ip', 'link', 'set', name, 'up'], 5)
+            try:
+                with open(os.path.join(self.sys_net, name, 'carrier'), encoding='ascii') as f:
+                    plugged = f.read().strip() == '1'
+            except OSError:
+                plugged = False
+            if not plugged:
+                self._wired.pop(name, None)                           # unplugged: the next cable is a new one
+                continue
+            if self._wired.get(name):
+                continue
+            self._wired[name] = True
+            rc, out = self.run(['ip', '-4', '-o', 'addr', 'show', 'dev', name], 5)
+            if rc == 0 and out.strip():
+                continue
+            log('a cable is plugged in %s and nothing configures it: asking for an address' % name)
+            rc, out = self.run(['dhclient', '-1', '-nw', '-pf', os.path.join(self.run_dir, 'dhclient-%s.pid' % name), name], 20)
+            if rc != 0:
+                log('dhclient on %s failed: %s' % (name, out.strip()[-160:]))
 
     def ensure_client_config(self):
         """Make `ifup wlan0` possible on a card that was never set up for Wi-Fi: Wi-Fi not blocked, a wpa_supplicant.conf that wpa_cli can talk
@@ -484,6 +519,12 @@ class Supervisor:
 
     # -- one round of the loop
     def step(self):
+        wired = getattr(self.sys, 'ensure_wired', None)
+        if wired:
+            try:
+                wired()                                              # a cable in a USB network adapter gets its address
+            except Exception as exc:                                 # noqa: BLE001 - never at the cost of the Wi-Fi supervisor
+                log('wired interface check failed:', exc)
         req = wifilib.take_request(self.run_dir)
         if req:
             self.handle(req)

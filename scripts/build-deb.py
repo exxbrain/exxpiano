@@ -18,7 +18,7 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 MAINTAINER = 'Denis Zakharov <noreply@localhost>'
 # hostapd and dnsmasq-base: the setup access point (no system service of theirs is used: exxpiano-wifi starts them itself)
-DEPENDS = 'fluidsynth, alsa-utils, python3, python3-mido, python3-rtmidi, hostapd, dnsmasq-base, iw, wpasupplicant'
+DEPENDS = 'fluidsynth, alsa-utils, python3, python3-mido, python3-rtmidi, hostapd, dnsmasq-base, iw, wpasupplicant, ifupdown, isc-dhcp-client'
 RECOMMENDS = 'avahi-daemon'
 
 

@@ -484,6 +484,55 @@ class SystemTests(unittest.TestCase):
         s, _ = self.make({'is-active': (3, 'inactive\n')})
         self.assertFalse(s.managed_elsewhere())
 
+    def wired(self, answers=None):
+        """A System with a fake /sys/class/net: -> (system, calls, helper that makes an interface with carrier 0 or 1)."""
+        s, calls = self.make(dict({'dhclient': (0, ''), 'addr show': (0, '')}, **(answers or {})))
+        s.sys_net = os.path.join(self.tmp.name, 'sys_net')
+        os.makedirs(s.sys_net)
+
+        def nic(name, carrier, physical=True):
+            os.makedirs(os.path.join(s.sys_net, name, 'device' if physical else 'virtual'), exist_ok=True)
+            with open(os.path.join(s.sys_net, name, 'carrier'), 'w') as f:
+                f.write('%d\n' % carrier)
+        return s, calls, nic
+
+    def test_a_usb_ethernet_adapter_with_a_cable_gets_an_address_once_per_cable(self):
+        s, calls, nic = self.wired()
+        self.write(os.path.join(self.net, 'interfaces'), 'source interfaces.d/*\n')
+        self.write(os.path.join(self.net, 'interfaces.d', 'eth0'), 'allow-hotplug eth0\niface eth0 inet dhcp\n')       # the board's own port: ifupdown does it
+        nic('eth0', 1)
+        nic('eth1', 0)                                                                       # the adapter, no cable yet
+        nic('lo', 1, physical=False)
+        nic('wlan0', 1)
+        s.ensure_wired()
+        self.assertFalse([c for c in calls if c[0] == 'dhclient'])                           # nothing to do without a cable
+        self.assertIn(['ip', 'link', 'set', 'eth1', 'up'], calls)
+        nic('eth1', 1)                                                                       # the cable is plugged in
+        s.ensure_wired()
+        s.ensure_wired()
+        dh = [c for c in calls if c[0] == 'dhclient']
+        self.assertEqual(len(dh), 1)
+        self.assertEqual((dh[0][:3], dh[0][-1]), (['dhclient', '-1', '-nw'], 'eth1'))
+        self.assertNotIn('eth0', ' '.join(' '.join(c) for c in dh))                          # an interface with a stanza is left alone
+        nic('eth1', 0)
+        s.ensure_wired()                                                                     # unplugged
+        nic('eth1', 1)
+        s.ensure_wired()                                                                     # plugged again: a new request
+        self.assertEqual(len([c for c in calls if c[0] == 'dhclient']), 2)
+
+    def test_an_interface_that_already_has_an_address_is_not_touched(self):
+        s, calls, nic = self.wired({'addr show': (0, '3: eth1    inet 192.168.1.40/24 brd 192.168.1.255 scope global eth1\n')})
+        nic('eth1', 1)
+        s.ensure_wired()
+        self.assertFalse([c for c in calls if c[0] == 'dhclient'])
+
+    def test_a_missing_dhclient_or_sysfs_does_not_break_anything(self):
+        s, calls, nic = self.wired({'dhclient': (127, 'no such file')})
+        nic('eth1', 1)
+        s.ensure_wired()
+        s.sys_net = os.path.join(self.tmp.name, 'nowhere')
+        s.ensure_wired()
+
     def write(self, path, text):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
