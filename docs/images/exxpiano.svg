@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" role="img" aria-labelledby="t d">
+<title id="t">exxpiano</title><desc id="d">The name exxpiano above a row of piano keys</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1f2a"/><stop offset="1" stop-color="#0f1219"/></linearGradient>
+<linearGradient id="wk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d9dde6"/></linearGradient></defs>
+<rect width="1200" height="300" rx="18" fill="url(#bg)"/>
+<text x="60" y="130" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="92" font-weight="700" fill="#f2f4f8" letter-spacing="1">exxpiano</text>
+<text x="62" y="172" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="26" fill="#9aa4b8">Salamander Grand Piano on a Raspberry Pi</text>
+<rect x="60" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="120" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="180" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="240" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="300" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="360" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="420" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="480" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="540" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="600" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="660" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="720" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="780" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="840" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="900" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="960" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="1020" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="1080" y="196" width="57" height="86" rx="5" fill="url(#wk)"/>
+<rect x="102" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="162" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="282" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="342" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="402" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="522" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="582" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="702" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="762" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="822" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="942" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+<rect x="1002" y="196" width="34" height="52" rx="4" fill="#1b1f2a" stroke="#0a0c12"/>
+</svg>

@@ -2,6 +2,12 @@
 
 [English](README.md) | Русский
 
+![exxpiano](docs/images/exxpiano.svg)
+
+[![сборка](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml)
+[![сборка релиза](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml)
+[![latest release](https://img.shields.io/github/v/release/exxbrain/exxpiano?label=release)](https://github.com/exxbrain/exxpiano/releases/latest)
+
 **Хороший звук фортепиано на дешёвой плате при минимуме усилий.** exxpiano превращает Raspberry Pi (даже б/у Pi 3 A+ с 512 МБ) в цифровое пианино для любой USB MIDI-клавиатуры: образ записывается на карту, плата включается, всё настраивается с телефона. Без установки и без экрана на плате. От записи карты до первого звука проходит несколько минут (не хронометрированный замер).
 
 ## Возможности

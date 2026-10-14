@@ -2,6 +2,12 @@
 
 English | [Русский](README.ru.md)
 
+![exxpiano](docs/images/exxpiano.svg)
+
+[![build](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml)
+[![release build](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml)
+[![latest release](https://img.shields.io/github/v/release/exxbrain/exxpiano?label=release)](https://github.com/exxbrain/exxpiano/releases/latest)
+
 **A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
 
 ## What it can do
