@@ -215,6 +215,34 @@ def parse_wpa_scan(text):
     return sorted(best.values(), key=lambda e: -e['signal'])
 
 
+def channel_of(freq):
+    """The 2.4 GHz channel of a frequency in MHz (None for 5 GHz and anything else)."""
+    if isinstance(freq, int) and 2412 <= freq <= 2472 and (freq - 2407) % 5 == 0:
+        return (freq - 2407) // 5
+    return 14 if freq == 2484 else None
+
+
+def concurrent_ap_sta(iw_list):
+    """True when `iw list` says the radio can run an access point and a station at the same time ("valid interface combinations")."""
+    block = re.search(r'valid interface combinations:(.*?)(?:\n\t[A-Za-z]|\Z)', iw_list or '', re.S)
+    if not block:
+        return False
+    for combo in re.split(r'\*\s', block.group(1))[1:]:
+        text = ' '.join(combo.split())
+        groups = [(set(x.strip() for x in g.split(',')), int(n)) for g, n in re.findall(r'#\{\s*([^}]*?)\s*\}\s*<=\s*(\d+)', text)]
+        ap = [(names, n) for names, n in groups if 'AP' in names]
+        sta = [(names, n) for names, n in groups if 'managed' in names]
+        total = re.search(r'total <= (\d+)', text)
+        if not ap or not sta or (total and int(total.group(1)) < 2):
+            continue
+        if any(a_names is s_names for a_names, _ in ap for s_names, _ in sta):                # one shared group: it must allow two interfaces
+            if any(n >= 2 for names, n in ap if any(names is s for s, _ in sta)):
+                return True
+            continue
+        return True
+    return False
+
+
 def scan_failure_reason(rc, out):
     """A short human reason for a failed scan, from the exit code and the text of `iw`."""
     text = (out or '').lower()

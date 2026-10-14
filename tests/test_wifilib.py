@@ -232,5 +232,32 @@ class AccessPointTests(unittest.TestCase):
             self.assertIn(line + '\n', text)
 
 
+
+class ConcurrentTests(unittest.TestCase):
+    BRCM = '''Wiphy phy0
+\tvalid interface combinations:
+\t\t * #{ managed } <= 2, #{ P2P-device } <= 1, #{ P2P-client, P2P-GO } <= 1,
+\t\t   total <= 3, #channels <= 2
+\t\t * #{ managed } <= 1, #{ AP } <= 1, #{ P2P-client } <= 1, #{ P2P-device } <= 1,
+\t\t   total <= 4, #channels <= 2
+\tDevice supports scan flush.
+'''
+    ONE = '''Wiphy phy0
+\tvalid interface combinations:
+\t\t * #{ managed, AP } <= 1, total <= 1, #channels <= 1
+\tDevice supports scan flush.
+'''
+
+    def test_the_chip_says_whether_an_access_point_and_a_station_fit_together(self):
+        self.assertTrue(wifilib.concurrent_ap_sta(self.BRCM))
+        self.assertFalse(wifilib.concurrent_ap_sta(self.ONE))
+        self.assertFalse(wifilib.concurrent_ap_sta(''))
+        self.assertFalse(wifilib.concurrent_ap_sta(None))
+
+    def test_channels_of_2_4_ghz_frequencies(self):
+        self.assertEqual([wifilib.channel_of(f) for f in (2412, 2437, 2462, 2472, 2484)], [1, 6, 11, 13, 14])
+        self.assertEqual([wifilib.channel_of(f) for f in (5180, 2400, 2413, None, 'x')], [None] * 5)
+
+
 if __name__ == '__main__':
     unittest.main()
