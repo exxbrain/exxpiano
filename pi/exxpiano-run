@@ -18,7 +18,10 @@ PERIOD_SIZE="${PERIOD_SIZE:-64}"
 PERIODS="${PERIODS:-3}"
 USB_PERIOD_SIZE="${USB_PERIOD_SIZE:-64}"
 USB_PERIODS="${USB_PERIODS:-3}"
-USB_WAIT="${USB_WAIT:-8}"          # seconds to wait for a USB card to appear at boot
+USB_WAIT="${USB_WAIT:-8}"          # the most seconds to wait for a USB card to appear at boot
+USB_SETTLE="${USB_SETTLE:-12}"      # seconds after the boot that USB devices need to show up; later nothing is waited for without a reason
+USB_SYSFS="${USB_SYSFS:-/sys/bus/usb/devices}"
+UPTIME_FILE="${PROC_UPTIME:-/proc/uptime}"
 POLYPHONY="${POLYPHONY:-128}"
 GAIN="${GAIN:-1.0}"
 REVERB="${REVERB:-0}"
@@ -57,6 +60,23 @@ if [ -f "$BANKLIB" ] && command -v python3 >/dev/null && [ -n "${PIANO_SF2:-}" ]
   fi
 fi
 
+# true while a USB audio device is on the bus but its driver has not taken it yet (ALSA has no card for it so far)
+usb_audio_pending() {
+  local d
+  for d in "$USB_SYSFS"/*:*; do
+    [ -r "$d/bInterfaceClass" ] || continue
+    [ "$(cat "$d/bInterfaceClass" 2>/dev/null)" = 01 ] || continue
+    [ -e "$d/driver" ] || return 0
+  done
+  return 1
+}
+
+uptime_seconds() {
+  local u=0
+  read -r u _ < "$UPTIME_FILE" 2>/dev/null || u=0
+  echo "${u%%.*}"
+}
+
 # prints "<card id> <usb|onboard|other>" for the best card, or nothing
 pick_card() {
   local usb="" onboard="" other="" num id
@@ -84,8 +104,12 @@ if [ "$ALSA_DEVICE" = auto ]; then
   choice="$(pick_card)"
   waited=0
   while [ "${choice##* }" != usb ] && [ "$waited" -lt "$USB_WAIT" ]; do   # a USB card enumerates late at boot
+    # nothing to wait for: the USB devices have had time to show up and no audio device is waiting for its driver (a keyboard that is
+    # a capture-only audio card has its driver already, so it does not hold the start back either)
+    if [ "$(uptime_seconds)" -ge "$USB_SETTLE" ] && ! usb_audio_pending; then break; fi
     sleep 1; waited=$((waited + 1)); choice="$(pick_card)"
   done
+  [ "$waited" -eq 0 ] || echo "exxpiano: waited ${waited} s for a USB sound card" >&2
   [ -n "$choice" ] || { echo "exxpiano: no sound card found (a Raspberry Pi 5 has no 3.5 mm jack: connect a USB sound card or an audio interface)" >&2; exit 1; }
   DEVICE="plughw:CARD=${choice%% *}"
   if [ "${choice##* }" = usb ]; then Z="$USB_PERIOD_SIZE"; C="$USB_PERIODS"; fi

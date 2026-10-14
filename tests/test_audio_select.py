@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -72,6 +73,47 @@ class AudioSelectTests(unittest.TestCase):
             r = self.run_script([HEADPHONES], **env)
             self.assertNotIn('does not fit', r.stderr)
             self.assertIn(big, r.stdout)
+
+    def timed(self, cards, sysfs_interfaces, uptime, **env):
+        """Run the script against a fake /sys/bus/usb/devices (interface name -> driver bound or not) and a fake uptime; -> (result, seconds)."""
+        with tempfile.TemporaryDirectory() as d:
+            sysfs = os.path.join(d, 'usb')
+            os.makedirs(sysfs)
+            for name, bound in sysfs_interfaces.items():
+                os.makedirs(os.path.join(sysfs, name))
+                with open(os.path.join(sysfs, name, 'bInterfaceClass'), 'w') as f:
+                    f.write('01\n')
+                if bound:
+                    os.symlink(d, os.path.join(sysfs, name, 'driver'))
+            up = os.path.join(d, 'uptime')
+            with open(up, 'w') as f:
+                f.write('%s 100.00\n' % uptime)
+            start = time.monotonic()
+            r = self.run_script(cards, USB_SYSFS=sysfs, PROC_UPTIME=up, **env)
+            return r, time.monotonic() - start
+
+    def test_nothing_is_waited_for_when_no_usb_audio_device_is_coming(self):
+        r, seconds = self.timed([HEADPHONES], {}, 500, USB_WAIT=4)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('plughw:CARD=Headphones', r.stdout)
+        self.assertLess(seconds, 2.5)
+        self.assertNotIn('waited', r.stderr)
+
+    def test_a_usb_keyboard_that_is_a_capture_only_audio_card_does_not_hold_the_start_back(self):
+        r, seconds = self.timed([HEADPHONES, keyboard(1)], {'1-1:1.0': True}, 500, USB_WAIT=4)      # its driver is bound already
+        self.assertIn('plughw:CARD=Headphones', r.stdout)
+        self.assertLess(seconds, 2.5)
+
+    def test_it_waits_for_a_usb_audio_device_that_is_still_waiting_for_its_driver(self):
+        r, seconds = self.timed([HEADPHONES], {'1-1:1.0': False}, 500, USB_WAIT=2)
+        self.assertIn('plughw:CARD=Headphones', r.stdout)                              # no card came: the jack
+        self.assertGreaterEqual(seconds, 1.9)
+        self.assertIn('waited 2 s', r.stderr)
+
+    def test_right_after_the_boot_it_still_gives_the_usb_devices_a_moment(self):
+        r, seconds = self.timed([HEADPHONES], {}, 1, USB_WAIT=2, USB_SETTLE=12)
+        self.assertGreaterEqual(seconds, 1.9)
+        self.assertIn('waited 2 s', r.stderr)
 
     def test_only_onboard_uses_its_own_buffer_settings(self):
         r = self.run_script([HEADPHONES])
