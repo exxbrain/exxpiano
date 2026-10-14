@@ -27,6 +27,21 @@ CH_HAMMER, CH_RES_L, CH_RES_S, CH_RES_V3, CH_PEDAL_DN, CH_PEDAL_UP = 1, 2, 3, 4,
 PROGRAMS = {CH_HAMMER: 1, CH_RES_L: 2, CH_RES_S: 3, CH_RES_V3: 4, CH_PEDAL_DN: 5, CH_PEDAL_UP: 6}
 ATT_RANGE_DB = 60.0   # attenuation covered by velocity 1..127 in Salamander-mech.sf2
 
+# Loudness of ONE string-resonance voice at velocity 127 (loudest 100 ms, RMS, dBFS at FluidSynth gain 1.0), measured on mech.sf2 for the keys
+# 20, 22 ... 88 (index (key-20)//2). A voice of velocity v is ATT_RANGE_DB*(1-v/127) dB quieter. The resonance is about 35 dB below the piano in
+# energy, and most single voices (all of group V3, the soft ones of S) are at or below -60 dBFS: they only take voices of the synthesizer.
+RES_LEVEL = {
+    CH_RES_L: (-39.5, -40.5, -34.6, -44.8, -44.6, -39.0, -38.3, -39.1, -46.8, -43.8, -44.5, -37.7, -41.1, -41.0, -45.0, -41.8, -42.4, -42.8, -45.4, -46.0, -44.6, -51.0, -50.8, -48.2, -53.2, -53.2, -53.8, -51.5, -51.8, -54.7, -61.8, -62.4, -58.5, -55.8, -56.5),
+    CH_RES_S: (-46.5, -46.9, -46.3, -55.7, -56.6, -53.0, -51.9, -52.0, -55.9, -54.0, -54.0, -53.9, -51.6, -52.3, -53.1, -49.6, -49.5, -52.5, -54.9, -54.7, -56.0, -58.1, -58.8, -57.2, -61.2, -61.3, -61.6, -61.2, -61.1, -61.5, -62.6, -62.3, -63.1, -62.3, -62.6),
+    CH_RES_V3: (-56.4, -56.6, -58.8, -59.2, -59.1, -59.1, -59.1, -59.5, -59.1, -57.5, -57.7, -62.4, -60.6, -61.3, -61.3, -59.9, -60.6, -59.7, -63.8, -64.2, -72.2, -68.2, -68.5, -66.1, -67.6, -67.3, -69.1, -64.8, -65.3, -63.4, -67.2, -67.6, -69.0, -67.2, -67.1),
+}
+
+
+def res_level(ch, note, vel):
+    """Expected loudness (dBFS, RMS) of the resonance voice (channel, key, velocity)."""
+    idx = min(34, max(0, int(round((note - 20) / 2.0))))
+    return RES_LEVEL[ch][idx] - ATT_RANGE_DB * (1.0 - vel / 127.0)
+
 
 def res_decay(key):
     """rt_decay (dB/s) of the long (L) resonance groups, by key."""
@@ -43,7 +58,10 @@ class FXCore:
     """Pure logic: feed it note/pedal events, it returns FX note-ons as (channel, note, velocity)."""
 
     def __init__(self, hammer_boost=10.0, res_boost=0.0, pedal_boost=0.0, rng=None, hammer_exp=2.0,
-                 randomness=1.0, velocity_curve=1.0, piano_bank=0, piano_prog=0):
+                 randomness=1.0, velocity_curve=1.0, piano_bank=0, piano_prog=0, res_floor=None, res_burst=0, res_makeup=6.0):
+        self.res_floor = res_floor            # dBFS: a resonance voice quieter than this is not started (None = every voice is started)
+        self.res_burst = res_burst            # at most this many resonance voices when the pedal lifts (0 = no limit)
+        self.res_makeup = res_makeup          # dB: the most that the loudest voices of a limited burst get back for the ones that were dropped
         self.boost = {'hammer': hammer_boost, 'res': res_boost, 'pedal': pedal_boost}
         self.hammer_exp = hammer_exp
         self.randomness = randomness
@@ -120,17 +138,35 @@ class FXCore:
                     key = cand
             self._emit(out, CH_HAMMER, key, att)
 
+    def _emit_res(self, out, ch, note, att_db):
+        """A resonance voice, unless it would be too quiet to hear: it would only take one of the synthesizer's voices."""
+        v = self._vel(att_db)
+        if v and (self.res_floor is None or res_level(ch, note, v) >= self.res_floor):
+            out.append((ch, note, v))
+
+    def _limit_burst(self, res):
+        """Pedal up releases every sustained note at once: keep the `res_burst` loudest resonance voices and give the power of the others back to
+        them as level (at most `res_makeup` dB), so the sum sounds the same with fewer voices."""
+        if not self.res_burst or len(res) <= self.res_burst:
+            return res
+        ranked = sorted(res, key=lambda e: -res_level(*e))
+        kept = ranked[:self.res_burst]
+        p_all = sum(10 ** (res_level(*e) / 10.0) for e in ranked)
+        p_kept = sum(10 ** (res_level(*e) / 10.0) for e in kept)
+        gain = min(self.res_makeup, 10.0 * math.log10(p_all / p_kept))
+        return [(ch, n, self._vel(ATT_RANGE_DB * (1.0 - v / 127.0) - gain) or v) for ch, n, v in kept]
+
     def resonance(self, out, note, vel, hold):
         if not 20 <= note <= 88:
             return
         b = self.boost['res']
         track_l = 94 if note <= 37 else 90
         if vel >= 45:   # long layer, only for velocities from 45
-            self._emit(out, CH_RES_L, note, 4.0 + self._track(vel, track_l) + res_decay(note) * hold - b)
+            self._emit_res(out, CH_RES_L, note, 4.0 + self._track(vel, track_l) + res_decay(note) * hold - b)
         else:           # short layer for velocities up to 44
             track_s = 95 if note <= 46 else 90
-            self._emit(out, CH_RES_S, note, self._track(vel, track_s) + 7.0 * hold - b)
-        self._emit(out, CH_RES_V3, note, self._track(vel, 96) + 2.0 * hold - b)
+            self._emit_res(out, CH_RES_S, note, self._track(vel, track_s) + 7.0 * hold - b)
+        self._emit_res(out, CH_RES_V3, note, self._track(vel, 96) + 2.0 * hold - b)
 
     def pedal_sound(self, out, down):
         key = self.rng.choice((60, 61))
@@ -166,8 +202,10 @@ class FXCore:
         self.pedal = down
         self.pedal_sound(out, down)
         if not down:
+            res = []
             for note, (t_on, vel) in sorted(self.sustained.items()):
-                self.resonance(out, note, vel, now - t_on)
+                self.resonance(res, note, vel, now - t_on)
+            out.extend(self._limit_burst(res))
             self.sustained.clear()
         return out
 
@@ -370,10 +408,16 @@ def main():
     ap.add_argument('--piano-prog', type=int, default=0, help='program of the piano preset on channel 0 (default 0)')
     ap.add_argument('--velocity-curve', type=float, default=1.0,
                     help='touch curve: out = 127*(in/127)**CURVE; 1 = unchanged, <1 more sensitive, >1 harder')
+    ap.add_argument('--res-floor', type=float, default=-64.0,
+                    help='dBFS: string-resonance voices quieter than this are not started, they only use up voices of the synthesizer (default -64; -200 = start all)')
+    ap.add_argument('--res-burst', type=int, default=0,
+                    help='at most this many resonance voices when the pedal lifts, the loudest ones, with the others given back as level (default 0 = no limit)')
+    ap.add_argument('--res-makeup', type=float, default=6.0, help='dB: the most that a limited burst gives back as level (default 6)')
     args = ap.parse_args()
     core = FXCore(args.hammer_boost, args.res_boost, args.pedal_boost, hammer_exp=args.hammer_exp,
                   randomness=args.random, velocity_curve=args.velocity_curve,
-                  piano_bank=args.piano_bank, piano_prog=args.piano_prog)
+                  piano_bank=args.piano_bank, piano_prog=args.piano_prog,
+                  res_floor=args.res_floor, res_burst=args.res_burst, res_makeup=args.res_makeup)
     bridge = Bridge(core)
     start_midi_player(bridge)
     bridge.run()

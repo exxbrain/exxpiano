@@ -4,8 +4,8 @@
 #   scripts/make-soundfonts.sh [-p PRESET] [-v SAMPLES] [-o OUTPUT_DIR] [-s SALAMANDER_DIR] [-u URL] [-n SFZ_NAME]
 #
 # -p  Preset of the piano bank (size = memory the bank takes on a Pi 3):
-#       full      ~700 MB  14 layers, stereo, 12 s tails. The main one, for boards with 1 GB or more (gain 1.0)
-#       lite      ~250 MB  6 layers, stereo, 9 s tails (gain 1.0)
+#       full      ~700 MB  14 layers, stereo, 12 s tails. The main one, for boards with 1 GB or more (gain 0.6)
+#       lite      ~250 MB  6 layers, stereo, 9 s tails (gain 0.6)
 #
 # -v  Which published Salamander package to take the samples from (all CC-BY, from freepats.zenvoid.org):
 #       44k16       WAV, 44.1 kHz 16 bit, 412 MB download.  Default. Tested on real data.
@@ -94,7 +94,7 @@ python3 -I "$HERE/tools/build_piano_sf2.py" "$SFZ_DIR" "$OUT/piano-$PRESET.sf2" 
 
 echo
 ls -lh "$OUT"/mech.sf2 "$OUT/piano-$PRESET.sf2"
-GAIN=1.0
+GAIN=0.6
 echo
 echo "Next (on the Pi, from the pi/ folder of the repository):"
 echo "  sudo ./install.sh --piano piano-$PRESET.sf2 --mech mech.sf2 --gain $GAIN"

@@ -122,8 +122,8 @@ it is not used here because it has no mechanics presets and no layer reduction.
 
 | Preset | Memory on the Pi | What it is | `GAIN` | Tested on a Pi 3 |
 |---|---|---|---|---|
-| `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
-| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 1.0 | starts and plays on a board with 1 GB; by ear it sounds better than the earlier 390 MB bank and significantly better than the ready-made light Salamander SoundFont of the official library (one listener, not a blind test); the free memory after loading was not recorded, watch `free -m` |
+| `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 0.6 | a close variant (CPU load ~30%) |
+| `full` | ~700 MB | 14 layers, stereo, 12 s tails; for a board with 1 GB (the memory reserve for such boards is 200 MB). **Not for 512 MB** | 0.6 | starts and plays on a board with 1 GB; by ear it sounds better than the earlier 390 MB bank and significantly better than the ready-made light Salamander SoundFont of the official library (one listener, not a blind test); the free memory after loading was not recorded, watch `free -m` |
 
 The whole file is read into RAM. A Pi 3 Model B/B+ has 1 GB; a **Pi 3 Model A+ has only 512 MB (about 414 MB usable)**, and `full` does not fit there:
 on a real Pi 3 A+ the kernel killed FluidSynth with a 390 MB bank at about 370 MB (`Out of memory: Killed process (fluidsynth)`) and the service restarted again and again. Use `lite`
@@ -247,8 +247,10 @@ Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart ex
 
 | Setting | What it does |
 |---|---|
-| `GAIN` | overall volume (0.2 is FluidSynth's own default; these banks want 1.0) |
-| `POLYPHONY` | number of voices; stereo uses two voices per note, and the mechanics add more |
+| `GAIN` | overall volume of the synthesizer (0.2 is FluidSynth's own default; **0.6** is the loudest value at which the densest piece tried does not clip; the slider of the web interface is a dB scale around it, and only its last part can distort) |
+| `POLYPHONY` | number of voices (default 192, up to 256); stereo uses two voices per note, and the mechanics add more |
+| `METER` | 1 = the output goes through the level meter: the **Home** section shows the peak of the left and the right channel and counts the samples at full scale (clipping). It costs about 3% of one core; 0 plays to the card directly |
+| `CPU_CORES` | synthesis threads of FluidSynth (1-4, default 3; one core always stays free): the voices of a dense piece are shared between the cores of the board, so a higher `POLYPHONY` (192 or 256) becomes possible (also in the **Audio output** section) |
 | `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
 | `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
 | `REVERB` | 1 enables FluidSynth's reverb (higher CPU load) |
@@ -264,6 +266,9 @@ Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart ex
 | `--res-boost DB` | 0 | string-resonance level |
 | `--pedal-boost DB` | 4.5 | pedal-noise level |
 | `--velocity-curve G` | 1.0 | touch curve for the whole piano: out = 127 * (in/127)^G. 1 = unchanged, below 1 soft touches sound louder, above 1 you must play harder |
+| `--res-floor DBFS` | -64 | string-resonance voices quieter than this are not started: they are 35-70 dB under the piano and only use up the synthesizer's voices (a dense piece with the pedal needs hundreds). -200 = start all |
+| `--res-burst N` | 0 | when the pedal lifts, at most N resonance voices (the loudest) start, the others give their power back as level; 0 = no limit, 10 is a strong limit |
+| `--res-makeup DB` | 6 | the most that a limited burst gives back as level |
 
 ## Choosing the piano bank
 

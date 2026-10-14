@@ -130,6 +130,8 @@ class DebTests(unittest.TestCase):
         names = [m.name for m in data.getmembers()]
         self.assertEqual(data.extractfile('./opt/exxpiano/VERSION').read().decode().strip(), '9.9.9')
         self.assertIn('./lib/udev/rules.d/90-exxpiano.rules', names)
+        for meter_file in ('./opt/exxpiano/exxpiano-meter.py', './etc/alsa/conf.d/60-exxpiano-tap.conf'):
+            self.assertIn(meter_file, names)
         for demo in ('./opt/exxpiano/exxpiano-demo-midi.py', './usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid', './usr/share/exxpiano/midi/liszt-la-campanella-2013.mid', './usr/share/exxpiano/midi/NOTICE.md'):
             self.assertIn(demo, names)
         self.assertEqual(data.getmember('./opt/exxpiano/exxpiano-demo-midi.py').mode, 0o755)

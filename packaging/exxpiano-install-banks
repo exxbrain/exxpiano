@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install the sound banks without the exxpiano-soundfonts package (faster for files of hundreds of megabytes).
 #
-#   sudo exxpiano-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 1.0]
+#   sudo exxpiano-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 0.6]
 set -euo pipefail
 
 CONF=/etc/exxpiano.conf

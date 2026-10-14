@@ -46,6 +46,8 @@ class DemoActions(web.Actions):
     def __init__(self, args):
         super().__init__()
         self.args, self.t0, self.rng = args, time.time(), random.Random(7)
+        self.volume_db = -12.0
+        self.clip_right, self.hold, self.gain_now = 0, [-90.0, -90.0], 0.6
         self.host = args.hostname
         self.mode = args.mode
         self.busy, self.busy_until, self.ap_until = None, 0.0, 0.0
@@ -85,6 +87,7 @@ class DemoActions(web.Actions):
 
     def set_gain(self, value):
         print('demo: gain %.2f' % value)
+        self.gain_now = float(value)
         return True
 
     def cards(self):
@@ -92,6 +95,24 @@ class DemoActions(web.Actions):
 
     def audio_output(self):
         return dict(device='plughw:CARD=U24', kind='usb', period=64, periods=3)
+
+    def levels(self):
+        """A simulated meter: a played piece that now and then goes over full scale on the right."""
+        t = time.time() - self.t0
+        swing = (math.sin(t * 2.3) + math.sin(t * 5.1)) / 4.0 + 0.5
+        louder = 20 * math.log10(max(self.gain_now, 1e-4) / 0.6)                 # the level follows the volume: above the safe value the loud places clip
+        left, right = -26 + 18 * swing + louder, -23 + 20 * swing + louder
+        self.clip_right += 1 if right > -0.3 else 0
+        self.hold = [max(left, self.hold[0] - 0.4), max(right, self.hold[1] - 0.4)]
+        return dict(t=time.time(), rate=44100, left=dict(peak=round(left, 1), hold=round(self.hold[0], 1), clipped=0),
+                    right=dict(peak=round(min(right, 0.0), 1), hold=round(min(self.hold[1], 0.0), 1), clipped=self.clip_right), clip_ago=None)
+
+    def output_volume(self, card):
+        return dict(control='PCM', db=self.volume_db, lo=-60.0, hi=4.0)
+
+    def set_output_volume(self, card, control, db):
+        self.volume_db = db
+        return True
 
     def hostname(self):
         return self.host
@@ -218,7 +239,7 @@ def main():
     usblib._write_json(usb_status, dict(drives=[dict(id='/dev/sda1', label='PIANO-BANKS', fs='vfat', mounted=True, mountpoint=drive, reason=None)]))
     conf = os.path.join(tmp, 'exxpiano.conf')
     lines = ['PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'), 'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'), 'BANK_DIR=%s' % banks, 'ALSA_DEVICE=auto',
-             'GAIN=1.0', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--velocity-curve 1 --hammer-boost 1.5 --hammer-exp 0.8 --random 1.6 --res-boost 0 --pedal-boost 4.5"',
+             'GAIN=0.6', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--velocity-curve 1 --hammer-boost 1.5 --hammer-exp 0.8 --random 1.6 --res-boost 0 --pedal-boost 4.5"',
              'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'WEB_PORT=%d' % args.port,
              'IMPORT_DIR=%s' % os.path.join(tmp, 'library'), 'USB_STATUS=%s' % usb_status,
              'MIDI_DIR=%s' % os.path.join(tmp, 'midi'), 'MIDI_RUN_DIR=%s' % os.path.join(tmp, 'midi-run')]

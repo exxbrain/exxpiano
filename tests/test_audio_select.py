@@ -155,6 +155,33 @@ class AudioSelectTests(unittest.TestCase):
         self.assertIn('-R 1', r.stdout)
         self.assertTrue(r.stdout.strip().endswith('/p.sf2 /m.sf2'))
 
+    def test_the_output_goes_through_the_level_meter_only_when_it_can(self):
+        with tempfile.TemporaryDirectory() as d:
+            conf = os.path.join(d, 'tap.conf'); prog = os.path.join(d, 'meter.py')
+            open(conf, 'w').close(); open(prog, 'w').close()
+            on = self.run_script([HEADPHONES], ALSA_TAP_CONF=conf, METER_PROGRAM=prog)
+            self.assertIn("audio.alsa.device=exxpiano_tap:'plughw:CARD=Headphones", on.stdout)
+            for why, env in (('switched off', dict(ALSA_TAP_CONF=conf, METER_PROGRAM=prog, METER=0)), ('no ALSA file', dict(ALSA_TAP_CONF=os.path.join(d, 'none'), METER_PROGRAM=prog)),
+                             ('no program', dict(ALSA_TAP_CONF=conf, METER_PROGRAM=os.path.join(d, 'none')))):
+                with self.subTest(why):
+                    off = self.run_script([HEADPHONES], **env)
+                    self.assertIn('audio.alsa.device=plughw:CARD=Headphones', off.stdout)
+                    self.assertNotIn('exxpiano_tap', off.stdout)
+
+    def test_the_defaults_are_192_voices_on_3_threads(self):
+        r = self.run_script([HEADPHONES], CPU_COUNT=4)
+        self.assertIn('synth.polyphony=192', r.stdout)
+        self.assertIn('synth.cpu-cores=3', r.stdout)
+
+    def test_the_synthesis_threads_are_shared_between_cores_and_one_core_stays_free(self):
+        for count, asked, want in ((4, None, 3), (4, 2, 2), (4, 4, 3), (4, 1, 1), (2, None, 1), (1, None, 1), (8, 3, 3), (3, None, 2)):
+            with self.subTest(cores=count, asked=asked):
+                env = dict(CPU_COUNT=count)
+                if asked is not None:
+                    env['CPU_CORES'] = asked
+                r = self.run_script([usb(1, 'U24')], **env)
+                self.assertIn('synth.cpu-cores=%d' % want, r.stdout)
+
     def test_usb_card_without_playback_is_ignored(self):
         # regression: the keyboard's own USB audio card (capture only) was chosen instead of the jack
         r = self.run_script([HEADPHONES, keyboard(1)])

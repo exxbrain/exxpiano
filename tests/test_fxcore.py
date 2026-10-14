@@ -28,6 +28,62 @@ def ch(events, channel):
     return [(n, v) for c, n, v in events if c == channel]
 
 
+class ResonanceFloorTests(unittest.TestCase):
+    """The string resonance is about 35 dB under the piano; voices too quiet to hear are not started, a burst of them is limited."""
+
+    def release(self, c, notes, vel=100, hold=0.5):
+        for n in notes:
+            c.note_on(n, vel, 0.0)
+        c.sustain(127, 0.0)
+        for n in notes:
+            c.note_off(n, hold)
+        return c.sustain(0, hold + 0.1)
+
+    def test_without_a_floor_every_resonance_voice_is_started_as_before(self):
+        ev = self.release(core(), [40, 50, 60])
+        self.assertEqual(sorted(c for c, _, _ in ev if c in (fx.CH_RES_L, fx.CH_RES_S, fx.CH_RES_V3)).count(fx.CH_RES_V3), 3)
+
+    def test_quiet_voices_are_dropped_with_a_floor_and_the_loud_ones_stay(self):
+        every = self.release(core(), [24, 40, 60, 84])
+        floored = self.release(core(res_floor=-64.0), [24, 40, 60, 84])
+        res = lambda ev: [(c, n, v) for c, n, v in ev if c in (fx.CH_RES_L, fx.CH_RES_S, fx.CH_RES_V3)]
+        self.assertLess(len(res(floored)), len(res(every)))
+        for c_, n, v in res(floored):
+            self.assertGreaterEqual(fx.res_level(c_, n, v), -64.0)
+        self.assertTrue(any(c_ == fx.CH_RES_L and n == 24 for c_, n, _ in res(floored)))       # the long resonance of a bass note is loud enough
+        self.assertFalse(any(c_ == fx.CH_RES_V3 and n >= 60 for c_, n, _ in res(floored)))      # group V3 is below -64 dBFS from C4 up: never started
+        for e in floored:                                                                       # what is not resonance is untouched
+            if e[0] not in (fx.CH_RES_L, fx.CH_RES_S, fx.CH_RES_V3):
+                self.assertIn(e, every)
+
+    def test_the_level_table_matches_the_measured_loudness_of_a_voice(self):
+        self.assertAlmostEqual(fx.res_level(fx.CH_RES_L, 24, 127), -34.6, delta=0.2)           # the loudest voice of the bank at full velocity
+        self.assertAlmostEqual(fx.res_level(fx.CH_RES_V3, 60, 127), -72.2, delta=0.2)
+        self.assertAlmostEqual(fx.res_level(fx.CH_RES_L, 60, 64), fx.res_level(fx.CH_RES_L, 60, 127) - att_db(64), delta=0.01)
+
+    def test_a_burst_at_pedal_up_is_limited_to_the_loudest_voices_with_their_power_given_back(self):
+        notes = list(range(30, 78, 2))
+        free = self.release(core(res_floor=-90.0), notes)
+        limited = self.release(core(res_floor=-90.0, res_burst=8), notes)
+        res = lambda ev: [(c, n, v) for c, n, v in ev if c in (fx.CH_RES_L, fx.CH_RES_S, fx.CH_RES_V3)]
+        self.assertGreater(len(res(free)), 8)
+        self.assertEqual(len(res(limited)), 8)
+        power = lambda ev: sum(10 ** (fx.res_level(*e) / 10.0) for e in ev)
+        loudest = sorted(res(free), key=lambda e: -fx.res_level(*e))[:8]
+        gain = 10 * __import__('math').log10(power(res(limited)) / power(loudest))
+        self.assertGreater(gain, 0.0)                                                           # the dropped power is given back ...
+        self.assertLessEqual(gain, 6.0 + 0.6)                                                   # ... by at most the make-up cap (velocities are whole numbers)
+        self.assertEqual([(c, n) for c, n, _ in sorted(res(limited), key=lambda e: e[1])], sorted((c, n) for c, n, _ in loudest))
+
+    def test_a_burst_inside_the_limit_and_a_single_release_are_left_alone(self):
+        few = self.release(core(res_floor=-90.0, res_burst=8), [40, 50])
+        self.assertEqual(few, self.release(core(res_floor=-90.0), [40, 50]))
+        limited, free = core(res_floor=-90.0, res_burst=1), core(res_floor=-90.0)
+        for c in (limited, free):
+            c.note_on(40, 100, 0.0)
+        self.assertEqual(limited.note_off(40, 0.5), free.note_off(40, 0.5))                  # a key released without the pedal is no burst
+
+
 class HammerTests(unittest.TestCase):
     def test_note_off_plays_hammer_on_channel_1(self):
         c = core()

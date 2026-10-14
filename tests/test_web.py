@@ -40,6 +40,8 @@ class FakeActions:
         self.gain_ok = True
         self.mem = 954 << 20
         self.mem_free = 300 << 20
+        self.level_answer = dict(t=1.0, rate=44100, left=dict(peak=-12.0, hold=-6.0, clipped=0), right=dict(peak=0.0, hold=0.0, clipped=7), clip_ago=1.5)
+        self.volume_db, self.volume_set, self.volume_asked, self.no_volume, self.volume_fails = -12.0, [], [], False, False
         self.ready = [True, True, True]     # answers of wait_synth_ready, one per switch attempt
         self.waits = 0
         self.gate = None                     # an Event: wait_synth_ready blocks until it is set
@@ -93,6 +95,18 @@ class FakeActions:
 
     def audio_output(self):
         return dict(device='plughw:CARD=U24', kind='usb', period=64, periods=3)
+
+    def levels(self):
+        return self.level_answer
+
+    def output_volume(self, card):
+        self.volume_asked.append(card)
+        return None if self.no_volume else dict(control='PCM', db=self.volume_db, lo=-60.0, hi=4.0)
+
+    def set_output_volume(self, card, control, db):
+        self.volume_set.append((card, control, db))
+        self.volume_db = db
+        return not self.volume_fails
 
     def errors(self):
         return [dict(t=1000, unit='exxpiano', level='error', text='no sound card found')]
@@ -279,6 +293,96 @@ class WebTests(ServerCase):
         self.assertTrue(s['auth_required'])
         self.assertEqual(self.call('/api/settings', {'gain': 1.1}, headers={'X-Token': 's3cret'})[0], 200)
         self.assertEqual(self.actions.restarts, 0)
+
+
+class GainScaleTests(ServerCase):
+    """The master volume slider is a dB scale around the loudest gain that does not clip; distortion is only possible at its end."""
+
+    def test_the_scale_is_consistent_with_the_settings_and_the_clipping_zone_is_the_last_part(self):
+        import re as _re
+        self.start()
+        page = self.call('/')[1].decode()
+        safe, lo_db, hi_db = (float(x) for x in _re.search(r'GAIN_SAFE = ([\d.]+), GAIN_LO_DB = (-?\d+), GAIN_HI_DB = (-?\d+);', page).groups())
+        spec = web.exxpianoconf.SETTINGS['gain']
+        self.assertEqual(safe, spec['default'])                                   # the default is the loudest setting that does not clip
+        self.assertGreaterEqual(safe * 10 ** (lo_db / 20.0), spec['lo'])         # the scale stays inside what the server accepts
+        self.assertLessEqual(safe * 10 ** (hi_db / 20.0), spec['hi'])
+        share = (0 - lo_db) / float(hi_db - lo_db)                                # where 0 dB (the safe gain) lies on the slider
+        self.assertGreater(share, 0.85)                                           # clipping is possible only in the last part
+        self.assertLess(share, 0.9)
+        css = _re.search(r'input\[type=range\]\.gain \{[^}]*transparent (\d+)%', page)
+        self.assertEqual(int(css.group(1)) / 100.0, round(share, 2))              # the orange part of the track starts at the safe position
+        self.assertIn('0 is the loudest setting at which even the densest passages', page)
+        code, r = self.jcall('/api/settings', {'gain': round(safe * 10 ** (hi_db / 20.0), 4)})     # the top of the slider is accepted
+        self.assertEqual(code, 200)
+
+
+class LevelsTests(ServerCase):
+    def test_the_levels_of_both_channels_and_the_clipped_samples_are_served(self):
+        self.start()
+        code, r = self.jcall('/api/levels')
+        self.assertEqual(code, 200)
+        self.assertTrue(r['available'])
+        self.assertEqual((r['left']['peak'], r['right']['clipped'], r['clip_ago']), (-12.0, 7, 1.5))
+
+    def test_without_the_meter_the_answer_says_so_and_the_token_protects_it(self):
+        self.start()
+        self.actions.level_answer = None
+        self.assertEqual(self.jcall('/api/levels')[1], dict(available=False))
+        self.start(CONF + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/levels')[0], 401)
+        self.assertEqual(self.call('/api/levels', headers={'X-Token': 's3cret'})[0], 200)
+
+    def test_the_page_has_the_meter_and_polls_it_only_on_home(self):
+        self.start()
+        page = self.call('/')[1].decode()
+        for needle in ('id="meter"', 'id="mLH"', 'async function pollLevels', '"/api/levels"', 'meter_clip: "CLIP"', 'meter_clip: "СРЕЗ"'):
+            self.assertIn(needle, page)
+        self.assertIn('currentPage !== "home"', page[page.index('async function pollLevels'):page.index('async function pollLevels') + 300])
+
+
+class OutputVolumeTests(ServerCase):
+    """The hardware volume of the sound card that plays (the headphone jack is loud): read in the state, set through its own endpoint."""
+
+    def test_the_state_tells_the_volume_of_the_card_that_plays(self):
+        self.start()
+        v = self.jcall('/api/state')[1]['output_volume']
+        self.assertEqual((v['card'], v['control'], v['db'], v['lo'], v['hi']), ('U24', 'PCM', -12.0, -60.0, 4.0))     # the card the synthesizer logged
+
+    def test_a_new_level_is_set_on_that_card_and_returned(self):
+        self.start()
+        code, r = self.jcall('/api/output-volume', {'db': -18.5})
+        self.assertEqual(code, 200)
+        self.assertEqual(self.actions.volume_set, [('U24', 'PCM', -18.5)])
+        self.assertEqual(r['output_volume']['db'], -18.5)
+        self.assertEqual(self.jcall('/api/state')[1]['output_volume']['db'], -18.5)
+
+    def test_nonsense_and_levels_out_of_range_change_nothing(self):
+        self.start()
+        for bad in ('loud', None, True, [1], 20, -90, float('inf')):
+            with self.subTest(bad):
+                self.assertEqual(self.jcall('/api/output-volume', {'db': bad})[0], 400)
+        self.assertEqual(self.call('/api/output-volume', raw=b'[1]')[0], 400)
+        self.assertEqual(self.actions.volume_set, [])
+
+    def test_a_card_without_a_volume_control_has_none_and_a_failure_is_reported(self):
+        self.start()
+        self.actions.no_volume = True
+        self.assertIsNone(self.jcall('/api/state')[1]['output_volume'])
+        self.assertEqual(self.jcall('/api/output-volume', {'db': -10})[0], 400)
+        self.actions.no_volume, self.actions.volume_fails = False, True
+        self.assertEqual(self.jcall('/api/output-volume', {'db': -10})[0], 500)
+
+    def test_the_token_protects_it_and_the_amixer_text_is_understood(self):
+        self.start(CONF + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/output-volume', {'db': -10})[0], 401)
+        self.assertEqual(self.actions.volume_set, [])
+        text = ("Simple mixer control 'PCM',0\n  Capabilities: pvolume pvolume-joined pswitch pswitch-joined\n  Playback channels: Mono\n"
+                "  Limits: Playback -10239 - 400\n  Mono: Playback -1200 [85%] [-12.00dB] [on]\n")
+        self.assertEqual(web.parse_amixer(text), dict(db=-12.0, lo=-60.0, hi=4.0))
+        usb = "Simple mixer control 'PCM',0\n  Limits: Playback 0 - 100\n  Front Left: Playback 40 [40%] [-20.00dB]\n"
+        self.assertEqual(web.parse_amixer(usb), dict(db=-20.0, lo=-60.0, hi=0.0))      # the unit of the limits is not 0.01 dB: no claim about the top
+        self.assertIsNone(web.parse_amixer("Simple mixer control 'Mic',0\n  Capabilities: cvolume\n"))
 
 
 class BankWebTests(ServerCase):

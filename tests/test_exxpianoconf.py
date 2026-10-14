@@ -50,7 +50,7 @@ class ConfTests(ConfBase):
 
     def test_missing_file_gives_defaults(self):
         s = pc.get_settings(os.path.join(self.tmp.name, 'nope.conf'))
-        self.assertEqual(s['gain'], 1.0)
+        self.assertEqual(s['gain'], 0.6)
 
     def test_rejects_unknown_and_out_of_range(self):
         for bad in ({'nope': 1}, {'gain': 99}, {'gain': -1}, {'polyphony': 5}, {'hammer_exp': 'abc'},

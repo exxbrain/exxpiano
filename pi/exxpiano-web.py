@@ -4,6 +4,8 @@
   http://<pi>:8080/        the control page
   GET  /api/state          settings, their ranges, service status, sound cards
   POST /api/settings       {"velocity_curve": 0.8, ...}  - validated, stored in /etc/exxpiano.conf, applied
+  GET  /api/levels         the level of the left and the right channel at the output (peak, held peak, clipped samples), when the meter runs
+  POST /api/output-volume  {"db": -12}  - the hardware volume of the sound card that plays (dB, stored for the next boot); the state tells it as output_volume
   POST /api/restart        restart exxpiano (needed after changing audio output / buffer / reverb / polyphony)
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
                            {"action": "delete", "id": "<bank>"}  - remove a bank that is not in use (not the current one, the last good one or the mechanics bank)
@@ -53,6 +55,27 @@ ERROR_UNITS = ('exxpiano.service', 'exxpiano-fx.service', 'exxpiano-web.service'
 ERROR_LIMIT = 40
 OOM_RE = re.compile(r'Out of memory: Killed process \d+ \(([^)]*)\).*?anon-rss:(\d+)kB')
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
+
+MIXER_CONTROLS = ('PCM', 'Speaker', 'Headphone', 'Master')           # the playback volume controls of a sound card, in the order they are tried
+MIXER_RE = re.compile(r'Playback\s+(-?\d+)\s+\[(\d+)%\]\s+\[(-?[\d.]+)dB\]')
+MIXER_LIMITS_RE = re.compile(r'Limits:\s*Playback\s+(-?\d+)\s*-\s*(-?\d+)')
+CARD_RE = re.compile(r'CARD=([A-Za-z0-9_.-]+)')
+VOLUME_FLOOR_DB = -60.0                                                # the slider does not go down to -102 dB: there is nothing to hear below this
+
+
+def parse_amixer(text):
+    """`amixer sget <control>` -> dict(db, lo, hi) of a playback control that has a dB scale, else None. lo/hi are in dB (hi is 0 when the unit of the
+    limits is not hundredths of a dB)."""
+    m = MIXER_RE.search(text)
+    if not m:
+        return None
+    raw, db = int(m.group(1)), float(m.group(3))
+    lim = MIXER_LIMITS_RE.search(text)
+    hi = 0.0
+    if lim and abs(raw / 100.0 - db) < 0.06:                          # the raw unit is 0.01 dB (the Raspberry Pi's own jack)
+        hi = int(lim.group(2)) / 100.0
+    return dict(db=db, lo=VOLUME_FLOOR_DB, hi=hi)
+
 
 class Actions:
     """Everything that touches the system; tests replace this."""
@@ -161,6 +184,15 @@ class Actions:
     def monitor(self, since=0):
         return self._monitor.get(since)
 
+    def levels(self):
+        """What exxpiano-meter measures at the output: {t, left{peak, hold, clipped}, right{...}, clip_ago}; None when the meter is not running."""
+        try:
+            with open(os.environ.get('METER_STATUS', '/run/exxpiano-meter/levels.json'), encoding='ascii') as f:
+                st = json.load(f)
+            return st if time.time() - float(st['t']) < 2.0 else None
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+
     def errors(self):
         """Warnings, errors and the notes of our own scripts the piano services logged since the boot: [{t (ms), unit, level, text}], newest last."""
         return self._cached('errors', 5, self._errors)
@@ -228,6 +260,29 @@ class Actions:
     def restart_synth(self):
         self._forget('service', 'output')                # the answers are about to change
         subprocess.Popen(['systemctl', '--no-block', 'restart', 'exxpiano.service'])
+
+    def output_volume(self, card):
+        """The hardware volume of a sound card: dict(control, db, lo, hi), or None when the card has no playback volume that has a dB scale."""
+        for control in MIXER_CONTROLS:
+            try:
+                r = subprocess.run(['amixer', '-c', card, 'sget', control], capture_output=True, text=True, timeout=3)
+            except (OSError, subprocess.SubprocessError):
+                return None
+            found = parse_amixer(r.stdout) if r.returncode == 0 else None
+            if found:
+                return dict(found, control=control)
+        return None
+
+    def set_output_volume(self, card, control, db):
+        """Set the volume of the card's control to `db` and remember it for the next boot. True on success."""
+        try:
+            r = subprocess.run(['amixer', '-c', card, '--', 'sset', control, '%.1fdB' % db], capture_output=True, text=True, timeout=3)
+            if r.returncode != 0:
+                return False
+            subprocess.run(['alsactl', 'store'], capture_output=True, timeout=5)          # the stored state is what alsa-restore puts back at boot
+            return True
+        except (OSError, subprocess.SubprocessError):
+            return False
 
     def set_gain(self, value):
         """Live master gain: write a shell command into the pipe FluidSynth reads (root-only, no network port).
@@ -493,9 +548,39 @@ class App:
             spec=self.spec(),
             status=dict(synth=a.service_state('exxpiano'), bridge=a.service_state('exxpiano-fx'),
                         output=a.audio_output(), cards=a.cards()),
+            output_volume=self.output_volume(),
         )
 
     # ---- settings remembered per instrument
+    def output_card(self):
+        """The id of the sound card that plays now: the one the synthesizer logged, else the first card that can play."""
+        out = self.actions.audio_output()
+        m = CARD_RE.search(out['device']) if out else None
+        if m:
+            return m.group(1)
+        cards = self.actions.cards()
+        return cards[0]['id'] if cards else None
+
+    def output_volume(self):
+        card = self.output_card()
+        vol = self.actions.output_volume(card) if card else None
+        return dict(vol, card=card) if vol else None
+
+    def set_output_volume(self, body):
+        if not isinstance(body, dict):
+            raise ValueError('expected an object')
+        db = body.get('db')
+        if isinstance(db, bool) or not isinstance(db, (int, float)) or db != db:
+            raise ValueError('db is a number')
+        vol = self.output_volume()
+        if vol is None:
+            raise ValueError('the sound card has no volume control')
+        if not vol['lo'] <= db <= vol['hi']:
+            raise ValueError('db must be between %s and %s' % (vol['lo'], vol['hi']))
+        if not self.actions.set_output_volume(vol['card'], vol['control'], float(db)):
+            raise OSError('the sound card volume could not be set')
+        return dict(output_volume=self.output_volume())
+
     def current_key(self):
         cur = exxpianoconf.parse_conf(self.conf_path).get('PIANO_SF2')
         return os.path.basename(cur) if cur else None
@@ -860,7 +945,7 @@ def make_handler(app):
 
         def log_request(self, code='-', size='-'):
             # the page polls the state and the monitor all the time: successful polls would only fill the journal with noise
-            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/usb', '/api/midi', '/api/wifi', '/api/qr', '/api/ping'):
+            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/levels', '/api/usb', '/api/midi', '/api/wifi', '/api/qr', '/api/ping'):
                 return
             super().log_request(code, size)
 
@@ -921,6 +1006,11 @@ def make_handler(app):
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
                 return self._send(200, app.wifi())
+            if url.path == '/api/levels':
+                if not self._authorised():
+                    return self._send(401, dict(error='token required'))
+                st = app.actions.levels()
+                return self._send(200, dict(available=bool(st), **(st or {})))
             if url.path == '/api/errors':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
@@ -942,6 +1032,8 @@ def make_handler(app):
             try:
                 if self.path == '/api/settings':
                     return self._send(200, app.update(self._body()))
+                if self.path == '/api/output-volume':
+                    return self._send(200, app.set_output_volume(self._body()))
                 if self.path == '/api/restart':
                     app.actions.restart_synth()
                     return self._send(200, dict(ok=True))

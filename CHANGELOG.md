@@ -2,6 +2,17 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.20
+
+- **Crackling in the loud, dense places is fixed at its cause.** Two things made it: (1) **clipping** in the synthesizer: the sum of many loud voices with the pedal went over full scale, mostly in the right channel (La Campanella at the old gain 1.15: 3596 clipped samples in the second half, the loudest sample 4.6 dB over full scale); (2) the synthesizer **cutting sounding notes** when it ran out of voices. The remedies below are measured on a Pi 3 B+ with the pieces that came with the device; **not yet heard by the maintainers on other music or on other boards**.
+- **The master volume is a scale in dB around the loudest value that does not clip** (`GAIN` 0.6, the new default; it was 1.0): 0 dB is that value, the slider goes from -34 to +5 dB, only its last 13% (orange) can make a loud passage crackle. The explanation is under the slider.
+- **Level meter of both channels** under the volume slider on **Home**: the peak and the held peak of the left and the right channel in dBFS and a red mark with a counter when samples hit full scale (within 0.06 dB of it), so clipping can be seen. The synthesizer plays through the ALSA device `exxpiano_tap` (`/etc/alsa/conf.d/60-exxpiano-tap.conf`), which copies the stream into a pipe read by `exxpiano-meter.py`; it costs about 3% of one core; `METER=0` plays to the card directly, and the card is also used directly when the ALSA file or the program is missing. Tried on the 3.5 mm jack of a Pi 3 B+ only (not on a USB sound card).
+- **Sound card volume** in **Audio output** (the headphone jack is loud): the hardware volume of the card that plays, in dB, applied at once and kept after a reboot (`alsactl store`); the row is hidden for a card without such a control.
+- **Several synthesis threads** (`CPU_CORES`, default 3, one core always stays free; also a setting in **Audio output**): the voices are shared between the cores. On a Pi 3 B+ with La Campanella the busiest thread went from 44% (one core, 128 voices) to 23-28% (3 cores, 192 voices); no underruns, the buffer never below 9.9 ms. **Polyphony is 192 by default** (was 128); 256 was measured too (busiest thread 25-35%).
+- **Less string resonance that nobody hears** (`--res-floor -64` by default; `--res-burst` and `--res-makeup` are optional): resonance voices quieter than -64 dBFS are not started (about two thirds of them, all of group V3 above C4); they were 35-70 dB under the piano and only took voices. About 11% of the energy of the resonance itself changes, which is about 45 dB under the music; judged by measurement, not by ear. `--res-floor -200` starts all of them as before.
+- Model on La Campanella (offline, the same banks): clicks from lost voices 91 at 128 voices before, 5 at 192 voices with the resonance floor.
+- Not tried on a real Raspberry Pi: the Pi 5 image, the USB drive, a USB sound card with the level meter, deleting a bank, and all of this on other music.
+
 ## 1.10.19
 
 - **Two real pieces come with the device:** Liszt's *Un Sospiro* and *La Campanella* (recordings of real pianists, International Piano-e-Competition) are put into the MIDI library once at the first installation; a piece you delete does not come back. They are taken unchanged from the **MAESTRO dataset (Google), CC BY-NC-SA 4.0**: non-commercial use, with attribution, under the same license; the code stays MIT (`assets/midi/NOTICE.md`).

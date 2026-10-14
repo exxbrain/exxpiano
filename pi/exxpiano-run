@@ -22,11 +22,20 @@ USB_WAIT="${USB_WAIT:-8}"          # the most seconds to wait for a USB card to 
 USB_SETTLE="${USB_SETTLE:-12}"      # seconds after the boot that USB devices need to show up; later nothing is waited for without a reason
 USB_SYSFS="${USB_SYSFS:-/sys/bus/usb/devices}"
 UPTIME_FILE="${PROC_UPTIME:-/proc/uptime}"
-POLYPHONY="${POLYPHONY:-128}"
-GAIN="${GAIN:-1.0}"
+POLYPHONY="${POLYPHONY:-192}"
+CPU_CORES="${CPU_CORES:-3}"        # synthesis threads of FluidSynth (synth.cpu-cores): the voices of a dense piece are shared between the cores
+CPU_COUNT="${CPU_COUNT:-$(nproc 2>/dev/null || echo 1)}"
+if [ "$CPU_CORES" -ge "$CPU_COUNT" ]; then          # one core always stays for the system, the bridge and the web interface
+  CPU_CORES=$(( CPU_COUNT > 1 ? CPU_COUNT - 1 : 1 ))
+fi
+GAIN="${GAIN:-0.6}"
 REVERB="${REVERB:-0}"
 FLUIDSYNTH="${FLUIDSYNTH:-/usr/bin/fluidsynth}"
 CMD_FIFO="${CMD_FIFO:-/run/exxpiano.cmd}"
+METER="${METER:-1}"                 # 1 = the output goes through the level meter (the web interface shows the peak of each channel and clipping)
+METER_DIR="${METER_DIR:-/run/exxpiano-meter}"
+ALSA_TAP_CONF="${ALSA_TAP_CONF:-/etc/alsa/conf.d/60-exxpiano-tap.conf}"
+METER_PROGRAM="${METER_PROGRAM:-$(dirname "$0")/exxpiano-meter.py}"
 
 # true if the card has a playback device (MIDI keyboards often show up as capture-only USB audio cards)
 has_playback() {
@@ -123,11 +132,27 @@ if [ "$Z" -lt 64 ] || [ "$Z" -gt 8192 ]; then
   Z="$clamped"
 fi
 
+# The level meter: the device is wrapped into `exxpiano_tap` (a copy of the stream goes into a pipe). Without the ALSA file or the program, or with METER=0,
+# the card is used directly and nothing else changes.
+OUT_DEVICE="$DEVICE"
+if [ "$METER" = 1 ] && [ -f "$ALSA_TAP_CONF" ] && [ -f "$METER_PROGRAM" ]; then
+  OUT_DEVICE="exxpiano_tap:'$DEVICE'"
+fi
+
 cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
-     -o "audio.alsa.device=$DEVICE" -o audio.sample-format=16bits -r 44100
-     -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -g "$GAIN"
+     -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r 44100
+     -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -g "$GAIN"
      "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "${cmd[*]}"; exit 0; fi
+if [ "$OUT_DEVICE" != "$DEVICE" ]; then
+  # While the pipe is not read, the audio waits: this shell holds the pipe open (read+write, it never blocks and never breaks) and runs the meter in a
+  # loop, so a restart of the meter takes a fraction of the 0.37 s that the pipe can hold.
+  mkdir -p "$METER_DIR"
+  rm -f "$METER_DIR/pcm" "$METER_DIR/levels.json"
+  mkfifo -m 600 "$METER_DIR/pcm"
+  exec 6<>"$METER_DIR/pcm"
+  ( while :; do python3 "$METER_PROGRAM" "$METER_DIR/pcm" "$METER_DIR/levels.json" 6<&-; sleep 0.2; done ) &
+fi
 rm -f "$CMD_FIFO"
 mkfifo -m 600 "$CMD_FIFO"
 exec 3<>"$CMD_FIFO"          # read+write: the pipe never reaches end-of-file, so FluidSynth keeps running

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install the piano on a Raspberry Pi (DietPi / Raspberry Pi OS Lite / Debian). Run as root.
 #
-#   sudo ./install.sh --piano /path/piano-full.sf2 --mech /path/mech.sf2 [--device plughw:Headphones] [--gain 1.0]
+#   sudo ./install.sh --piano /path/piano-full.sf2 --mech /path/mech.sf2 [--device plughw:Headphones] [--gain 0.6]
 #
 # Safe to run again: /etc/exxpiano.conf is never overwritten,
 # only the values you pass as flags are changed.
@@ -51,6 +51,8 @@ install -m 644 "$HERE/usblib.py" "$PREFIX/usblib.py"
 install -m 644 "$HERE/midilib.py" "$PREFIX/midilib.py"
 install -m 644 "$HERE/midiplayer.py" "$PREFIX/midiplayer.py"
 install -m 755 "$HERE/exxpiano-demo-midi.py" "$PREFIX/exxpiano-demo-midi.py"
+install -m 755 "$HERE/exxpiano-meter.py" "$PREFIX/exxpiano-meter.py"
+install -D -m 644 "$HERE/60-exxpiano-tap.conf" /etc/alsa/conf.d/60-exxpiano-tap.conf
 install -d /usr/share/exxpiano/midi
 for piece in "$HERE"/../assets/midi/*.mid; do install -m 644 "$piece" "/usr/share/exxpiano/midi/$(basename "$piece")"; done
 install -m 644 "$HERE/../assets/midi/NOTICE.md" /usr/share/exxpiano/midi/NOTICE.md

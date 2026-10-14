@@ -168,6 +168,8 @@ def main():
         ('opt/exxpiano/midilib.py', src('pi', 'midilib.py'), 0o644),
         ('opt/exxpiano/midiplayer.py', src('pi', 'midiplayer.py'), 0o644),
         ('opt/exxpiano/exxpiano-demo-midi.py', src('pi', 'exxpiano-demo-midi.py'), 0o755),
+        ('opt/exxpiano/exxpiano-meter.py', src('pi', 'exxpiano-meter.py'), 0o755),
+        ('etc/alsa/conf.d/60-exxpiano-tap.conf', src('pi', '60-exxpiano-tap.conf'), 0o644),
         ('usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid', src('assets', 'midi', 'liszt-un-sospiro-2011.mid'), 0o644),
         ('usr/share/exxpiano/midi/liszt-la-campanella-2013.mid', src('assets', 'midi', 'liszt-la-campanella-2013.mid'), 0o644),
         ('usr/share/exxpiano/midi/NOTICE.md', src('assets', 'midi', 'NOTICE.md'), 0o644),
