@@ -359,13 +359,13 @@ def start_midi_player(bridge):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--hammer-boost', type=float, default=10.0, help='dB louder than the SFZ level (default 10)')
+    ap.add_argument('--hammer-boost', type=float, default=1.5, help='dB louder than the SFZ level (default 1.5)')
     ap.add_argument('--res-boost', type=float, default=0.0)
-    ap.add_argument('--pedal-boost', type=float, default=0.0)
-    ap.add_argument('--hammer-exp', type=float, default=2.0,
-                    help='hammer noise amplitude ~ (velocity/127)**EXP; larger = stronger dependence (default 2)')
-    ap.add_argument('--random', type=float, default=1.0,
-                    help='variation of knock/pedal level and sample choice: 0 = none, 1 = default, 2 = strong')
+    ap.add_argument('--pedal-boost', type=float, default=4.5)
+    ap.add_argument('--hammer-exp', type=float, default=0.8,
+                    help='hammer noise amplitude ~ (velocity/127)**EXP; larger = stronger dependence (default 0.8)')
+    ap.add_argument('--random', type=float, default=1.6,
+                    help='variation of knock/pedal level and sample choice: 0 = none, 1 = normal, 2 = strong (default 1.6)')
     ap.add_argument('--piano-bank', type=int, default=0, help='bank of the piano preset on channel 0 (default 0)')
     ap.add_argument('--piano-prog', type=int, default=0, help='program of the piano preset on channel 0 (default 0)')
     ap.add_argument('--velocity-curve', type=float, default=1.0,

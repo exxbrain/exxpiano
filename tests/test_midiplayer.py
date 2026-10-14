@@ -131,6 +131,12 @@ class PlayerTests(unittest.TestCase):
         self.assertEqual(r.status()['state'], 'playing')
         self.assertLess(r.status()['position'], 1.8)
 
+    def test_the_status_names_the_piece_as_the_library_does(self):
+        r = Rig(self, notes=[(0, 60, 80, 8)], pedal=[], title='control track')                 # a title nobody wants to read
+        r.ask(op='play', id=r.id)
+        r.advance(0.6)
+        self.assertEqual(r.status()['title'], 'a')                                              # the library names it after the file
+
     def test_stop_in_the_middle_silences_everything_and_lets_the_pedal_go(self):
         r = Rig(self, pedal=[(0, 127), (4, 0)])
         r.ask(op='play', id=r.id)

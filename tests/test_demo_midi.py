@@ -57,11 +57,17 @@ class DemoMidiTests(unittest.TestCase):
         with open(os.path.join(self.lib, demo.MARKER), encoding='utf-8') as f:
             self.assertEqual(json.load(f), [PIECE])
 
-    def test_the_piece_in_the_repository_is_a_valid_midi_file_with_its_notice(self):
-        path = os.path.join(ROOT, 'assets', 'midi', PIECE)
-        info = midilib.inspect(path)
-        self.assertGreater(info['notes'], 1000)
-        self.assertLess(os.path.getsize(path), midilib.MAX_BYTES)
+    def test_the_pieces_in_the_repository_are_valid_midi_files_with_their_notice_and_a_title(self):
+        folder = os.path.join(ROOT, 'assets', 'midi')
+        pieces = sorted(n for n in os.listdir(folder) if n.endswith('.mid'))
+        self.assertEqual(pieces, ['liszt-la-campanella-2013.mid', 'liszt-un-sospiro-2011.mid'])
+        for name in pieces:
+            with self.subTest(name):
+                path = os.path.join(folder, name)
+                self.assertGreater(midilib.inspect(path)['notes'], 1000)
+                self.assertLess(os.path.getsize(path), midilib.MAX_BYTES)
+                self.assertIn(name, demo.TITLES)                                   # shown under a readable name, not a file name
+        path = os.path.join(folder, PIECE)
         with open(os.path.join(ROOT, 'assets', 'midi', 'NOTICE.md'), encoding='utf-8') as f:
             notice = f.read()
         for needle in ('CC BY-NC-SA 4.0', 'MAESTRO', 'unchanged', 'Google'):

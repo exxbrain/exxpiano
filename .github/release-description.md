@@ -6,7 +6,14 @@ The image already includes:
 - exxpiano;
 - the Salamander Grand Piano bank (**full**, about 700 MB; reported to start and play on a board with 1 GB, the free memory afterwards was not recorded);
 - the smaller `lite` bank, selected by itself on a board with less than 800 MB of memory (a Pi 3 A+);
-- the piano mechanics bank.
+- the piano mechanics bank;
+- two demonstration recordings of real pianists in the MIDI player (Liszt, *Un Sospiro* and *La Campanella*, International Piano-e-Competition).
+
+**Rights.**
+- exxpiano itself (scripts, web interface): **MIT** ([LICENSE](https://github.com/exxbrain/exxpiano/blob/main/LICENSE)).
+- The sounds: [**Salamander Grand Piano V3**](https://freepats.zenvoid.org/Piano/SalamanderGrandPiano/) by Alexander Holm, [**CC-BY**](https://creativecommons.org/licenses/by/3.0/). The `.sf2` banks in the image are derivative works (converted: fewer velocity layers, shorter tails, level-matched); credit: "Salamander Grand Piano V3 by Alexander Holm, CC-BY. Converted to SF2".
+- The two recordings are from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC), [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): **non-commercial use only**, with attribution, shared under the same license, and this applies to these files, not to the rest of the image. If you use exxpiano commercially, delete them (**Delete** in the MIDI player). Details: [`assets/midi/NOTICE.md`](https://github.com/exxbrain/exxpiano/blob/main/assets/midi/NOTICE.md).
+- DietPi and the Debian packages in the image keep their own licenses.
 
 ## Installation
 

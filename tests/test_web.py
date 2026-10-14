@@ -770,6 +770,24 @@ class MonitorEndpointTests(ServerCase):
         self.assertEqual(got, [dict(t=1700000000123, unit='exxpiano', level='error', text='exxpiano: no sound card found'),
                                dict(t=1700000001000, unit='exxpiano-web', level='warning', text='hi')])
 
+    def test_the_notes_of_our_scripts_are_info_and_other_info_lines_are_not_listed(self):
+        import json as j
+        lines = '\n'.join([
+            j.dumps({'__REALTIME_TIMESTAMP': '1000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '6', 'MESSAGE': 'exxpiano: audio output plughw:CARD=Headphones (onboard), period 64 x 3'}),
+            j.dumps({'__REALTIME_TIMESTAMP': '2000000', '_SYSTEMD_UNIT': 'exxpiano-wifi.service', 'PRIORITY': '6', 'MESSAGE': 'exxpiano-wifi: started'}),
+            j.dumps({'__REALTIME_TIMESTAMP': '3000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '6', 'MESSAGE': 'FluidSynth runtime version 2.4.4'}),
+            j.dumps({'__REALTIME_TIMESTAMP': '4000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '4', 'MESSAGE': 'fluidsynth: warning: No preset found'})])
+        got = web.parse_journal_errors(lines)
+        self.assertEqual([(g['level'], g['text'][:20]) for g in got],
+                         [('info', 'exxpiano: audio outp'), ('info', 'exxpiano-wifi: start'), ('warning', 'fluidsynth: warning:')])
+
+    def test_the_page_calls_the_card_service_messages_not_errors(self):
+        self.start()
+        page = self.call('/')[1].decode()
+        self.assertIn('e_title: "Service messages"', page)
+        self.assertIn('e_title: "Сообщения служб"', page)
+        self.assertNotIn('e_title: "Errors"', page)
+
     def test_the_monitor_endpoint_returns_the_sample_and_the_points(self):
         self.start()
         code, r = self.jcall('/api/monitor')

@@ -52,7 +52,7 @@ install -m 644 "$HERE/midilib.py" "$PREFIX/midilib.py"
 install -m 644 "$HERE/midiplayer.py" "$PREFIX/midiplayer.py"
 install -m 755 "$HERE/exxpiano-demo-midi.py" "$PREFIX/exxpiano-demo-midi.py"
 install -d /usr/share/exxpiano/midi
-install -m 644 "$HERE/../assets/midi/liszt-un-sospiro-2011.mid" /usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid
+for piece in "$HERE"/../assets/midi/*.mid; do install -m 644 "$piece" "/usr/share/exxpiano/midi/$(basename "$piece")"; done
 install -m 644 "$HERE/../assets/midi/NOTICE.md" /usr/share/exxpiano/midi/NOTICE.md
 python3 "$PREFIX/exxpiano-demo-midi.py" >/dev/null 2>&1 || true              # the demonstration piece goes into the MIDI library once
 install -m 755 "$HERE/exxpiano-usb.py" "$PREFIX/exxpiano-usb.py"

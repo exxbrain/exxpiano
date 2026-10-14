@@ -16,7 +16,8 @@ import midilib  # noqa: E402
 
 DEMO_DIR = os.environ.get('EXXPIANO_DEMO_MIDI_DIR', '/usr/share/exxpiano/midi')
 MARKER = '.demo-imported'
-TITLES = {'liszt-un-sospiro-2011.mid': 'Liszt: Un Sospiro (Piano-e-Competition 2011)'}
+TITLES = {'liszt-un-sospiro-2011.mid': 'Liszt: Un Sospiro (Piano-e-Competition 2011)',
+          'liszt-la-campanella-2013.mid': 'Liszt: La Campanella (Piano-e-Competition 2013)'}
 
 
 def _done(library_dir):

@@ -169,6 +169,7 @@ def main():
         ('opt/exxpiano/midiplayer.py', src('pi', 'midiplayer.py'), 0o644),
         ('opt/exxpiano/exxpiano-demo-midi.py', src('pi', 'exxpiano-demo-midi.py'), 0o755),
         ('usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid', src('assets', 'midi', 'liszt-un-sospiro-2011.mid'), 0o644),
+        ('usr/share/exxpiano/midi/liszt-la-campanella-2013.mid', src('assets', 'midi', 'liszt-la-campanella-2013.mid'), 0o644),
         ('usr/share/exxpiano/midi/NOTICE.md', src('assets', 'midi', 'NOTICE.md'), 0o644),
         ('opt/exxpiano/exxpiano-usb.py', src('pi', 'exxpiano-usb.py'), 0o755),
         ('lib/systemd/system/exxpiano-usb@.service', src('pi', 'exxpiano-usb@.service'), 0o644),
@@ -193,7 +194,7 @@ def main():
     ]
     scripts = {name: read(src('packaging', 'debian', name)) for name in ('postinst', 'prerm', 'postrm')}
     description = (
-        'Salamander piano on FluidSynth with piano mechanics (Raspberry Pi)\n'
+        'Digital piano on FluidSynth with piano mechanics (Raspberry Pi)\n'
         ' Systemd services exxpiano (FluidSynth) and exxpiano-fx (MIDI bridge that adds hammer,\n'
         ' damper, string resonance and pedal noise). Settings: /etc/exxpiano.conf. Web page on\n'
         ' port 8080 with Wi-Fi setup (the Pi starts its own network when it has none).\n'

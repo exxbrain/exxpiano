@@ -99,7 +99,9 @@ class Player:
             self.midi_id = None
             self._publish(now)
             return
-        self.midi_id, self.title, self.loop, self.length = midi_id, parsed['title'], loop, parsed['length']
+        _, meta = midilib._entry(self.library_dir, midi_id)               # the name the library shows, not the title inside the file (often empty)
+        title = (meta or {}).get('name') or parsed['title']
+        self.midi_id, self.title, self.loop, self.length = midi_id, title, loop, parsed['length']
         self._events, self._i, self._t0, self._port, self._pedal_down = parsed['events'], 0, now, port, False
         self.playing, self.reason = True, None
         self._publish(now)

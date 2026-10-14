@@ -2,6 +2,17 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.19
+
+- **Two real pieces come with the device:** Liszt's *Un Sospiro* and *La Campanella* (recordings of real pianists, International Piano-e-Competition) are put into the MIDI library once at the first installation; a piece you delete does not come back. They are taken unchanged from the **MAESTRO dataset (Google), CC BY-NC-SA 4.0**: non-commercial use, with attribution, under the same license; the code stays MIT (`assets/midi/NOTICE.md`).
+- **New section "About"** in the web interface: the links (source, releases, troubleshooting, changelog, problems), the version and the licenses of the code, the sounds and the demonstration recordings; a copyright line with a link to it is at the bottom of every section. The release description and the READMEs carry the same rights, with links.
+- **New default mechanics settings** (what the owner tuned on a real board): hammer noise +1.5 dB, randomness 1.6, pedal noise +4.5 dB (the knock dependence on touch stays 0.8, the resonance 0). They apply to new cards and installations; a device that is already set up keeps its own settings. The defaults in the bridge program now match the documented ones.
+- **The "Errors" card of the Monitor is called "Service messages"**: it also lists the notes of the piano's own scripts (grey), not only warnings and errors, and it says it is not the whole log.
+- **The MIDI player and Home name the piece** as the library does (it was empty or a service name such as `control track`); units in the Russian interface are МБ and ГБ.
+- **The release title says "SD card images for Raspberry Pi 2/3/4/5"**, the banner and the descriptions no longer speak only about Salamander (any SoundFont bank can be added; the mechanics are tuned on Salamander).
+- **Screenshots** moved to the top of the README and retaken from the demo with the real pieces, the memory tiles, the Delete buttons and the seek slider (`scripts/make-screenshots.py` makes them).
+- **Not tried on a real Raspberry Pi:** pressing **Delete** on a bank, the exactness of the seek and of the timing of a long piece (the first 5 seconds of a piece were measured: 0.1 s off), the demonstration pieces inside a built image, the Pi 5 image, the USB drive.
+
 ## 1.10.18
 
 - **Wi-Fi on a fresh card:** `ifup wlan0` failed with "unknown interface wlan0" because a fresh DietPi has no `wlan0` stanza. The supervisor now writes the stanza, the `wpa_supplicant` header and the country, and unblocks rfkill before it brings the network up. A cable in a USB network adapter (or any wired port without a configuration) gets its address by DHCP (`ifupdown` and `isc-dhcp-client` are now dependencies). **Not tried on every board:** the USB Ethernet adapter was only seen on one Pi 3 B+.

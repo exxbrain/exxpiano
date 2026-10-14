@@ -12,19 +12,31 @@ English | [Русский](README.ru.md)
 
 ## What it can do
 
-- **Real piano sound:** Salamander Grand Piano V3 (Yamaha C5) through FluidSynth, plus the piano mechanics (hammer and damper noise, string resonance, pedal noise) that the SF2 format cannot express by itself.
+- **Real piano sound:** SoundFont banks through FluidSynth, plus the piano mechanics (hammer and damper noise, string resonance, pedal noise) that the SF2 format cannot express by itself. The ready images carry the Salamander Grand Piano V3 (Yamaha C5); any other `.sf2` / `.sf3` bank can be added from a USB drive and chosen in the web interface, and every bank remembers its own touch and mechanics settings.
 - **Fits cheap boards:** the `full` bank (about 700 MB) for a board with 1 GB, a smaller `lite` bank for 512 MB; the image picks the bank by itself.
 - **A ready image:** one ZIP for the Raspberry Pi 2/3/4 and one for the Pi 5; the first start is offline and asks for nothing. The Pi 5 has no 3.5 mm jack and plays through a USB sound card.
 - **Automatic choices:** any USB MIDI keyboard is found by itself; the sound goes through a USB sound card (small delay) when there is one, else through the 3.5 mm jack.
 - **Setup from a phone:** a web interface for the touch curve, the mechanics, volume, banks, audio output, Wi-Fi (through the device's own setup network and a QR code) and monitoring (processor, temperature, power, memory, errors).
 - **From a USB drive:** import sound banks and play MIDI files on the chosen piano, with the mechanics.
-- **Open and tested:** open source (scripts MIT, sounds CC-BY) with hundreds of automatic tests; what was not tried on a real board is marked as such.
+- **Open and tested:** open source (scripts MIT, sounds CC-BY, the two demonstration recordings CC BY-NC-SA) with hundreds of automatic tests; what was not tried on a real board is marked as such.
 
 Not yet tried on real hardware: the Pi 5 image, the import from a USB drive, the MIDI player (see "Tested on" below).
 
+## What it looks like
+
+| Home | Piano bank (and the USB import) | Touch and mechanics |
+|---|---|---|
+| ![Home](docs/images/ui-home.png) | ![Piano bank](docs/images/ui-bank.png) | ![Touch and mechanics](docs/images/ui-sound.png) |
+
+| Monitor | Wi-Fi | MIDI player |
+|---|---|---|
+| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
+
+*The pictures are made by `scripts/make-screenshots.py` from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the banks are made up; the pieces are the real recordings of `assets/midi/`), at the width of a phone.*
+
 ## How it works
 
-A digital piano appliance for Raspberry Pi 2/3/4 ARMv8: **Salamander Grand Piano V3** (Yamaha C5) through FluidSynth, plus
+A digital piano appliance for Raspberry Pi 2/3/4/5 (ARMv8): SoundFont banks through FluidSynth (the ready images carry **Salamander Grand Piano V3**, Yamaha C5; the mechanics are tuned on it, so with another bank the levels may need adjusting in the web interface), plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
 express by itself, so a small bridge program adds them.
 
@@ -246,11 +258,11 @@ Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart ex
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--hammer-boost DB` | 0 | hammer-noise level; 0 is as in the SFZ (very quiet), +6 is clearly louder |
+| `--hammer-boost DB` | 1.5 | hammer-noise level; 0 is as in the SFZ (very quiet), +6 is clearly louder |
 | `--hammer-exp N` | 0.8 | dependence of the knock on touch: amplitude ~ (velocity/127)^N. Larger = soft playing is more silent. 0.6-1.0 is gentle, 2.0 is steep |
-| `--random R` | 1.0 | randomness of knock and pedal: 0 off, 1 normal, 2 strong. Level varies, and for the hammer the sample of a neighbouring key is picked |
+| `--random R` | 1.6 | randomness of knock and pedal: 0 off, 1 normal, 2 strong. Level varies, and for the hammer the sample of a neighbouring key is picked |
 | `--res-boost DB` | 0 | string-resonance level |
-| `--pedal-boost DB` | 0 | pedal-noise level |
+| `--pedal-boost DB` | 4.5 | pedal-noise level |
 | `--velocity-curve G` | 1.0 | touch curve for the whole piano: out = 127 * (in/127)^G. 1 = unchanged, below 1 soft touches sound louder, above 1 you must play harder |
 
 ## Choosing the piano bank
@@ -286,7 +298,7 @@ How it is kept safe: the drive is mounted read only (`ro,nosuid,nodev,noexec`) a
 
 Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a USB drive (the same drive as for the banks, FAT32, exFAT or ext4) and open the **MIDI player** section of the web interface (its own item in the menu): it lists them. **Import** copies the chosen file into the device's own library (`/var/lib/exxpiano/midi/`), only when you press the button; the copy is a transaction like the bank import (a temporary file, a check, one atomic publication), so a drive pulled out or a full card leaves no half-copied file. After that the drive is not needed. **Play** plays the file on **the piano you have chosen** (the current bank and preset), with the hammer, damper, resonance and pedal noises of the mechanics and with your touch curve, exactly as if you played it; **Stop** silences it at once; a slider and the **−10 s / +10 s** buttons move to any moment of the piece without stopping it (the notes that sound at that moment are let go, the pedal gets the state the file has there), and the time shows elapsed / total / left; **Repeat** plays it again and again. You can play the keyboard over it: the sounds mix. The piece goes on when you open another section (the Monitor, say): the player is part of the mechanics bridge, not of the page, and the Home section shows what is playing and where.
 
-**A piece comes with the device.** The package and the images carry one recording of a real pianist, Liszt's *Un Sospiro* played at the International Piano-e-Competition 2011 (`assets/midi/liszt-un-sospiro-2011.mid`), and put it into the library once, at the first installation; a piece you delete does not come back with an update. The recording is from the MAESTRO dataset (Google, taken unchanged) and is licensed **CC BY-NC-SA 4.0**: non-commercial use, with attribution, shared under the same license; the rest of exxpiano stays MIT. If you use exxpiano commercially, delete the piece (the **Delete** button of the MIDI player). Details: `assets/midi/NOTICE.md`.
+**Two pieces come with the device.** The package and the images carry two recordings of a real pianist, Liszt's *Un Sospiro* and *La Campanella*, played at the International Piano-e-Competition (`assets/midi/`), and put them into the library once, at the first installation; a piece you delete does not come back with an update. The recordings are from the MAESTRO dataset (Google, taken unchanged) and are licensed **CC BY-NC-SA 4.0**: non-commercial use, with attribution, shared under the same license; the rest of exxpiano stays MIT. If you use exxpiano commercially, delete the pieces (the **Delete** button of the MIDI player). Details: `assets/midi/NOTICE.md`.
 
 What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Changing the bank or restarting the synthesizer stops the piece; start it again after the new instrument has loaded. Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
 
@@ -306,24 +318,16 @@ interface). Change the sliders, switch the bank, rename the device, add or forge
 ## Interface for controlling the instrument and monitoring the device
 
 This is the web interface for controlling the instrument and monitoring the device: instrument banks, touch and mechanics, audio output, Wi-Fi, and the state of the board (processor, temperature, power, memory, errors). It opens in a browser, so no program is needed on the phone. Open `http://<device>:8080/` from a phone or a computer on the same network (the address is shown on the device's HDMI screen and in your router's list of clients; the name is `exxpiano-<ID>`). The **menu** (the ☰ button) opens the sections: **Home** (the status of the services, what is playing, the volume, and a
-glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch and mechanics**, **Audio output**, **Monitor** and **Wi-Fi**. An address like
+glance at the device: CPU, temperature, power, network), **Piano bank**, **MIDI player**, **Touch and mechanics**, **Audio output**, **Monitor**, **Wi-Fi** and **About** (the links, the version and the licenses of the code, the sounds and the demonstration recordings; a copyright line with a link to it is at the bottom of every section). An address like
 `http://<device>:8080/#/wifi` opens a section directly (Back works, bookmarks work). The sections have:
 
-| Home | Piano bank (and the USB import) | Touch and mechanics |
-|---|---|---|
-| ![Home](docs/images/ui-home.png) | ![Piano bank](docs/images/ui-bank.png) | ![Touch and mechanics](docs/images/ui-sound.png) |
-
-| Monitor | Wi-Fi | MIDI player |
-|---|---|---|
-| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
-
-*The pictures are taken from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the USB drive are made up), at the width of a phone.*
+The pictures of every section are at the top of this page.
 
 
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
-- **Monitor section**: live, once a second. **Errors**: warnings and errors the piano services logged since the boot (for example "no sound card found"), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
+- **Monitor section**: live, once a second. **Service messages**: warnings and errors the piano services logged since the boot (for example "no sound card found"), the notes of the piano's own scripts (grey: which audio output was chosen, that a service started; not the whole log), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web interface, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
   chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
@@ -407,6 +411,8 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Licenses
 
-The repository's scripts are MIT ([LICENSE](LICENSE)). The Salamander Grand Piano V3 sounds are CC-BY, by Alexander Holm
+The repository's scripts are MIT ([LICENSE](LICENSE)). The [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/SalamanderGrandPiano/) sounds are [CC-BY](https://creativecommons.org/licenses/by/3.0/), by Alexander Holm
 ([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
 attribution.
+
+The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.

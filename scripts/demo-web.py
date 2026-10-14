@@ -14,6 +14,7 @@ import importlib.util
 import math
 import os
 import random
+import shutil
 import sys
 import tempfile
 import threading
@@ -31,8 +32,12 @@ spec.loader.exec_module(web)
 import midilib  # noqa: E402
 import midiplayer  # noqa: E402
 import usblib  # noqa: E402
-from midifixture import make_midi  # noqa: E402
 from sf2fixture import make_sf2  # noqa: E402
+
+
+spec = importlib.util.spec_from_file_location('exxpiano_demo_midi', os.path.join(PI, 'exxpiano-demo-midi.py'))
+demo_midi = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(demo_midi)
 
 
 class DemoActions(web.Actions):
@@ -193,23 +198,27 @@ def main():
     make_sf2(os.path.join(banks, 'mech.sf2'), presets=[('Hammer', 0, 1)], name='Mechanics', sample_bytes=2000)
     make_sf2(os.path.join(banks, 'Salamander Grand.sf2'), presets=[('Grand Piano', 0, 0), ('Bright', 0, 5), ('Felt', 3, 0)], name='Salamander Grand Piano', sample_bytes=900000)
     make_sf2(os.path.join(banks, 'Upright.sf2'), presets=[('Upright', 0, 0)], name='Upright piano', sample_bytes=300000)
+    for name, megabytes in (('mech.sf2', 36), ('Salamander Grand.sf2', 695), ('Upright.sf2', 237)):          # sparse padding: the sizes of the real banks, no disk used
+        os.truncate(os.path.join(banks, name), megabytes << 20)
     # a simulated USB drive with two banks in piano-banks/ (the import works for real: it copies into a temporary library)
     drive = os.path.join(tmp, 'usb-drive')
     os.makedirs(os.path.join(drive, 'piano-banks'))
     make_sf2(os.path.join(drive, 'piano-banks', 'Kawai Grand.sf2'), presets=[('Kawai Grand', 0, 0)], name='Kawai Grand', sample_bytes=600000)
     make_sf2(os.path.join(drive, 'piano-banks', 'Electric Piano.sf2'), presets=[('Electric', 0, 4)], name='Electric Piano', sample_bytes=250000)
+    # the real pieces of assets/midi are on the drive; one is already in the library (as after the first installation of the package)
     os.makedirs(os.path.join(drive, 'piano-midi'))
-    melody = [(i * 0.5, n, 70 + (i % 4) * 10, 0.5) for i, n in enumerate([60, 64, 67, 72, 71, 67, 64, 60, 62, 65, 69, 74, 72, 69, 65, 62])]
-    make_midi(os.path.join(drive, 'piano-midi', 'Arpeggio.mid'), melody, tempo=500000, pedal=[(0, 127), (7.5, 0), (8, 127), (15.5, 0)], title='Arpeggio')
-    make_midi(os.path.join(drive, 'piano-midi', 'Slow chords.mid'), [(0, 48, 60, 4), (0, 55, 60, 4), (0, 64, 60, 4), (4, 50, 70, 4), (4, 57, 70, 4), (4, 65, 70, 4)],
-              tempo=700000, title='Slow chords')
-    long_piece = [(rep * 8 + start, note + (rep % 3) * 2, vel, length) for rep in range(48) for start, note, vel, length in melody]       # about three minutes: to try the slider
-    make_midi(os.path.join(drive, 'piano-midi', 'Long etude.mid'), long_piece, tempo=500000, title='Long etude')
+    for name in os.listdir(os.path.join(ROOT, 'assets', 'midi')):
+        if name.endswith('.mid'):
+            shutil.copy(os.path.join(ROOT, 'assets', 'midi', name), os.path.join(drive, 'piano-midi', name))
+    first = os.path.join(tmp, 'first-piece')
+    os.makedirs(first)
+    shutil.copy(os.path.join(ROOT, 'assets', 'midi', 'liszt-un-sospiro-2011.mid'), first)
+    demo_midi.import_demo(first, os.path.join(tmp, 'midi'))
     usb_status = os.path.join(tmp, 'usb-status.json')
     usblib._write_json(usb_status, dict(drives=[dict(id='/dev/sda1', label='PIANO-BANKS', fs='vfat', mounted=True, mountpoint=drive, reason=None)]))
     conf = os.path.join(tmp, 'exxpiano.conf')
     lines = ['PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'), 'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'), 'BANK_DIR=%s' % banks, 'ALSA_DEVICE=auto',
-             'GAIN=1.0', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--hammer-boost 0 --hammer-exp 0.8 --random 1"',
+             'GAIN=1.0', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--velocity-curve 1 --hammer-boost 1.5 --hammer-exp 0.8 --random 1.6 --res-boost 0 --pedal-boost 4.5"',
              'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'WEB_PORT=%d' % args.port,
              'IMPORT_DIR=%s' % os.path.join(tmp, 'library'), 'USB_STATUS=%s' % usb_status,
              'MIDI_DIR=%s' % os.path.join(tmp, 'midi'), 'MIDI_RUN_DIR=%s' % os.path.join(tmp, 'midi-run')]

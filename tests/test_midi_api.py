@@ -169,6 +169,14 @@ class MidiApiTests(ServerCase):
         self.assertEqual(page.count('action: "stop"'), 1)
         self.assertEqual(page.count('action: "seek"'), 1)                 # the slider and the ±10 s buttons send a seek through one function
         self.assertIn('type = "range"', page)
+        # the rights and the links are in their own section (About), a short copyright line is the footer of every section; both in English and Russian
+        for needle in ('id="legal"', 'id="legalCopy"', 'id="paneAbout"', 'data-page="about"', 'about: "paneAbout"', 'https://github.com/exxbrain/exxpiano/blob/main/LICENSE',
+                       'https://github.com/exxbrain/exxpiano/releases', 'TROUBLESHOOTING.ru.md', 'https://www.fluidsynth.org', 'by Alexander Holm, [CC-BY](https://creativecommons.org/licenses/by/3.0/)', '[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only',
+                       '[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование', 'https://magenta.tensorflow.org/datasets/maestro', 'https://freepats.zenvoid.org/Piano/SalamanderGrandPiano/',
+                       'liszt-un-sospiro-2011.mid', 'liszt-la-campanella-2013.mid'):
+            self.assertIn(needle, page)
+        self.assertNotIn('id="bankRights"', page)
+        self.assertNotIn('id="midiRights"', page)
 
     def test_the_token_protects_the_midi_api_too(self):
         self.start(self.conf_text_base + 'WEB_TOKEN=secret\n')

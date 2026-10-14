@@ -98,6 +98,9 @@
   }
   .wnote { font-size: .92rem; margin: 0 0 8px; } .wnote.ok { color: var(--ok); } .wnote.warn { color: var(--warn); } .wnote.bad { color: var(--bad); }
   .wnote b { overflow-wrap: anywhere; }
+  #legal { max-width: 760px; margin: 0 auto; padding: 4px 16px 28px; color: var(--muted); font-size: .8rem; }
+  #legal p { margin: 0; } #legal a { color: inherit; }
+  ul.plain { margin: 0 0 12px; padding-left: 1.2em; } ul.plain li { margin: 0 0 6px; overflow-wrap: anywhere; }
   .row2 { display: flex; gap: 8px; flex-wrap: wrap; }
   .midi-times { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; color: var(--muted); font-size: .92rem; margin: 2px 0 8px; }
   .net { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
@@ -108,7 +111,7 @@
   .wform input[type=text], .wform input[type=password] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line);
          background: var(--bg); color: var(--text); font-size: 1rem; }
   .errs { font-size: .88rem; max-height: 14em; overflow-y: auto; }
-  .errs p { margin: 0 0 6px; overflow-wrap: anywhere; } .errs p.error { color: var(--bad); } .errs p.warning { color: var(--warn); } .errs time { opacity: .7; }
+  .errs p { margin: 0 0 6px; overflow-wrap: anywhere; } .errs p.error { color: var(--bad); } .errs p.warning { color: var(--warn); } .errs p.info { color: var(--muted); } .errs time { opacity: .7; }
   .thr { font-size: .95rem; }
   .thr p { margin: 0 0 6px; } .thr p:last-child { margin: 0; }
   .thr .ok { color: var(--ok); } .thr .warn { color: var(--warn); } .thr .bad { color: var(--bad); font-weight: 600; }
@@ -149,6 +152,7 @@
   <a href="#/audio" data-page="audio" data-t="nav_audio">Audio output</a>
   <a href="#/mon" data-page="mon" data-t="nav_mon">Monitor</a>
   <a href="#/wifi" data-page="wifi" data-t="nav_wifi">Wi-Fi</a>
+  <a href="#/about" data-page="about" data-t="nav_about">About</a>
 </nav>
 <main>
 <div class="card wrong" id="wrongDevice" role="alert" hidden></div>
@@ -289,7 +293,7 @@
 
   <div id="paneMon" hidden>
     <div class="card"><h2 data-t="m_throttle">Power and throttling</h2><div class="thr" id="thr"></div></div>
-    <div class="card"><h2 data-t="e_title">Errors</h2><p class="hint" data-t="e_hint">Warnings and errors of the piano services since the boot.</p><div class="errs" id="mErrors"></div></div>
+    <div class="card"><h2 data-t="e_title">Service messages</h2><p class="hint" data-t="e_hint">Warnings, errors and notes of the piano services since the boot (not the whole log).</p><div class="errs" id="mErrors"></div></div>
     <div class="card"><h2 data-t="a_title">Audio interface</h2><p class="hint" data-t="a_hint">What the driver really negotiated for the stream that is playing now, not what was asked for.</p><div id="mAudio"></div></div>
     <div class="card">
       <div class="tiles">
@@ -310,7 +314,18 @@
       <div id="mProcs"></div>
     </div>
   </div>
+  <section id="paneAbout" hidden>
+    <div class="card">
+      <h2 data-t="about_title">About and licenses</h2>
+      <p class="hint" id="aboutVer"></p>
+      <h3 data-t="about_links">Links</h3>
+      <ul class="plain" id="aboutLinks"></ul>
+      <h3 data-t="about_rights">Licenses</h3>
+      <ul class="plain" id="aboutRights"></ul>
+    </div>
+  </section>
 </main>
+<footer id="legal"><p><span id="legalCopy"></span> · <a href="#/about" data-t="legal_more">Licenses and links</a></p></footer>
 <div id="msg" role="status" aria-live="polite"></div>
 
 <script>
@@ -321,7 +336,7 @@ const T = {
     a_none: "No stream is open: the synthesizer is not playing right now.", a_card: "Card", a_state: "State", a_format: "Format", a_channels: "Channels", a_rate: "Sample rate",
     a_period: "Period", a_buffer: "Buffer (latency)", a_delay: "Queued now", a_clock: "USB clock", a_rates: "Supported rates",
     a_asked: "Asked for {p} × {n} frames; the driver gave {rp} × {rn}.", a_frames: "{n} frames", a_bit: "{n} bit",
-    nav_home: "Home", nav_bank: "Piano bank", nav_midi: "MIDI player", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", menu: "Menu",
+    nav_home: "Home", nav_bank: "Piano bank", nav_midi: "MIDI player", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", nav_about: "About", about_title: "About and licenses", about_links: "Links", about_rights: "Licenses", legal_more: "Licenses and links", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [DietPi](https://dietpi.com) and the [Debian](https://www.debian.org) packages in the image keep their own licenses.", about_code: "exxpiano (the scripts and this web interface): [MIT license](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Source code and documentation](https://github.com/exxbrain/exxpiano)", link_rel: "[Releases and SD card images](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Troubleshooting](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.md)", link_log: "[Changelog](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Report a problem](https://github.com/exxbrain/exxpiano/issues)", menu: "Menu",
     home_now: "Now playing", home_midi: "MIDI player", home_midi_now: "MIDI: {pos} of {len}", home_change: "Change", home_health: "Device", home_more: "Details", h_power: "Power", h_net: "Network",
     h_power_ok: "OK", h_power_now: "Problem", h_power_past: "Earlier", h_net_ap: "Setup mode", h_net_none: "No network", h_loading: "Loading {bank}…",
     w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (exxpiano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
@@ -341,7 +356,7 @@ const T = {
     w_ok: "Connected to {ssid}.", w_failed: "Could not connect to {ssid}: {error}.", w_forgot: "Forgot {ssid}.", w_ap_failed: "The setup network could not start.",
     w_nm: "This system uses NetworkManager. Connect with the command sudo nmtui; this page cannot change the network here.",
     w_off: "The Wi-Fi service is not running (systemctl status exxpiano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
-    e_title: "Errors", e_hint: "Warnings and errors of the piano services since the boot.", e_none: "No errors since the boot.",
+    e_title: "Service messages", e_hint: "Warnings, errors and notes of the piano services since the boot (not the whole log).", e_none: "No messages since the boot.",
     m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
     m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
     m_procs_hint: "Share of one core; a service with several threads can pass 100 %.", m_load: "load {a} · {b} · {c}", m_max: "of {n} MHz", m_of: "of {n} MB",
@@ -349,7 +364,7 @@ const T = {
     th_unknown: "The throttling state cannot be read on this device.", th_ok: "No throttling now.", th_now: "Right now: {list}.", th_past: "Since the boot: {list}.",
     th_clean: "Nothing since the boot.", th_power: "Under-voltage: use a 5 V / 2.5 A supply and a short, thick cable.",
     th_undervoltage: "under-voltage (weak power supply)", th_freq_capped: "frequency capped", th_throttled: "CPU slowed down", th_soft_limit: "temperature limit reached",
-    bank_title: "Piano bank", midi_title: "MIDI files", midi_hint: "Put MIDI files (.mid) into the folder piano-midi of a USB drive and import them: a file plays on the piano you have chosen, with the hammer, damper and pedal noises. The drive is not needed afterwards.", midi_lib: "On the device", midi_drive: "On the USB drive", midi_nofolder: "There is no folder piano-midi on this drive.", midi_nofiles: "The folder piano-midi has no .mid or .midi files.", midi_none: "No MIDI files have been imported yet.", midi_play: "Play", midi_stop: "Stop", midi_repeat: "Repeat", midi_idle: "Not playing.", midi_playing: "Playing {title}", midi_seek: "Position in the piece", midi_back: "−10 s", midi_fwd: "+10 s", midi_unavailable: "The player is not running (the mechanics bridge exxpiano-fx).", midi_import: "Import", midi_delete: "Delete", midi_confirm_delete: "Delete the MIDI file {name}?", midi_notes: "{n} notes", midi_importing: "Copying {name}: {done} of {total}", midi_checking: "Checking {name}…", midi_done: "{name} is imported.", midi_already: "{name} was already imported.", midi_failed: "Import of {name} failed: {error}", usb_title: "Banks from a USB drive", usb_hint: "Put SoundFont files (.sf2, .sf3) into the folder piano-banks of a USB drive (FAT32, exFAT or ext4), plug it in and import: the copy starts only when you press the button, and the drive is not needed afterwards.", usb_none: "No USB drive is connected.", usb_nofolder: "There is no folder piano-banks on this drive.", usb_nofiles: "The folder piano-banks has no .sf2 or .sf3 files.", usb_import: "Import", usb_delete: "Delete", usb_imported: "imported", usb_confirm_delete: "Delete the imported bank {name}?", bank_confirm_delete: "Delete the bank {name} from this device? It cannot be undone: to get it back, install the bank again or write a new card.", bank_deleted: "Deleted: {name} {freed}", usb_copying: "Copying {name}: {done} of {total}", usb_verifying: "Checking {name}…", usb_done: "{name} is imported. You can take the drive out.", usb_already: "{name} was already imported.", usb_failed: "Import of {name} failed: {error}", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
+    bank_title: "Piano bank", midi_title: "MIDI files", midi_hint: "Put MIDI files (.mid) into the folder piano-midi of a USB drive and import them: a file plays on the piano you have chosen, with the hammer, damper and pedal noises. The drive is not needed afterwards.", midi_lib: "On the device", midi_drive: "On the USB drive", midi_nofolder: "There is no folder piano-midi on this drive.", midi_nofiles: "The folder piano-midi has no .mid or .midi files.", midi_none: "No MIDI files have been imported yet.", midi_play: "Play", midi_stop: "Stop", midi_repeat: "Repeat", midi_idle: "Not playing.", midi_playing: "Playing {title}", midi_seek: "Position in the piece", midi_back: "−10 s", midi_fwd: "+10 s", midi_unavailable: "The player is not running (the mechanics bridge exxpiano-fx).", midi_import: "Import", midi_delete: "Delete", midi_confirm_delete: "Delete the MIDI file {name}?", midi_notes: "{n} notes", midi_importing: "Copying {name}: {done} of {total}", midi_checking: "Checking {name}…", midi_done: "{name} is imported.", midi_already: "{name} was already imported.", midi_failed: "Import of {name} failed: {error}", usb_title: "Banks from a USB drive", usb_hint: "Put SoundFont files (.sf2, .sf3) into the folder piano-banks of a USB drive (FAT32, exFAT or ext4), plug it in and import: the copy starts only when you press the button, and the drive is not needed afterwards.", usb_none: "No USB drive is connected.", usb_nofolder: "There is no folder piano-banks on this drive.", usb_nofiles: "The folder piano-banks has no .sf2 or .sf3 files.", usb_import: "Import", usb_delete: "Delete", usb_imported: "imported", usb_confirm_delete: "Delete the imported bank {name}?", legal_copy: "© 2026 Denis Zakharov · [exxpiano {version}](https://github.com/exxbrain/exxpiano)", legal_sounds: "Sounds: [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/SalamanderGrandPiano/) by Alexander Holm, [CC-BY](https://creativecommons.org/licenses/by/3.0/) (converted to SF2). Banks you add keep the licenses of their authors.", legal_midi: "The demonstration recordings (Liszt, Un Sospiro and La Campanella) are from the [MAESTRO dataset](https://magenta.tensorflow.org/datasets/maestro) (Google), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only. Delete them if you use exxpiano commercially.", bank_confirm_delete: "Delete the bank {name} from this device? It cannot be undone: to get it back, install the bank again or write a new card.", bank_deleted: "Deleted: {name} {freed}", usb_copying: "Copying {name}: {done} of {total}", usb_verifying: "Checking {name}…", usb_done: "{name} is imported. You can take the drive out.", usb_already: "{name} was already imported.", usb_failed: "Import of {name} failed: {error}", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
     bank_profile: "Touch, volume and mechanics settings are remembered for each instrument.",
     bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", bank_share: "{pct}% of what a bank may take", mem_limit_k: "Largest bank", mem_limit_note: "system keeps {reserve}, mechanics {mech}", mem_disk_k: "Free on the card", mem_current: "Current bank", preset: "Preset",
     sw_switching: "Loading {bank}… about a minute of silence.", sw_done: "Now playing {bank}.", sw_rolled_back: "{bank} did not load; the previous bank is playing again.",
@@ -378,7 +393,7 @@ const T = {
     a_none: "Ни один поток не открыт: синтезатор сейчас не играет.", a_card: "Карта", a_state: "Состояние", a_format: "Формат", a_channels: "Каналы", a_rate: "Частота дискретизации",
     a_period: "Период", a_buffer: "Буфер (задержка)", a_delay: "В очереди сейчас", a_clock: "Тактирование USB", a_rates: "Поддерживаемые частоты",
     a_asked: "Запрошено {p} × {n} кадров; драйвер дал {rp} × {rn}.", a_frames: "{n} кадров", a_bit: "{n} бит",
-    nav_home: "Главная", nav_bank: "Банк рояля", nav_midi: "MIDI-плеер", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", menu: "Меню",
+    nav_home: "Главная", nav_bank: "Банк рояля", nav_midi: "MIDI-плеер", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", nav_about: "О проекте", about_title: "О проекте и лицензии", about_links: "Ссылки", about_rights: "Лицензии", legal_more: "Лицензии и ссылки", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [DietPi](https://dietpi.com) и пакеты [Debian](https://www.debian.org) в образе остаются под своими лицензиями.", about_code: "exxpiano (скрипты и этот web-интерфейс): [лицензия MIT](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Исходный код и документация](https://github.com/exxbrain/exxpiano)", link_rel: "[Релизы и образы SD-карт](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Если что-то не работает](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.ru.md)", link_log: "[Список изменений](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Сообщить о проблеме](https://github.com/exxbrain/exxpiano/issues)", menu: "Меню",
     home_now: "Сейчас играет", home_midi: "MIDI-плеер", home_midi_now: "MIDI: {pos} из {len}", home_change: "Сменить", home_health: "Устройство", home_more: "Подробнее", h_power: "Питание", h_net: "Сеть",
     h_power_ok: "В порядке", h_power_now: "Проблема", h_power_past: "Было", h_net_ap: "Режим настройки", h_net_none: "Нет сети", h_loading: "Загружается {bank}…",
     w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (exxpiano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
@@ -398,7 +413,7 @@ const T = {
     w_ok: "Подключено к {ssid}.", w_failed: "Не удалось подключиться к {ssid}: {error}.", w_forgot: "Сеть {ssid} забыта.", w_ap_failed: "Сеть настройки не запустилась.",
     w_nm: "В этой системе сетью управляет NetworkManager. Подключайтесь командой sudo nmtui; отсюда сеть изменить нельзя.",
     w_off: "Служба Wi-Fi не запущена (systemctl status exxpiano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
-    e_title: "Ошибки", e_hint: "Предупреждения и ошибки служб рояля с момента включения.", e_none: "С момента включения ошибок не было.",
+    e_title: "Сообщения служб", e_hint: "Предупреждения, ошибки и пометки служб рояля с момента включения (не весь журнал).", e_none: "С момента включения сообщений нет.",
     m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
     m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
     m_procs_hint: "Доля одного ядра; служба с несколькими потоками может превысить 100 %.", m_load: "нагрузка {a} · {b} · {c}", m_max: "из {n} МГц", m_of: "из {n} МБ",
@@ -406,7 +421,7 @@ const T = {
     th_unknown: "На этом устройстве состояние троттлинга прочитать нельзя.", th_ok: "Сейчас троттлинга нет.", th_now: "Сейчас: {list}.", th_past: "С момента включения: {list}.",
     th_clean: "С момента включения ничего не было.", th_power: "Недостаточное напряжение: нужен блок питания 5 В / 2,5 А и короткий толстый кабель.",
     th_undervoltage: "недостаточное напряжение (слабый блок питания)", th_freq_capped: "частота ограничена", th_throttled: "процессор замедлен", th_soft_limit: "достигнут температурный предел",
-    bank_title: "Банк рояля", midi_title: "MIDI-файлы", midi_hint: "Положите MIDI-файлы (.mid) в папку piano-midi на USB-накопителе и импортируйте: файл играет на выбранном рояле, со стуком молоточков, демпферов и педали. После импорта накопитель не нужен.", midi_lib: "На устройстве", midi_drive: "На USB-накопителе", midi_nofolder: "На накопителе нет папки piano-midi.", midi_nofiles: "В папке piano-midi нет файлов .mid и .midi.", midi_none: "MIDI-файлы ещё не импортированы.", midi_play: "Играть", midi_stop: "Стоп", midi_repeat: "Повторять", midi_idle: "Не играет.", midi_playing: "Играет {title}", midi_seek: "Позиция в произведении", midi_back: "−10 с", midi_fwd: "+10 с", midi_unavailable: "Проигрыватель не работает (мост механики exxpiano-fx).", midi_import: "Импортировать", midi_delete: "Удалить", midi_confirm_delete: "Удалить MIDI-файл {name}?", midi_notes: "нот: {n}", midi_importing: "Копируется {name}: {done} из {total}", midi_checking: "Проверяется {name}…", midi_done: "{name} импортирован.", midi_already: "{name} уже был импортирован.", midi_failed: "Импорт {name} не удался: {error}", usb_title: "Банки с USB-накопителя", usb_hint: "Положите файлы SoundFont (.sf2, .sf3) в папку piano-banks на USB-накопителе (FAT32, exFAT или ext4), подключите его и импортируйте: копирование начинается только по кнопке, а после него накопитель не нужен.", usb_none: "USB-накопитель не подключён.", usb_nofolder: "На накопителе нет папки piano-banks.", usb_nofiles: "В папке piano-banks нет файлов .sf2 и .sf3.", usb_import: "Импортировать", usb_delete: "Удалить", usb_imported: "импортирован", usb_confirm_delete: "Удалить импортированный банк {name}?", bank_confirm_delete: "Удалить банк {name} с этого устройства? Отменить нельзя: чтобы вернуть его, установите банк снова или запишите новую карту.", bank_deleted: "Удалён: {name} {freed}", usb_copying: "Копируется {name}: {done} из {total}", usb_verifying: "Проверяется {name}…", usb_done: "{name} импортирован. Накопитель можно вынуть.", usb_already: "{name} уже был импортирован.", usb_failed: "Импорт {name} не удался: {error}", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
+    bank_title: "Банк рояля", midi_title: "MIDI-файлы", midi_hint: "Положите MIDI-файлы (.mid) в папку piano-midi на USB-накопителе и импортируйте: файл играет на выбранном рояле, со стуком молоточков, демпферов и педали. После импорта накопитель не нужен.", midi_lib: "На устройстве", midi_drive: "На USB-накопителе", midi_nofolder: "На накопителе нет папки piano-midi.", midi_nofiles: "В папке piano-midi нет файлов .mid и .midi.", midi_none: "MIDI-файлы ещё не импортированы.", midi_play: "Играть", midi_stop: "Стоп", midi_repeat: "Повторять", midi_idle: "Не играет.", midi_playing: "Играет {title}", midi_seek: "Позиция в произведении", midi_back: "−10 с", midi_fwd: "+10 с", midi_unavailable: "Проигрыватель не работает (мост механики exxpiano-fx).", midi_import: "Импортировать", midi_delete: "Удалить", midi_confirm_delete: "Удалить MIDI-файл {name}?", midi_notes: "нот: {n}", midi_importing: "Копируется {name}: {done} из {total}", midi_checking: "Проверяется {name}…", midi_done: "{name} импортирован.", midi_already: "{name} уже был импортирован.", midi_failed: "Импорт {name} не удался: {error}", usb_title: "Банки с USB-накопителя", usb_hint: "Положите файлы SoundFont (.sf2, .sf3) в папку piano-banks на USB-накопителе (FAT32, exFAT или ext4), подключите его и импортируйте: копирование начинается только по кнопке, а после него накопитель не нужен.", usb_none: "USB-накопитель не подключён.", usb_nofolder: "На накопителе нет папки piano-banks.", usb_nofiles: "В папке piano-banks нет файлов .sf2 и .sf3.", usb_import: "Импортировать", usb_delete: "Удалить", usb_imported: "импортирован", usb_confirm_delete: "Удалить импортированный банк {name}?", legal_copy: "© 2026 Denis Zakharov · [exxpiano {version}](https://github.com/exxbrain/exxpiano)", legal_sounds: "Звуки: [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/SalamanderGrandPiano/), автор Alexander Holm, [CC-BY](https://creativecommons.org/licenses/by/3.0/) (преобразовано в SF2). Банки, которые вы добавили, остаются под лицензиями своих авторов.", legal_midi: "Демонстрационные записи (Лист, «Вздох» и «Кампанелла») взяты из [набора MAESTRO](https://magenta.tensorflow.org/datasets/maestro) (Google), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование. Удалите их, если используете exxpiano коммерчески.", bank_confirm_delete: "Удалить банк {name} с этого устройства? Отменить нельзя: чтобы вернуть его, установите банк снова или запишите новую карту.", bank_deleted: "Удалён: {name} {freed}", usb_copying: "Копируется {name}: {done} из {total}", usb_verifying: "Проверяется {name}…", usb_done: "{name} импортирован. Накопитель можно вынуть.", usb_already: "{name} уже был импортирован.", usb_failed: "Импорт {name} не удался: {error}", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
     bank_profile: "Чувствительность, громкость и механика запоминаются для каждого инструмента.",
     bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", bank_share: "{pct}% от допустимого для банка", mem_limit_k: "Наибольший банк", mem_limit_note: "системе {reserve}, механике {mech}", mem_disk_k: "Свободно на карте", mem_current: "Текущий банк", preset: "Пресет",
     sw_switching: "Загружается {bank}… около минуты тишины.", sw_done: "Теперь играет {bank}.", sw_rolled_back: "{bank} не загрузился; снова играет прежний банк.",
@@ -442,6 +457,29 @@ function showDeviceName(name, installId) {       // several installed copies: th
   $("devName").textContent = (installId ? installId + " · " : "") + name;
 }
 document.querySelectorAll("[data-t]").forEach(el => { el.textContent = tr(el.dataset.t); });
+// a text with [label](https://address) parts: the links are made as elements, never as HTML (the texts are ours, but nothing is trusted to markup)
+function linkify(el, text) {
+  el.textContent = "";
+  for (const part of text.split(/(\[[^\]]+\]\(https:\/\/[^)\s]+\))/)) {
+    const m = part.match(/^\[([^\]]+)\]\((https:\/\/[^)\s]+)\)$/);
+    if (!m) { el.append(document.createTextNode(part)); continue; }
+    const a = document.createElement("a"); a.textContent = m[1]; a.href = m[2]; a.target = "_blank"; a.rel = "noopener noreferrer"; el.append(a);
+  }
+}
+function fmt0(text, version) { return text.replace("{version}", version).replace(/ \]/, "]"); }
+const DEMO_PIECES = ["liszt-un-sospiro-2011.mid", "liszt-la-campanella-2013.mid"];      // the recordings that come with the device carry a non-commercial license
+let demoPresent = true;                                                                  // until the library says otherwise: the safe side
+function renderAbout(version) {
+  linkify(document.getElementById("legalCopy"), fmt0(tr("legal_copy"), version || ""));
+  document.getElementById("aboutVer").textContent = version ? "exxpiano " + version : "";
+  const fill = (id, keys) => { const ul = document.getElementById(id); ul.textContent = ""; for (const k of keys) { const li = document.createElement("li"); linkify(li, tr(k)); ul.append(li); } };
+  fill("aboutLinks", ["link_src", "link_rel", "link_help", "link_log", "link_bug"]);
+  fill("aboutRights", demoPresent ? ["about_code", "legal_sounds", "legal_midi", "about_other"] : ["about_code", "legal_sounds", "about_other"]);
+}
+function legalMidi(library) {
+  const now = library.some(m => DEMO_PIECES.includes(m.original_name));
+  if (now !== demoPresent) { demoPresent = now; renderAbout(state && state.version); }
+}
 
 const $ = id => document.getElementById(id);
 const LIVE = {
@@ -536,8 +574,9 @@ let lastStatus = "";
 let lastBanks = "";
 let bankNote = "";                 // what the last deletion did: shown until a switch starts
 const fmt = (text, vars) => text.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
-const gb = n => (n >= 1073741824 ? (n / 1073741824).toFixed(n >= 10737418240 ? 0 : 1) + " GB" : mb(n));
-const mb = n => (n / 1048576 >= 10 ? Math.round(n / 1048576) : (n / 1048576).toFixed(1)) + " MB";
+const gb = n => (n >= 1073741824 ? (n / 1073741824).toFixed(n >= 10737418240 ? 0 : 1) + unitGB() : mb(n));
+const unitMB = () => (L === "ru" ? " МБ" : " MB"), unitGB = () => (L === "ru" ? " ГБ" : " GB");
+const mb = n => (n / 1048576 >= 10 ? Math.round(n / 1048576) : (n / 1048576).toFixed(1)) + unitMB();
 
 function renderBankMemory(m) {                      // like the Monitor: tiles with a level colour and a bar
   const box = $("bankMem"); box.textContent = "";
@@ -551,7 +590,7 @@ function renderBankMemory(m) {                      // like the Monitor: tiles w
   };
   const tiles = document.createElement("div"); tiles.className = "tiles";
   const usedPct = m.used != null ? m.used / m.total * 100 : null;
-  tiles.append(tile("m_mem", m.used != null ? Math.round(m.used / 1048576) + " MB" : "–", fmt(tr("m_of"), { n: Math.round(m.total / 1048576) }), level(usedPct, 80, 92)));
+  tiles.append(tile("m_mem", m.used != null ? Math.round(m.used / 1048576) + unitMB() : "–", fmt(tr("m_of"), { n: Math.round(m.total / 1048576) }), level(usedPct, 80, 92)));
   if (m.limit != null) tiles.append(tile("mem_limit_k", mb(m.limit), fmt(tr("mem_limit_note"), { reserve: mb(m.reserve || 0), mech: mb(m.mech || 0) })));
   if (m.disk_free != null) tiles.append(tile("mem_disk_k", gb(m.disk_free), ""));
   box.append(tiles);
@@ -665,6 +704,7 @@ function renderMidi() {
   // the player: built when the piece or the state changes, then only its numbers are updated (a slider that is rebuilt every second cannot be dragged)
   renderPlayer(p);
   // the library
+  legalMidi(d.library);
   const lib = $("midiLibrary"); const keepLoop = $("midiLoop") ? $("midiLoop").checked : false; lib.textContent = "";
   lib.append(mk("h3", "", tr("midi_lib")));
   if (!d.library.length) lib.append(mk("p", "hint", tr("midi_none")));
@@ -915,7 +955,7 @@ function renderMon(n) {
   setTile("mFreq", n.freq == null ? "–" : n.freq + " MHz", "");          // below the maximum is normal at idle; throttling is reported above
   $("mFreqMax").textContent = n.freq_max ? fmt(tr("m_max"), { n: n.freq_max }) : "";
   const m = n.mem, usedPct = m ? m.used / m.total * 100 : null;
-  setTile("mMem", m ? m.used + " MB" : "–", level(usedPct, 80, 92));
+  setTile("mMem", m ? m.used + unitMB() : "–", level(usedPct, 80, 92));
   $("mMemTotal").textContent = m ? fmt(tr("m_of"), { n: m.total }) : "";
   renderThrottle(n.throttle);
   const cores = $("mCores"); cores.textContent = "";
@@ -951,7 +991,7 @@ async function pollMon() {
   } catch (e) { /* the next tick tries again */ } finally { mon.busy = false; }
 }
 // ---- pages and the menu: the address (#/wifi, #/bank ...) says which page is open, so Back, a bookmark and a link all work
-const PAGES = { home: "paneHome", bank: "paneBank", midi: "paneMidi", sound: "paneSound", audio: "paneAudio", mon: "paneMon", wifi: "paneWifi" };
+const PAGES = { home: "paneHome", bank: "paneBank", midi: "paneMidi", sound: "paneSound", audio: "paneAudio", mon: "paneMon", wifi: "paneWifi", about: "paneAbout" };
 let currentPage = "home";
 function pageFromHash() { const m = /^#\/?([a-z]+)/.exec(location.hash); return m && PAGES[m[1]] ? m[1] : null; }
 function setDrawer(open) {
@@ -1203,6 +1243,8 @@ async function start() {
   showDeviceName(state.hostname, state.device && state.device.installation_id); $("nameInput").value = state.hostname || "";
   checkDeviceParam();
   $("ver").textContent = [state.version ? "exxpiano " + state.version : "", state.fluidsynth ? "FluidSynth " + state.fluidsynth : ""].filter(Boolean).join(" · ");
+  renderAbout(state.version);
+  api("/api/midi").then(m => legalMidi(m.library)).catch(() => { /* the line about the recordings stays: it is the safe side */ });
   ["touchRows", "volumeRows", "mechRows"].forEach(id => { $(id).textContent = ""; });
   buildSliders(); drawCurve(state.settings.velocity_curve); fillAudio(); renderStatus(); renderBanks(true);
   $("preset").addEventListener("change", () => { const [bank, program] = $("preset").value.split(":").map(Number); save({ piano_bank: bank, piano_prog: program }); });

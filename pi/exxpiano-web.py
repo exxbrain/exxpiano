@@ -162,7 +162,7 @@ class Actions:
         return self._monitor.get(since)
 
     def errors(self):
-        """Warnings and errors the piano services logged since the boot: [{t (ms), unit, level, text}], newest last."""
+        """Warnings, errors and the notes of our own scripts the piano services logged since the boot: [{t (ms), unit, level, text}], newest last."""
         return self._cached('errors', 5, self._errors)
 
     def _errors(self):
@@ -300,8 +300,8 @@ def parse_oom(text):
 
 
 def parse_journal_errors(text):
-    """`journalctl -o json` lines -> [{t, unit, level, text}]. Kept: warnings and errors, and the deliberate diagnostics of our own
-    scripts ("exxpiano: ..." even at info level). Lines that are not JSON are skipped; a message repeated again and again is listed once with the last time."""
+    """`journalctl -o json` lines -> [{t, unit, level, text}]; level is error, warning, or info for the deliberate notes of our own
+    scripts ("exxpiano: ..." logged at info level: which audio output was chosen, that a service started). Kept: warnings, errors and those notes. Lines that are not JSON are skipped; a message repeated again and again is listed once with the last time."""
     out = []
     for line in text.splitlines():
         try:
@@ -319,7 +319,7 @@ def parse_journal_errors(text):
         msg = msg.strip()
         if prio > 4 and not msg.startswith(('exxpiano:', 'exxpiano-wifi:')):
             continue
-        item = dict(t=t, unit=unit, level='error' if prio <= 3 else 'warning', text=msg[:300])
+        item = dict(t=t, unit=unit, level='error' if prio <= 3 else 'warning' if prio <= 4 else 'info', text=msg[:300])
         for i, old in enumerate(out):
             if old['unit'] == item['unit'] and old['text'] == item['text']:
                 del out[i]
