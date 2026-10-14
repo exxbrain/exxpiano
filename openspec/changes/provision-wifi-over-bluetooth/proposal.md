@@ -20,11 +20,11 @@
 
 ### New Capabilities
 
-- `bluetooth-provisioning`: обнаружение устройства, защищённый BLE-протокол настройки, мобильный клиент, жизненный цикл сессии и совместимость Bluetooth-адаптеров.
+- `network/bluetooth-provisioning`: обнаружение устройства, защищённый BLE-протокол настройки, мобильный клиент, жизненный цикл сессии и совместимость Bluetooth-адаптеров.
 
 ### Modified Capabilities
 
-- `wifi-setup`: принимать проверенные запросы подключения от BLE-службы через существующий supervisor и сохранять setup Wi-Fi как fallback после ошибки или при отсутствии Bluetooth.
+- `network/wifi-setup`: принимать проверенные запросы подключения от BLE-службы через существующий supervisor и сохранять setup Wi-Fi как fallback после ошибки или при отсутствии Bluetooth.
 
 ## Impact
 
@@ -32,4 +32,4 @@
 - Новый мобильный клиент Android/iOS в отдельном каталоге проекта; Web Bluetooth не является обязательным клиентом.
 - Потребуются BlueZ и D-Bus-интеграция на DietPi; web-сервер остаётся без новых зависимостей.
 - Меняется пользовательский путь первоначальной настройки, но формат SD-образа, installation ID и формат `wpa_supplicant` сохраняются.
-- Change должен быть согласован с переносом `wifi-setup` в `network/wifi-setup`, запланированным change `reorganize-spec-capability-tree`.
+- Change согласован с деревом capabilities `<домен>/<capability>` (`network/wifi-setup`), введённым change `reorganize-spec-capability-tree`.
