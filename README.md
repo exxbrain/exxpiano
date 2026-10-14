@@ -2,7 +2,21 @@
 
 English | [Русский](README.ru.md)
 
-**Purpose:** a good piano sound on a cheap board with the least effort. Write an image to a card, power the board on, set it up from a phone: no installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
+**A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
+
+## What it can do
+
+- **Real piano sound:** Salamander Grand Piano V3 (Yamaha C5) through FluidSynth, plus the piano mechanics (hammer and damper noise, string resonance, pedal noise) that the SF2 format cannot express by itself.
+- **Fits cheap boards:** the `full` bank (about 700 MB) for a board with 1 GB, a smaller `lite` bank for 512 MB; the image picks the bank by itself.
+- **A ready image:** one ZIP for the Raspberry Pi 2/3/4 and one for the Pi 5; the first start is offline and asks for nothing. The Pi 5 has no 3.5 mm jack and plays through a USB sound card.
+- **Automatic choices:** any USB MIDI keyboard is found by itself; the sound goes through a USB sound card (small delay) when there is one, else through the 3.5 mm jack.
+- **Setup from a phone:** a web interface for the touch curve, the mechanics, volume, banks, audio output, Wi-Fi (through the device's own setup network and a QR code) and monitoring (processor, temperature, power, memory, errors).
+- **From a USB drive:** import sound banks and play MIDI files on the chosen piano, with the mechanics.
+- **Open and tested:** open source (scripts MIT, sounds CC-BY) with hundreds of automatic tests; what was not tried on a real board is marked as such.
+
+Not yet tried on real hardware: the Pi 5 image, the import from a USB drive, the MIDI player (see "Tested on" below).
+
+## How it works
 
 A digital piano appliance for Raspberry Pi 2/3/4 ARMv8: **Salamander Grand Piano V3** (Yamaha C5) through FluidSynth, plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
