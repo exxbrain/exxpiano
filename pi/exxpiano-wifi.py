@@ -28,6 +28,9 @@ import wifilib  # noqa: E402
 IFACE = os.environ.get('WIFI_IFACE', 'wlan0')
 WPA_CONF = os.environ.get('WIFI_WPA_CONF', '/etc/wpa_supplicant/wpa_supplicant.conf')
 TICK = 3.0
+NET_DIR = '/etc/network'
+DIETPI_TXT = ('/boot/firmware/dietpi.txt', '/boot/dietpi.txt')
+CTRL_LINE = 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev'
 
 
 def log(*parts):
@@ -60,8 +63,9 @@ def config_from_env(env=None):
 class System:
     """Everything that touches the machine; the tests replace it."""
 
-    def __init__(self, iface=IFACE, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, run=None):
+    def __init__(self, iface=IFACE, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, run=None, net_dir=NET_DIR, dietpi_txt=DIETPI_TXT):
         self.iface, self.run_dir, self.wpa_conf = iface, run_dir, wpa_conf
+        self.net_dir, self.dietpi_txt = net_dir, dietpi_txt
         self._run = run or self._real_run
         self.procs = []
         self.scan_error = None                          # why the last scan found nothing, or None
@@ -128,14 +132,89 @@ class System:
         rc, out = self.run(['iw', 'dev', self.iface, 'station', 'dump'], 5)
         return len(re.findall(r'(?m)^Station ', out)) if rc == 0 else 0
 
+    # -- what a freshly written card may lack: DietPi sets up wlan0 only when its own Wi-Fi is switched on, and the image switches it off
+    def _dietpi_country(self):
+        for path in self.dietpi_txt:
+            try:
+                with open(path, encoding='utf-8', errors='replace') as f:
+                    m = re.search(r'(?m)^\s*AUTO_SETUP_NET_WIFI_COUNTRY_CODE\s*=\s*([A-Za-z]{2})\s*$', f.read())
+            except OSError:
+                continue
+            if m:
+                return m.group(1).upper()
+        return None
+
+    def _interfaces_files(self):
+        files = [os.path.join(self.net_dir, 'interfaces')]
+        folder = os.path.join(self.net_dir, 'interfaces.d')
+        try:
+            files += [os.path.join(folder, n) for n in sorted(os.listdir(folder))]
+        except OSError:
+            pass
+        return files
+
+    def _has_stanza(self):
+        for path in self._interfaces_files():
+            try:
+                with open(path, encoding='utf-8', errors='replace') as f:
+                    if re.search(r'(?m)^\s*iface\s+%s\s' % re.escape(self.iface), f.read()):
+                        return True
+            except OSError:
+                continue
+        return False
+
+    def ensure_client_config(self):
+        """Make `ifup wlan0` possible on a card that was never set up for Wi-Fi: Wi-Fi not blocked, a wpa_supplicant.conf that wpa_cli can talk
+        to (with the Wi-Fi country), and a stanza for the interface. What is already there is left alone."""
+        self.run(['rfkill', 'unblock', 'wifi'], 5)
+        try:
+            with open(self.wpa_conf, encoding='utf-8') as f:
+                text = f.read()
+        except OSError:
+            text = ''
+        new = text
+        country = wifilib.country(text) or self._dietpi_country()
+        if 'ctrl_interface' not in new:
+            new = CTRL_LINE + '\n' + new
+        if country and not wifilib.country(new):
+            first, _, rest = new.partition('\n')
+            new = first + '\ncountry=' + country + '\n' + rest if first.startswith('ctrl_interface') else 'country=' + country + '\n' + new
+        if new != text:
+            os.makedirs(os.path.dirname(os.path.abspath(self.wpa_conf)), exist_ok=True)
+            wifilib.write_secret(self.wpa_conf, new)
+            log('wpa_supplicant.conf was missing its header: written')
+        if country:
+            self.run(['iw', 'reg', 'set', country], 5)
+        if not self._has_stanza():
+            folder = os.path.join(self.net_dir, 'interfaces.d')
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, 'exxpiano-' + self.iface), 'w', encoding='utf-8') as f:
+                f.write('# written by exxpiano-wifi: the Wi-Fi interface joins the networks of %s\nallow-hotplug %s\niface %s inet dhcp\n\twpa-conf %s\n'
+                        % (self.wpa_conf, self.iface, self.iface, self.wpa_conf))
+            log('no stanza for %s in %s: written' % (self.iface, self.net_dir))
+
+    def _ifargs(self):
+        """ifup/ifdown read our own stanza file directly when the main interfaces file does not include the folder interfaces.d."""
+        mine = os.path.join(self.net_dir, 'interfaces.d', 'exxpiano-' + self.iface)
+        try:
+            with open(os.path.join(self.net_dir, 'interfaces'), encoding='utf-8', errors='replace') as f:
+                includes = re.search(r'(?m)^\s*source(-directory)?\s', f.read()) is not None
+        except OSError:
+            includes = False
+        return ['-i', mine] if os.path.exists(mine) and not includes else []
+
     # -- client mode (ifupdown starts wpa_supplicant and dhclient)
     def client_down(self):
         self.run(['wpa_cli', '-i', self.iface, 'terminate'], 5)
-        self.run(['ifdown', '--force', self.iface], 20)
+        self.run(['ifdown', '--force'] + self._ifargs() + [self.iface], 20)
 
     def client_up(self):
-        self.run(['ifdown', '--force', self.iface], 20)
-        rc, out = self.run(['ifup', self.iface], 30)
+        try:
+            self.ensure_client_config()
+        except OSError as exc:                                      # not root, a read-only disk: ifup will say what is missing
+            log('could not prepare the Wi-Fi configuration:', exc)
+        self.run(['ifdown', '--force'] + self._ifargs() + [self.iface], 20)
+        rc, out = self.run(['ifup'] + self._ifargs() + [self.iface], 30)
         if rc != 0:
             log('ifup %s failed: %s' % (self.iface, out.strip()[-200:]))
 
@@ -481,6 +560,11 @@ def main(argv=None):
         return 2
     cfg = config_from_env()
     system = System()
+    if cfg['enabled'] and not system.managed_elsewhere():
+        try:
+            system.ensure_client_config()                           # a fresh card has no Wi-Fi set up: do it before the first scan or connection
+        except Exception as exc:                                    # noqa: BLE001 - the supervisor must start anyway
+            log('could not prepare the Wi-Fi configuration:', exc)
     if not cfg['enabled']:
         log('disabled (WIFI_SETUP=0)')
         return 0

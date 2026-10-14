@@ -456,7 +456,12 @@ class SystemTests(unittest.TestCase):
                 if key in ' '.join(cmd):
                     return value
             return (1, '')
-        s = pw.System('wlan0', '/tmp/none', '/tmp/none.conf', run)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.net = os.path.join(self.tmp.name, 'network')
+        self.wpa = os.path.join(self.tmp.name, 'wpa_supplicant.conf')
+        self.dietpi = os.path.join(self.tmp.name, 'dietpi.txt')
+        s = pw.System('wlan0', '/tmp/none', self.wpa, run, net_dir=self.net, dietpi_txt=(self.dietpi,))
         return s, calls
 
     def test_the_link_comes_from_the_supplicant(self):
@@ -479,12 +484,67 @@ class SystemTests(unittest.TestCase):
         s, _ = self.make({'is-active': (3, 'inactive\n')})
         self.assertFalse(s.managed_elsewhere())
 
+    def write(self, path, text):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(text)
+
+    def test_a_fresh_card_gets_what_ifup_needs_and_the_country_of_the_image(self):
+        s, calls = self.make({'ifup': (0, '')})
+        self.write(self.dietpi, 'AUTO_SETUP_NET_WIFI_COUNTRY_CODE=RU\nAUTO_SETUP_NET_WIFI_ENABLED=0\n')
+        self.write(os.path.join(self.net, 'interfaces'), 'auto lo\niface lo inet loopback\n')       # no wlan0 and no source line: "unknown interface wlan0"
+        s.client_up()
+        with open(self.wpa) as f:
+            conf = f.read().splitlines()
+        self.assertEqual(conf[:2], ['ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev', 'country=RU'])
+        stanza = os.path.join(self.net, 'interfaces.d', 'exxpiano-wlan0')
+        with open(stanza) as f:
+            text = f.read()
+        self.assertIn('iface wlan0 inet dhcp', text)
+        self.assertIn('wpa-conf ' + self.wpa, text)
+        self.assertIn(['rfkill', 'unblock', 'wifi'], calls)
+        self.assertIn(['iw', 'reg', 'set', 'RU'], calls)
+        self.assertIn(['ifup', '-i', stanza, 'wlan0'], calls)                          # the main file does not include interfaces.d: the stanza is read directly
+        self.assertEqual(os.stat(self.wpa).st_mode & 0o777, 0o600)
+
+    def test_what_dietpi_already_set_up_is_left_alone(self):
+        s, calls = self.make({'ifup': (0, '')})
+        self.write(os.path.join(self.net, 'interfaces'), 'source interfaces.d/*\n')
+        self.write(os.path.join(self.net, 'interfaces.d', 'wlan0'), 'allow-hotplug wlan0\niface wlan0 inet dhcp\n\twpa-conf /etc/wpa_supplicant/wpa_supplicant.conf\n')
+        own = 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev\ncountry=GB\nnetwork={\n\tssid="x"\n}\n'
+        self.write(self.wpa, own)
+        s.client_up()
+        with open(self.wpa) as f:
+            self.assertEqual(f.read(), own)
+        self.assertFalse(os.path.exists(os.path.join(self.net, 'interfaces.d', 'exxpiano-wlan0')))
+        self.assertIn(['ifup', 'wlan0'], calls)
+
+    def test_saved_networks_survive_when_only_the_header_is_added(self):
+        s, calls = self.make({'ifup': (0, '')})
+        self.write(os.path.join(self.net, 'interfaces'), 'source interfaces.d/*\n')
+        self.write(self.wpa, 'network={\n\tssid="Home"\n\tpsk="secret123"\n}\n')
+        self.write(self.dietpi, 'AUTO_SETUP_NET_WIFI_COUNTRY_CODE=GB\n')
+        s.client_up()
+        with open(self.wpa) as f:
+            conf = f.read()
+        self.assertTrue(conf.startswith('ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev\ncountry=GB\n'))
+        self.assertIn('psk="secret123"', conf)
+
+    def test_a_card_that_cannot_be_prepared_still_tries_ifup(self):
+        s, calls = self.make({'ifup': (1, 'ifup: unknown interface wlan0')})
+        self.write(os.path.join(self.tmp.name, 'blocker'), 'a file where a folder is needed')
+        s.net_dir = os.path.join(self.tmp.name, 'blocker')                              # the stanza cannot be written here
+        s.client_up()
+        self.assertIn(['ifup', 'wlan0'], calls)
+
     def test_client_mode_goes_through_ifupdown_only(self):
         s, calls = self.make({'ifup': (0, '')})
+        self.write(os.path.join(self.net, 'interfaces'), 'source interfaces.d/*\n')                # a card set up by DietPi
+        self.write(os.path.join(self.net, 'interfaces.d', 'wlan0'), 'allow-hotplug wlan0\niface wlan0 inet dhcp\n')
         s.client_up()
         s.client_down()
         names = [c[0] for c in calls]
-        self.assertEqual(set(names), {'ifdown', 'ifup', 'wpa_cli'})
+        self.assertEqual(set(names), {'ifdown', 'ifup', 'wpa_cli', 'rfkill'})
         self.assertIn(['ifup', 'wlan0'], calls)
         self.assertIn(['ifdown', '--force', 'wlan0'], calls)
 
