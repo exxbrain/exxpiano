@@ -104,6 +104,14 @@ class LibraryTests(unittest.TestCase):
         self.assertTrue(midilib.resolve(self.lib, midi_id).endswith('song.mid'))
         self.assertEqual(self.leftovers(), [])
 
+    def test_a_generic_track_name_gives_way_to_the_file_name(self):
+        for title in ('control track', 'Track 1', 'Untitled'):
+            with self.subTest(title):
+                src = make_midi(os.path.join(self.tmp.name, 'liszt-consolation_no3.mid'), [(0, 60, 80, 1)], title=title)
+                lib = os.path.join(self.tmp.name, 'lib-' + title.replace(' ', ''))
+                midilib.import_midi(src, 'liszt-consolation_no3.mid', lib)
+                self.assertEqual(midilib.list_library(lib)[0]['name'], 'liszt consolation no3')
+
     def test_the_same_file_is_not_copied_twice(self):
         a, _ = midilib.import_midi(self.src, 'Prelude.mid', self.lib)
         b, already = midilib.import_midi(self.src, 'again.mid', self.lib)

@@ -19,7 +19,7 @@ network={
 \tssid="Home"
 \tscan_ssid=1
 \tkey_mgmt=WPA-PSK
-\tpsk=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+\tpsk=012abc012abc012abc012abc
 }
 """
 HEX = 'ab' * 32
@@ -62,7 +62,7 @@ class WpaConfTests(unittest.TestCase):
         self.assertIn('psk=' + HEX, text)
         for kept in ('country=GB', 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev', 'update_config=1', '# Allow wpa_cli/wpa_gui'):
             self.assertIn(kept, text)
-        self.assertIn('psk=0123456789abcdef', text)                         # the old network is untouched
+        self.assertIn('psk=012abc', text)                         # the old network is untouched
         self.assertTrue(text.endswith('}\n'))
 
     def test_the_same_name_is_replaced_not_duplicated(self):
@@ -72,7 +72,7 @@ class WpaConfTests(unittest.TestCase):
         self.assertEqual([n['ssid'] for n in nets], ['Home'])
         self.assertIn('cd' * 32, twice)
         self.assertNotIn(HEX, twice)
-        self.assertNotIn('0123456789abcdef0123', twice)
+        self.assertNotIn('012abc0123', twice)
 
     def test_open_and_hidden_networks(self):
         text = wifilib.add_network(WPA, 'Cafe')
@@ -168,11 +168,26 @@ class HostnameTests(unittest.TestCase):
     def test_installation_id_is_created_once_and_persisted(self):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, 'installation-id')
-            self.assertEqual(wifilib.installation_id(path, lambda: '0123456789abcdef'), '0123456789ABCDEF')
-            self.assertEqual(wifilib.installation_id(path, lambda: 'ffffffffffffffff'), '0123456789ABCDEF')
+            self.assertEqual(wifilib.installation_id(path, lambda: '012abc'), '012ABC')
+            self.assertEqual(wifilib.installation_id(path, lambda: 'ffffff'), '012ABC')
             with open(path) as f:
-                self.assertEqual(f.read(), '0123456789ABCDEF\n')
+                self.assertEqual(f.read(), '012ABC\n')
             self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o644)
+
+    def test_a_new_id_has_six_digits_and_a_long_id_of_an_earlier_version_is_kept(self):
+        with tempfile.TemporaryDirectory() as d:
+            fresh = os.path.join(d, 'new')
+            self.assertRegex(wifilib.installation_id(fresh), r'^[0-9A-F]{6}$')
+            old = os.path.join(d, 'old')
+            with open(old, 'w') as f:
+                f.write('0123456789abcdef\n')
+            self.assertEqual(wifilib.installation_id(old), '0123456789ABCDEF')
+            self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', '0123456789ABCDEF'), 'exxpiano-Setup-0123456789ABCDEF')
+            for bad in ('12345', '1234567', 'GHIJKL'):
+                with open(old, 'w') as f:
+                    f.write(bad + '\n')
+                with self.assertRaises(ValueError):
+                    wifilib.installation_id(old)
 
     def test_invalid_existing_installation_id_is_not_silently_replaced(self):
         with tempfile.TemporaryDirectory() as d:
@@ -205,9 +220,9 @@ class HostnameTests(unittest.TestCase):
 
 class AccessPointTests(unittest.TestCase):
     def test_the_name_ends_with_the_installation_id(self):
-        install_id = '0123456789ABCDEF'
-        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', install_id), 'exxpiano-Setup-0123456789ABCDEF')
-        self.assertEqual(wifilib.setup_credentials({}, install_id), ('exxpiano-Setup-0123456789ABCDEF', 'exxpianosetup'))
+        install_id = '012ABC'
+        self.assertEqual(wifilib.ap_ssid('exxpiano-Setup', install_id), 'exxpiano-Setup-012ABC')
+        self.assertEqual(wifilib.setup_credentials({}, install_id), ('exxpiano-Setup-012ABC', 'exxpianosetup'))
         self.assertLessEqual(len(wifilib.ap_ssid('x' * 60, install_id).encode()), 32)
         for bad in ('', '1234', 'not-hex', None):
             with self.subTest(bad), self.assertRaises(ValueError):

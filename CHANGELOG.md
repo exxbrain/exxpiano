@@ -2,6 +2,16 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.18
+
+- **Wi-Fi on a fresh card:** `ifup wlan0` failed with "unknown interface wlan0" because a fresh DietPi has no `wlan0` stanza. The supervisor now writes the stanza, the `wpa_supplicant` header and the country, and unblocks rfkill before it brings the network up. A cable in a USB network adapter (or any wired port without a configuration) gets its address by DHCP (`ifupdown` and `isc-dhcp-client` are now dependencies). **Not tried on every board:** the USB Ethernet adapter was only seen on one Pi 3 B+.
+- **A shorter installation ID: 6 hexadecimal characters** instead of 16 (`exxpiano-Setup-012ABC`, hostname `exxpiano-012abc`). A device that already has a long ID keeps it, so its names and printed QR codes do not change. With 24 bits two devices in one room almost never share a name, but it is not a guarantee.
+- **MIDI player: seek and timing.** A slider and the **−10 s / +10 s** buttons move to any moment of the piece without stopping it (the sounding notes are let go, the pedal gets the state the file has there); the time shows elapsed / total / left and runs smoothly. A file whose track is called `control track`, `Track 1` or similar is named after the file.
+- **Deleting banks.** The **Delete** button is on every bank that is not in use, an installed one as well as an imported one (not the current bank, the last good one or the mechanics bank; not while a bank switches). The question warns that it cannot be undone. OpenSpec change `delete-installed-banks`.
+- **Memory in the bank list**, as in the Monitor: memory in use, the largest bank that fits (with the reserve of the system and the mechanics bank), free space on the card, a bar of the current bank and every bank's share of the limit.
+- **A piece comes with the device:** Liszt's *Un Sospiro*, a recording of a real pianist (International Piano-e-Competition 2011, Yamaha Disklavier), is put into the MIDI library once at the first installation; a piece you delete does not come back. It is taken unchanged from the **MAESTRO dataset (Google), license CC BY-NC-SA 4.0**: non-commercial use, with attribution, under the same license; the code stays MIT. Delete the piece if you use exxpiano commercially (`assets/midi/NOTICE.md`).
+- **Not tried on a real Raspberry Pi:** pressing **Delete** on a bank, the exactness of the seek and of the timing of a long piece, the demonstration piece inside a built image (the image check was extended, but the image was not built for this release by hand), the Pi 5 image, the USB drive. Tested by 402 automatic tests and in the demo.
+
 ## 1.10.17
 
 - **MIDI player** (its own section of the menu): put `.mid` / `.midi` files into the folder `piano-midi/` of a USB drive, import them, and they play on the piano you have chosen, with the mechanics (hammers, dampers, resonance, pedal) and your touch curve. Stop and repeat; a piece goes on when another section is open, and Home shows what is playing. Only the notes and the sustain pedal of a file are played (no program or bank changes, no drums), and the files are limited (4 MB, 30 minutes). **Not tried on a real Raspberry Pi yet:** the exactness of the timing, the load of a dense file, the USB drive.

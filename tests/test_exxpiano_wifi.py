@@ -143,7 +143,7 @@ class SupervisorCase(unittest.TestCase):
         self.portal = FakePortal()
         self.cfg = pw.config_from_env({})
         self.sup = pw.Supervisor(self.system, self.cfg, self.run_dir, self.wpa, self.clock, lambda: 1_700_000_000 + self.clock.t, self.clock.sleep,
-                                 self.portal, install_id='0123456789ABCDEF')
+                                 self.portal, install_id='012ABC')
 
     def write_wpa(self, text):
         with open(self.wpa, 'w') as f:
@@ -179,10 +179,10 @@ class WhenToStartTests(SupervisorCase):
         self.assertEqual(self.sup.mode, 'client')
         self.advance(10)
         self.assertEqual(self.sup.mode, 'ap')                                          # 10 s of grace by default
-        self.assertEqual(self.system.ap_args, ('exxpiano-Setup-0123456789ABCDEF', 'exxpianosetup', 6, 'GB'))
+        self.assertEqual(self.system.ap_args, ('exxpiano-Setup-012ABC', 'exxpianosetup', 6, 'GB'))
         self.assertTrue(self.portal.running)
         st = self.status()
-        self.assertEqual((st['mode'], st['ap']['ssid']), ('ap', 'exxpiano-Setup-0123456789ABCDEF'))
+        self.assertEqual((st['mode'], st['ap']['ssid']), ('ap', 'exxpiano-Setup-012ABC'))
         self.assertEqual([n['ssid'] for n in st['scan']], ['Home', 'Cafe'])             # scanned before the radio became an access point
         self.assertLess(self.system.calls.index('scan'), self.system.calls.index('ap_start'))
 
@@ -693,7 +693,7 @@ class EnsureNameTests(unittest.TestCase):
         real = pw.System
         real_installation_id = pw.wifilib.installation_id
         pw.System = FakeSystem
-        pw.wifilib.installation_id = lambda: '0123456789ABCDEF'
+        pw.wifilib.installation_id = lambda: '012ABC'
         try:
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
@@ -707,13 +707,13 @@ class EnsureNameTests(unittest.TestCase):
         for generic in ('DietPi', 'raspberrypi', 'piano', 'localhost'):
             code, out, calls = self.run_cli(generic)
             self.assertEqual(code, 0)
-            self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-0123456789abcdef'], calls)
-            self.assertIn('exxpiano-0123456789abcdef', out)
+            self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-012abc'], calls)
+            self.assertIn('exxpiano-012abc', out)
 
     def test_the_installation_id_names_the_device_even_without_an_adapter(self):
         code, out, calls = self.run_cli('dietpi', mac='')
         self.assertEqual(code, 0)
-        self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-0123456789abcdef'], calls)
+        self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-012abc'], calls)
 
     def test_a_chosen_name_is_kept(self):
         for chosen in ('exxpiano', 'kitchen-piano', 'exxpiano-81de'):

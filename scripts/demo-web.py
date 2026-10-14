@@ -3,7 +3,7 @@
 
   python3 scripts/demo-web.py                    # http://127.0.0.1:8080/
   python3 scripts/demo-web.py --mode ap          # the device in setup mode (its own Wi-Fi), the page opens on the Wi-Fi tab
-  python3 scripts/demo-web.py --installation-id 0123456789ABCDEF --open
+  python3 scripts/demo-web.py --installation-id 012ABC --open
 
 Everything works as on the device (a USB drive with two banks is "plugged in": import one on the Piano bank page): move the sliders, change the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" in it does not connect;
 "Cafe" is open), start the setup network, scan the QR codes. Nothing is written outside a temporary folder and nothing is sent anywhere.
@@ -61,6 +61,9 @@ class DemoActions(web.Actions):
 
     def mem_total(self):
         return 954 << 20
+
+    def mem_available(self):
+        return 454 << 20
 
     def synth_pid(self):
         return 4242
@@ -178,7 +181,7 @@ def main():
     ap.add_argument('--bind', default='127.0.0.1', help='127.0.0.1 (this computer only); 0.0.0.0 to look at it from a phone on the same network')
     ap.add_argument('--mode', choices=('client', 'ap'), default='client', help='ap: the device has no network and runs its own (setup mode)')
     ap.add_argument('--hostname', default='exxpiano')
-    ap.add_argument('--installation-id', default='0123456789ABCDEF', help='16 hexadecimal characters, generated automatically on a real device')
+    ap.add_argument('--installation-id', default='012ABC', help='6 hexadecimal characters, generated automatically on a real device')
     ap.add_argument('--throttled', action='store_true', help='show that the board was throttled earlier (under-voltage)')
     ap.add_argument('--token', default='', help='ask for this access token, as WEB_TOKEN does')
     ap.add_argument('--open', action='store_true', help='open the page in the browser')
@@ -200,6 +203,8 @@ def main():
     make_midi(os.path.join(drive, 'piano-midi', 'Arpeggio.mid'), melody, tempo=500000, pedal=[(0, 127), (7.5, 0), (8, 127), (15.5, 0)], title='Arpeggio')
     make_midi(os.path.join(drive, 'piano-midi', 'Slow chords.mid'), [(0, 48, 60, 4), (0, 55, 60, 4), (0, 64, 60, 4), (4, 50, 70, 4), (4, 57, 70, 4), (4, 65, 70, 4)],
               tempo=700000, title='Slow chords')
+    long_piece = [(rep * 8 + start, note + (rep % 3) * 2, vel, length) for rep in range(48) for start, note, vel, length in melody]       # about three minutes: to try the slider
+    make_midi(os.path.join(drive, 'piano-midi', 'Long etude.mid'), long_piece, tempo=500000, title='Long etude')
     usb_status = os.path.join(tmp, 'usb-status.json')
     usblib._write_json(usb_status, dict(drives=[dict(id='/dev/sda1', label='PIANO-BANKS', fs='vfat', mounted=True, mountpoint=drive, reason=None)]))
     conf = os.path.join(tmp, 'exxpiano.conf')

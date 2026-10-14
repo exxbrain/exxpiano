@@ -1,12 +1,13 @@
 """The player of imported MIDI files for the bridge (standard library only: the bridge gives it the way to the synthesizer).
 
-The web service asks for things through /run/exxpiano-midi/request.json (play an id of the library, with repeat, or stop; every request has a new
+The web service asks for things through /run/exxpiano-midi/request.json (play an id of the library, with repeat, move to a position of the piece that plays, or stop; every request has a new
 `nonce`) and reads /run/exxpiano-midi/status.json. The player never sees a path from outside: it takes an id and looks it up in the library.
 The notes go through the same `on_event` as a keyboard's notes, so the touch curve, the piano and the mechanics treat them alike; nothing in the
 file (programs, banks, volume, drums) reaches the synthesizer, because midilib keeps only notes and the sustain pedal.
 
 `step()` does one small piece of work using the clock it is given, so tests drive it with a fake clock; `run()` is the loop of the real thing.
 """
+import bisect
 import json
 import os
 import tempfile
@@ -76,6 +77,8 @@ class Player:
             self.stop('stopped')
         elif op == 'play':
             self._start(req.get('id'), bool(req.get('loop')), now)
+        elif op == 'seek':
+            self.seek(req.get('id'), req.get('position'), now)
         else:
             self._publish(now)
 
@@ -99,6 +102,24 @@ class Player:
         self.midi_id, self.title, self.loop, self.length = midi_id, parsed['title'], loop, parsed['length']
         self._events, self._i, self._t0, self._port, self._pedal_down = parsed['events'], 0, now, port, False
         self.playing, self.reason = True, None
+        self._publish(now)
+
+    def seek(self, midi_id, position, now):
+        """Move to `position` seconds of the piece that plays. A late request for a piece that has ended or been replaced is ignored.
+        Notes that sound at that moment are let go (they began before the new position); the sustain pedal gets the state the file has there."""
+        if not self.playing or midi_id != self.midi_id or isinstance(position, bool) or not isinstance(position, (int, float)) or position != position:
+            return
+        position = min(max(float(position), 0.0), self.length)
+        self.release_all(self._pedal_down)
+        self._pedal_down = False
+        self._i = bisect.bisect_left(self._events, (position,))          # the first event at or after the position
+        for _, kind, a, b in reversed(self._events[:self._i]):
+            if kind == 'pedal':
+                if a >= 64:
+                    self._pedal_down = True
+                    self.on_event(kind, a, b)
+                break
+        self._t0 = now - position
         self._publish(now)
 
     def stop(self, reason, publish=True):

@@ -35,6 +35,18 @@ def mem_total_bytes(meminfo='/proc/meminfo'):
     return None
 
 
+def mem_available_bytes(meminfo='/proc/meminfo'):
+    """MemAvailable of the kernel: what a program can still get without swapping."""
+    try:
+        with open(meminfo) as f:
+            for line in f:
+                if line.startswith('MemAvailable:'):
+                    return int(line.split()[1]) * 1024
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def size_limit(mem_total, mech_bytes=0, reserve_mb=None):
     """The largest piano bank that fits next to the mechanics bank, or None when the memory size is unknown."""
     if mem_total is None:
@@ -44,6 +56,25 @@ def size_limit(mem_total, mech_bytes=0, reserve_mb=None):
     else:
         reserve = reserve_mb * (1 << 20)
     return max(0, mem_total - reserve - mech_bytes)
+
+
+def memory_info(bank_dir, mem_total, mech_bytes=0, current_path=None, reserve_mb=None, statvfs=os.statvfs, mem_available=None):
+    """What the bank list shows about memory: dict(total, used, limit, mech, reserve, current, disk_free). Bytes; None where it is not known.
+    `used` is the memory in use now (what the Monitor shows), `total` minus what is available.
+    `limit` is the largest piano bank that fits, `reserve` what is kept for the system, `current` the size of the bank that plays."""
+    limit = size_limit(mem_total, mech_bytes, reserve_mb)
+    try:
+        current = os.path.getsize(current_path) if current_path else None
+    except OSError:
+        current = None
+    try:
+        st = statvfs(bank_dir)
+        disk_free = st.f_bavail * st.f_frsize
+    except OSError:
+        disk_free = None
+    reserve = None if limit is None else mem_total - limit - mech_bytes
+    used = mem_total - mem_available if mem_total is not None and mem_available is not None else None
+    return dict(total=mem_total, used=used, limit=limit, mech=mech_bytes, reserve=reserve, current=current, disk_free=disk_free)
 
 
 def inspect(path):
@@ -219,6 +250,22 @@ def resolve_any(bank_dir, import_dir, bank_id):
             raise ValueError('no such bank in the library')
         return path
     return resolve(bank_dir, bank_id)
+
+
+def delete_installed(bank_dir, bank_id, keep_paths=()):
+    """Remove an installed bank (a plain file of the bank library) unless it is one of `keep_paths`: the current bank, the last good one and
+    the mechanics bank. ValueError with a reason otherwise. -> the number of bytes freed. The file is renamed out of the catalog first."""
+    path = resolve(bank_dir, bank_id)                          # ValueError unless it is a plain file of the library
+    if any(_same(path, k) for k in keep_paths if k):
+        raise ValueError('this bank is in use: choose another working bank first')
+    size = os.lstat(path).st_size
+    gone = os.path.join(bank_dir, '.deleting-' + bank_id)
+    os.rename(path, gone)
+    try:
+        os.remove(gone)
+    except OSError:
+        pass                                                   # a leftover with a dot name is not listed; the next delete or restart can clear it
+    return size
 
 
 def delete_import(import_dir, bank_id, keep_paths=()):

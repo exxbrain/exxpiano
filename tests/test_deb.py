@@ -130,6 +130,9 @@ class DebTests(unittest.TestCase):
         names = [m.name for m in data.getmembers()]
         self.assertEqual(data.extractfile('./opt/exxpiano/VERSION').read().decode().strip(), '9.9.9')
         self.assertIn('./lib/udev/rules.d/90-exxpiano.rules', names)
+        for demo in ('./opt/exxpiano/exxpiano-demo-midi.py', './usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid', './usr/share/exxpiano/midi/NOTICE.md'):
+            self.assertIn(demo, names)
+        self.assertEqual(data.getmember('./opt/exxpiano/exxpiano-demo-midi.py').mode, 0o755)
         for web_file in ('./opt/exxpiano/exxpianoconf.py', './opt/exxpiano/exxpiano-web.py', './opt/exxpiano/sf2info.py',
                          './opt/exxpiano/banklib.py', './opt/exxpiano/bankimport.py', './opt/exxpiano/usblib.py', './opt/exxpiano/midilib.py', './opt/exxpiano/midiplayer.py', './opt/exxpiano/exxpiano-usb.py', './lib/systemd/system/exxpiano-usb@.service', './opt/exxpiano/profiles.py', './opt/exxpiano/sysmon.py', './opt/exxpiano/wifilib.py', './opt/exxpiano/qrlib.py', './opt/exxpiano/deviceid.py', './opt/exxpiano/exxpiano-wifi.py', './lib/systemd/system/exxpiano-wifi.service', './var/lib/exxpiano',
                          './opt/exxpiano/web/index.html', './lib/systemd/system/exxpiano-web.service'):

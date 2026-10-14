@@ -228,7 +228,7 @@ class BuildTests(Case):
         self.assertFalse(os.path.exists(os.path.join(self.out, 'sticker')))
         with open(os.path.join(self.out, 'README-rpi234.txt'), encoding='utf-8') as f:
             text = f.read()
-        for needle in ('creates and permanently saves its own 16-character hexadecimal ID', 'exxpiano-Setup-<INSTALLATION-ID>', 'setup password 1',
+        for needle in ('creates and permanently saves its own 6-character hexadecimal ID', 'exxpiano-Setup-<INSTALLATION-ID>', 'setup password 1',
                        'needs neither Internet nor an Ethernet cable', 'DietPi: 10.7.0'):
             self.assertIn(needle, text)
         with open(os.path.join(self.out, 'manifest-rpi234.json'), encoding='utf-8') as f:
@@ -613,6 +613,9 @@ class ShellScriptTests(unittest.TestCase):
                 os.path.join(root, 'opt', 'exxpiano', 'exxpiano-web.py'): '#!/usr/bin/python3\n',
                 os.path.join(root, 'opt', 'exxpiano', 'exxpiano-wifi.py'): '#!/usr/bin/python3\n',
                 os.path.join(root, 'lib', 'systemd', 'system', 'exxpiano.service'): '[Service]\n',
+                os.path.join(root, 'usr', 'share', 'exxpiano', 'midi', 'liszt-un-sospiro-2011.mid'): 'MThd',
+                os.path.join(root, 'usr', 'share', 'exxpiano', 'midi', 'NOTICE.md'): 'CC BY-NC-SA 4.0',
+                os.path.join(root, 'var', 'lib', 'exxpiano', 'midi', 'm-0123456789abcdef', 'song.mid'): 'MThd',
                 os.path.join(root, 'opt', 'exxpiano', 'soundfonts', 'piano.sf2'): 'piano',
                 os.path.join(root, 'opt', 'exxpiano', 'soundfonts', 'mech.sf2'): 'mech',
                 os.path.join(root, 'etc', 'exxpiano.conf'): ('PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2\n'
@@ -658,6 +661,8 @@ class ShellScriptTests(unittest.TestCase):
                     'root/etc/systemd/system/dietpi-firstboot.service.d/exxpiano-preinstalled.conf',
                     'root/var/lib/dietpi/postboot.d/10-exxpiano-image-firstboot',
                     'root/usr/local/sbin/exxpiano-console', 'root/etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf',
+                    'root/usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid', 'root/usr/share/exxpiano/midi/NOTICE.md',
+                    'root/var/lib/exxpiano/midi/m-0123456789abcdef/song.mid',
                     'root/opt/exxpiano/exxpiano-web.py', 'root/lib/systemd/system/exxpiano.service',
                     'root/opt/exxpiano/soundfonts/piano.sf2', 'root/opt/exxpiano/soundfonts/mech.sf2',
                     'root/etc/exxpiano.conf'):

@@ -6,10 +6,11 @@
   POST /api/settings       {"velocity_curve": 0.8, ...}  - validated, stored in /etc/exxpiano.conf, applied
   POST /api/restart        restart exxpiano (needed after changing audio output / buffer / reverb / polyphony)
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
+                           {"action": "delete", "id": "<bank>"}  - remove a bank that is not in use (not the current one, the last good one or the mechanics bank)
   GET  /api/usb            the USB drive (label, state, the SoundFont files of piano-banks/) and the state of the import
   POST /api/usb            {"action": "import", "name": "<file listed on the drive>"} | {"action": "delete", "id": "i-<16 hex>"}  - copy a bank from the drive / remove an imported one
   GET  /api/midi           MIDI files: the ones on the drive (piano-midi/), the library, the player (state, position), the import
-  POST /api/midi           {"action": "import", "name"} | {"action": "delete", "id"} | {"action": "play", "id", "loop"} | {"action": "stop"}
+  POST /api/midi           {"action": "import", "name"} | {"action": "delete", "id"} | {"action": "play", "id", "loop"} | {"action": "seek", "id", "position"} | {"action": "stop"}
   GET  /api/wifi           Wi-Fi: link, saved networks, scan results, access point (the setup mode), result of the last change
   POST /api/device         {"name": "piano-kitchen"}  - rename the device (its network name, http://<name>.local:8080/); useful with several devices
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
@@ -109,6 +110,9 @@ class Actions:
 
     def mem_total(self):
         return banklib.mem_total_bytes()
+
+    def mem_available(self):
+        return banklib.mem_available_bytes()
 
     def synth_pid(self):
         try:
@@ -635,6 +639,7 @@ class App:
         s = exxpianoconf.get_settings(self.conf_path)
         key = os.path.basename(current) if current else None
         return dict(dir=bank_dir, current=current_id, external=external, banks=banks,
+                    memory=banklib.memory_info(bank_dir, self.actions.mem_total(), mech_bytes, current, mem_available=self.actions.mem_available()),
                     profile=dict(key=key, saved=bool(key and profiles.get(self.profile_path, key))),
                     presets=banklib.presets_of(current) if current else [],
                     preset=dict(bank=s['piano_bank'], program=s['piano_prog']), switch=self.switcher.status)
@@ -709,6 +714,11 @@ class App:
             return self._midi_delete(body.get('id'))
         if action == 'play':
             return self._midi_request(dict(op='play', id=self._midi_id(body.get('id')), loop=bool(body.get('loop'))))
+        if action == 'seek':
+            position = body.get('position')
+            if isinstance(position, bool) or not isinstance(position, (int, float)) or not 0 <= position <= 24 * 3600:
+                raise ValueError('position is a number of seconds')
+            return self._midi_request(dict(op='seek', id=self._midi_id(body.get('id')), position=float(position)))
         if action == 'stop':
             return self._midi_request(dict(op='stop'))
         raise ValueError('unknown action')
@@ -761,6 +771,18 @@ class App:
         keep = [conf.get('PIANO_SF2'), conf.get('PIANO_SF2_LAST_GOOD')]
         banklib.delete_import(self.import_dir, bank_id, keep_paths=keep)
         return dict(deleted=True)
+
+    def delete_bank(self, bank_id):
+        """Remove a bank of the library (installed or imported) that is not in use; the current bank, the last good one and the mechanics bank stay."""
+        if self.importer.busy() or self.switcher.busy():
+            raise Busy()
+        bank_dir, current, mech, _ = self._bank_context()
+        conf = exxpianoconf.parse_conf(self.conf_path)
+        keep = [current, conf.get('PIANO_SF2_LAST_GOOD'), mech]
+        if isinstance(bank_id, str) and banklib.IMPORT_ID_RE.match(bank_id):
+            banklib.delete_import(self.import_dir, bank_id, keep_paths=keep)
+            return dict(deleted=True)
+        return dict(deleted=True, freed=banklib.delete_installed(bank_dir, bank_id, keep_paths=keep))
 
     def switch_bank(self, bank_id):
         bank_dir, current, mech, mech_bytes = self._bank_context()
@@ -935,6 +957,8 @@ def make_handler(app):
                     body = self._body()
                     if not isinstance(body, dict):
                         raise ValueError('expected an object')
+                    if body.get('action') == 'delete':
+                        return self._send(200, app.delete_bank(body.get('id')))
                     return self._send(200, app.switch_bank(body.get('id')))
             except Busy:
                 return self._send(409, dict(error='a bank switch is in progress, wait until it finishes'))

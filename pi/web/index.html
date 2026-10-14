@@ -98,6 +98,8 @@
   }
   .wnote { font-size: .92rem; margin: 0 0 8px; } .wnote.ok { color: var(--ok); } .wnote.warn { color: var(--warn); } .wnote.bad { color: var(--bad); }
   .wnote b { overflow-wrap: anywhere; }
+  .row2 { display: flex; gap: 8px; flex-wrap: wrap; }
+  .midi-times { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; color: var(--muted); font-size: .92rem; margin: 2px 0 8px; }
   .net { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
   .net:first-child { border-top: 0; }
   .net .meta { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -197,6 +199,7 @@
   <div class="card">
     <h2 data-t="bank_title">Piano bank</h2>
     <p class="hint" id="bankHint"></p>
+    <div id="bankMem"></div>
     <div id="bankList"></div>
     <div class="row" id="presetRow" style="display:none"><label for="preset" data-t="preset">Preset</label><select id="preset" style="grid-column:1/3"></select></div>
     <p id="bankStatus" role="status"></p>
@@ -346,9 +349,9 @@ const T = {
     th_unknown: "The throttling state cannot be read on this device.", th_ok: "No throttling now.", th_now: "Right now: {list}.", th_past: "Since the boot: {list}.",
     th_clean: "Nothing since the boot.", th_power: "Under-voltage: use a 5 V / 2.5 A supply and a short, thick cable.",
     th_undervoltage: "under-voltage (weak power supply)", th_freq_capped: "frequency capped", th_throttled: "CPU slowed down", th_soft_limit: "temperature limit reached",
-    bank_title: "Piano bank", midi_title: "MIDI files", midi_hint: "Put MIDI files (.mid) into the folder piano-midi of a USB drive and import them: a file plays on the piano you have chosen, with the hammer, damper and pedal noises. The drive is not needed afterwards.", midi_lib: "On the device", midi_drive: "On the USB drive", midi_nofolder: "There is no folder piano-midi on this drive.", midi_nofiles: "The folder piano-midi has no .mid or .midi files.", midi_none: "No MIDI files have been imported yet.", midi_play: "Play", midi_stop: "Stop", midi_repeat: "Repeat", midi_idle: "Not playing.", midi_playing: "Playing {title}: {pos} of {len}", midi_unavailable: "The player is not running (the mechanics bridge exxpiano-fx).", midi_import: "Import", midi_delete: "Delete", midi_confirm_delete: "Delete the MIDI file {name}?", midi_notes: "{n} notes", midi_importing: "Copying {name}: {done} of {total}", midi_checking: "Checking {name}…", midi_done: "{name} is imported.", midi_already: "{name} was already imported.", midi_failed: "Import of {name} failed: {error}", usb_title: "Banks from a USB drive", usb_hint: "Put SoundFont files (.sf2, .sf3) into the folder piano-banks of a USB drive (FAT32, exFAT or ext4), plug it in and import: the copy starts only when you press the button, and the drive is not needed afterwards.", usb_none: "No USB drive is connected.", usb_nofolder: "There is no folder piano-banks on this drive.", usb_nofiles: "The folder piano-banks has no .sf2 or .sf3 files.", usb_import: "Import", usb_delete: "Delete", usb_imported: "imported", usb_confirm_delete: "Delete the imported bank {name}?", usb_copying: "Copying {name}: {done} of {total}", usb_verifying: "Checking {name}…", usb_done: "{name} is imported. You can take the drive out.", usb_already: "{name} was already imported.", usb_failed: "Import of {name} failed: {error}", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
+    bank_title: "Piano bank", midi_title: "MIDI files", midi_hint: "Put MIDI files (.mid) into the folder piano-midi of a USB drive and import them: a file plays on the piano you have chosen, with the hammer, damper and pedal noises. The drive is not needed afterwards.", midi_lib: "On the device", midi_drive: "On the USB drive", midi_nofolder: "There is no folder piano-midi on this drive.", midi_nofiles: "The folder piano-midi has no .mid or .midi files.", midi_none: "No MIDI files have been imported yet.", midi_play: "Play", midi_stop: "Stop", midi_repeat: "Repeat", midi_idle: "Not playing.", midi_playing: "Playing {title}", midi_seek: "Position in the piece", midi_back: "−10 s", midi_fwd: "+10 s", midi_unavailable: "The player is not running (the mechanics bridge exxpiano-fx).", midi_import: "Import", midi_delete: "Delete", midi_confirm_delete: "Delete the MIDI file {name}?", midi_notes: "{n} notes", midi_importing: "Copying {name}: {done} of {total}", midi_checking: "Checking {name}…", midi_done: "{name} is imported.", midi_already: "{name} was already imported.", midi_failed: "Import of {name} failed: {error}", usb_title: "Banks from a USB drive", usb_hint: "Put SoundFont files (.sf2, .sf3) into the folder piano-banks of a USB drive (FAT32, exFAT or ext4), plug it in and import: the copy starts only when you press the button, and the drive is not needed afterwards.", usb_none: "No USB drive is connected.", usb_nofolder: "There is no folder piano-banks on this drive.", usb_nofiles: "The folder piano-banks has no .sf2 or .sf3 files.", usb_import: "Import", usb_delete: "Delete", usb_imported: "imported", usb_confirm_delete: "Delete the imported bank {name}?", bank_confirm_delete: "Delete the bank {name} from this device? It cannot be undone: to get it back, install the bank again or write a new card.", bank_deleted: "Deleted: {name} {freed}", usb_copying: "Copying {name}: {done} of {total}", usb_verifying: "Checking {name}…", usb_done: "{name} is imported. You can take the drive out.", usb_already: "{name} was already imported.", usb_failed: "Import of {name} failed: {error}", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
     bank_profile: "Touch, volume and mechanics settings are remembered for each instrument.",
-    bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", preset: "Preset",
+    bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", bank_share: "{pct}% of what a bank may take", mem_limit_k: "Largest bank", mem_limit_note: "system keeps {reserve}, mechanics {mech}", mem_disk_k: "Free on the card", mem_current: "Current bank", preset: "Preset",
     sw_switching: "Loading {bank}… about a minute of silence.", sw_done: "Now playing {bank}.", sw_rolled_back: "{bank} did not load; the previous bank is playing again.",
     sw_failed: "{bank} did not load and the previous bank could not be restored either: check the device.", sw_same: "This bank is already in use.",
     title: "exxpiano", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
@@ -403,9 +406,9 @@ const T = {
     th_unknown: "На этом устройстве состояние троттлинга прочитать нельзя.", th_ok: "Сейчас троттлинга нет.", th_now: "Сейчас: {list}.", th_past: "С момента включения: {list}.",
     th_clean: "С момента включения ничего не было.", th_power: "Недостаточное напряжение: нужен блок питания 5 В / 2,5 А и короткий толстый кабель.",
     th_undervoltage: "недостаточное напряжение (слабый блок питания)", th_freq_capped: "частота ограничена", th_throttled: "процессор замедлен", th_soft_limit: "достигнут температурный предел",
-    bank_title: "Банк рояля", midi_title: "MIDI-файлы", midi_hint: "Положите MIDI-файлы (.mid) в папку piano-midi на USB-накопителе и импортируйте: файл играет на выбранном рояле, со стуком молоточков, демпферов и педали. После импорта накопитель не нужен.", midi_lib: "На устройстве", midi_drive: "На USB-накопителе", midi_nofolder: "На накопителе нет папки piano-midi.", midi_nofiles: "В папке piano-midi нет файлов .mid и .midi.", midi_none: "MIDI-файлы ещё не импортированы.", midi_play: "Играть", midi_stop: "Стоп", midi_repeat: "Повторять", midi_idle: "Не играет.", midi_playing: "Играет {title}: {pos} из {len}", midi_unavailable: "Проигрыватель не работает (мост механики exxpiano-fx).", midi_import: "Импортировать", midi_delete: "Удалить", midi_confirm_delete: "Удалить MIDI-файл {name}?", midi_notes: "нот: {n}", midi_importing: "Копируется {name}: {done} из {total}", midi_checking: "Проверяется {name}…", midi_done: "{name} импортирован.", midi_already: "{name} уже был импортирован.", midi_failed: "Импорт {name} не удался: {error}", usb_title: "Банки с USB-накопителя", usb_hint: "Положите файлы SoundFont (.sf2, .sf3) в папку piano-banks на USB-накопителе (FAT32, exFAT или ext4), подключите его и импортируйте: копирование начинается только по кнопке, а после него накопитель не нужен.", usb_none: "USB-накопитель не подключён.", usb_nofolder: "На накопителе нет папки piano-banks.", usb_nofiles: "В папке piano-banks нет файлов .sf2 и .sf3.", usb_import: "Импортировать", usb_delete: "Удалить", usb_imported: "импортирован", usb_confirm_delete: "Удалить импортированный банк {name}?", usb_copying: "Копируется {name}: {done} из {total}", usb_verifying: "Проверяется {name}…", usb_done: "{name} импортирован. Накопитель можно вынуть.", usb_already: "{name} уже был импортирован.", usb_failed: "Импорт {name} не удался: {error}", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
+    bank_title: "Банк рояля", midi_title: "MIDI-файлы", midi_hint: "Положите MIDI-файлы (.mid) в папку piano-midi на USB-накопителе и импортируйте: файл играет на выбранном рояле, со стуком молоточков, демпферов и педали. После импорта накопитель не нужен.", midi_lib: "На устройстве", midi_drive: "На USB-накопителе", midi_nofolder: "На накопителе нет папки piano-midi.", midi_nofiles: "В папке piano-midi нет файлов .mid и .midi.", midi_none: "MIDI-файлы ещё не импортированы.", midi_play: "Играть", midi_stop: "Стоп", midi_repeat: "Повторять", midi_idle: "Не играет.", midi_playing: "Играет {title}", midi_seek: "Позиция в произведении", midi_back: "−10 с", midi_fwd: "+10 с", midi_unavailable: "Проигрыватель не работает (мост механики exxpiano-fx).", midi_import: "Импортировать", midi_delete: "Удалить", midi_confirm_delete: "Удалить MIDI-файл {name}?", midi_notes: "нот: {n}", midi_importing: "Копируется {name}: {done} из {total}", midi_checking: "Проверяется {name}…", midi_done: "{name} импортирован.", midi_already: "{name} уже был импортирован.", midi_failed: "Импорт {name} не удался: {error}", usb_title: "Банки с USB-накопителя", usb_hint: "Положите файлы SoundFont (.sf2, .sf3) в папку piano-banks на USB-накопителе (FAT32, exFAT или ext4), подключите его и импортируйте: копирование начинается только по кнопке, а после него накопитель не нужен.", usb_none: "USB-накопитель не подключён.", usb_nofolder: "На накопителе нет папки piano-banks.", usb_nofiles: "В папке piano-banks нет файлов .sf2 и .sf3.", usb_import: "Импортировать", usb_delete: "Удалить", usb_imported: "импортирован", usb_confirm_delete: "Удалить импортированный банк {name}?", bank_confirm_delete: "Удалить банк {name} с этого устройства? Отменить нельзя: чтобы вернуть его, установите банк снова или запишите новую карту.", bank_deleted: "Удалён: {name} {freed}", usb_copying: "Копируется {name}: {done} из {total}", usb_verifying: "Проверяется {name}…", usb_done: "{name} импортирован. Накопитель можно вынуть.", usb_already: "{name} уже был импортирован.", usb_failed: "Импорт {name} не удался: {error}", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
     bank_profile: "Чувствительность, громкость и механика запоминаются для каждого инструмента.",
-    bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", preset: "Пресет",
+    bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", bank_share: "{pct}% от допустимого для банка", mem_limit_k: "Наибольший банк", mem_limit_note: "системе {reserve}, механике {mech}", mem_disk_k: "Свободно на карте", mem_current: "Текущий банк", preset: "Пресет",
     sw_switching: "Загружается {bank}… около минуты тишины.", sw_done: "Теперь играет {bank}.", sw_rolled_back: "{bank} не загрузился; снова играет прежний банк.",
     sw_failed: "{bank} не загрузился, и прежний банк восстановить тоже не удалось: проверьте устройство.", sw_same: "Этот банк уже используется.",
     title: "exxpiano", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
@@ -531,18 +534,40 @@ function fillAudio() {
 
 let lastStatus = "";
 let lastBanks = "";
+let bankNote = "";                 // what the last deletion did: shown until a switch starts
 const fmt = (text, vars) => text.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
+const gb = n => (n >= 1073741824 ? (n / 1073741824).toFixed(n >= 10737418240 ? 0 : 1) + " GB" : mb(n));
 const mb = n => (n / 1048576 >= 10 ? Math.round(n / 1048576) : (n / 1048576).toFixed(1)) + " MB";
+
+function renderBankMemory(m) {                      // like the Monitor: tiles with a level colour and a bar
+  const box = $("bankMem"); box.textContent = "";
+  if (!m || !m.total) return;
+  const tile = (key, value, note, cls) => {
+    const t = document.createElement("div"); t.className = "tile " + (cls || "");
+    const k = document.createElement("span"); k.className = "k"; k.textContent = tr(key);
+    const bEl = document.createElement("b"); bEl.textContent = value; t.append(k, bEl);
+    if (note) { const s = document.createElement("small"); s.textContent = note; s.style.whiteSpace = "normal"; t.append(s); }
+    return t;
+  };
+  const tiles = document.createElement("div"); tiles.className = "tiles";
+  const usedPct = m.used != null ? m.used / m.total * 100 : null;
+  tiles.append(tile("m_mem", m.used != null ? Math.round(m.used / 1048576) + " MB" : "–", fmt(tr("m_of"), { n: Math.round(m.total / 1048576) }), level(usedPct, 80, 92)));
+  if (m.limit != null) tiles.append(tile("mem_limit_k", mb(m.limit), fmt(tr("mem_limit_note"), { reserve: mb(m.reserve || 0), mech: mb(m.mech || 0) })));
+  if (m.disk_free != null) tiles.append(tile("mem_disk_k", gb(m.disk_free), ""));
+  box.append(tiles);
+  if (m.limit && m.current != null) box.append(bar(tr("mem_current"), m.current / m.limit * 100, 80, 100));
+}
 
 function renderBanks(force) {
   const b = state.banks; if (!b) return;
-  const sig = JSON.stringify([b.current, b.external, b.banks, b.switch, b.preset, b.presets, L]);
+  const sig = JSON.stringify([b.current, b.external, b.banks, b.switch, b.preset, b.presets, b.memory, L]);
   if (sig === lastBanks && !force) return;
   lastBanks = sig;
   $("bankHint").textContent = fmt(tr("bank_hint"), { dir: b.dir }) + " " + tr("bank_profile");
+  renderBankMemory(b.memory);
   const list = $("bankList"); list.textContent = "";
-  const busy = b.switch.state === "switching";
-  const add = (title, small, playing, why, id, canUse, delId) => {
+  const busy = b.switch.state === "switching", limit = b.memory && b.memory.limit;
+  const add = (title, small, playing, why, id, canUse, delId, delImported) => {
     const row = document.createElement("div"); row.className = "bank";
     const meta = document.createElement("div"); meta.className = "meta";
     const t = document.createElement("b"); t.textContent = title;
@@ -556,15 +581,16 @@ function renderBanks(force) {
     }
     if (delId && !playing) {
       const del = document.createElement("button"); del.className = "secondary"; del.textContent = tr("usb_delete"); del.disabled = busy;
-      del.addEventListener("click", () => deleteImport(delId, title)); row.append(del);
+      del.addEventListener("click", () => deleteBank(delId, title, delImported)); row.append(del);
     }
     list.append(row);
   };
   if (b.external) add(b.external.name, b.external.path + " (" + tr("outside") + ")", true, null, null, false);
   for (const x of b.banks) {
     const label = x.source === "imported" ? (x.original_name || x.id) + " (" + tr("usb_imported") + ")" : x.id;
-    add(x.name, label + " · " + mb(x.size) + " · " + fmt(tr("presets_n"), { n: x.presets }), x.id === b.current,
-        x.ok && x.fits ? null : x.reason, x.id, x.ok && x.fits, x.source === "imported" ? x.id : null);
+    const share = limit ? " · " + fmt(tr("bank_share"), { pct: Math.round(100 * x.size / limit) }) : "";
+    add(x.name, label + " · " + mb(x.size) + share + " · " + fmt(tr("presets_n"), { n: x.presets }), x.id === b.current,
+        x.ok && x.fits ? null : x.reason, x.id, x.ok && x.fits, x.id, x.source === "imported");
   }
   if (!b.banks.length && !b.external) { const p = document.createElement("p"); p.className = "hint"; p.textContent = fmt(tr("bank_empty"), { dir: b.dir }); list.append(p); }
   // the preset of the current bank (only when there is a choice)
@@ -580,29 +606,64 @@ function renderBanks(force) {
   const st = $("bankStatus"), sw = b.switch;
   const cls = { switching: "warn", done: "ok", rolled_back: "err", failed: "err" }[sw.state] || "";
   st.className = cls;
-  st.textContent = sw.state === "idle" ? "" : fmt(tr("sw_" + sw.state), { bank: sw.bank || "" });
+  if (sw.state !== "idle") bankNote = "";
+  st.textContent = sw.state === "idle" ? bankNote : fmt(tr("sw_" + sw.state), { bank: sw.bank || "" });
+  if (sw.state === "idle" && bankNote) st.className = "ok";
   renderHomeBank();
 }
 
 // ---- MIDI files: the drive's files, the library, the player of the bridge
-const midi = { data: null, busy: false };
+const midi = { data: null, busy: false, key: null, ui: null, base: null, hold: 0, dragging: false };
 const kb = n => (n < 1048576 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB" : mb(n));
 const clock = s => { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+function renderPlayer(p) {
+  const box = $("midiPlayer"), playing = p.state === "playing";
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const key = [p.state, p.id || "", p.reason || "", Math.round(p.length || 0)].join("|");
+  if (midi.key !== key) {
+    midi.key = key; box.textContent = ""; midi.ui = null; midi.hold = 0; midi.dragging = false;
+    const line = mk("p", p.state === "unavailable" ? "hint warn" : "wnote");
+    if (playing) { line.className = "wnote ok"; line.textContent = fmt(tr("midi_playing"), { title: p.title || "" }); }
+    else if (p.state === "unavailable") line.textContent = tr("midi_unavailable");
+    else line.textContent = p.reason ? p.reason : tr("midi_idle");
+    box.append(line);
+    if (playing) {
+      const range = document.createElement("input"); range.type = "range"; range.min = 0; range.max = Math.max(1, Math.round(p.length || 1)); range.step = 1; range.value = 0;
+      range.setAttribute("aria-label", tr("midi_seek"));
+      const cur = mk("span", "", "0:00"), left = mk("span", "", ""), total = mk("span", "", clock(p.length));
+      const times = mk("div", "midi-times"); const a = mk("span", ""); a.append(cur, document.createTextNode(" / "), total); times.append(a, left);
+      range.addEventListener("input", () => { midi.dragging = true; cur.textContent = clock(+range.value); left.textContent = "−" + clock(midi.base.length - +range.value); });
+      range.addEventListener("change", () => { midi.dragging = false; midiSeek(+range.value); });
+      const row = mk("div", "row2");
+      const back = mk("button", "secondary", tr("midi_back")), fwd = mk("button", "secondary", tr("midi_fwd")), stop = mk("button", "secondary", tr("midi_stop"));
+      back.addEventListener("click", () => midiSeek(midiPosition() - 10)); fwd.addEventListener("click", () => midiSeek(midiPosition() + 10));
+      stop.addEventListener("click", () => midiAct({ action: "stop" }));
+      row.append(back, fwd, stop); box.append(range, times, row);
+      midi.ui = { range, cur, left };
+    }
+  }
+  if (!midi.hold || performance.now() > midi.hold) midi.base = { position: p.position || 0, length: p.length || 0, at: performance.now(), playing };
+  else midi.base.playing = playing;            // a position that was just asked for: the answer of the bridge may still show the old one
+  tickMidi();
+}
+const midiPosition = () => { const b = midi.base; return b ? Math.min(b.length, b.position + (b.playing ? (performance.now() - b.at) / 1000 : 0)) : 0; };
+function tickMidi() {
+  const u = midi.ui; if (!u || !midi.base || !midi.base.playing || midi.dragging) return;
+  const pos = midiPosition();
+  u.range.value = Math.round(pos); u.cur.textContent = clock(pos); u.left.textContent = "−" + clock(midi.base.length - pos);
+}
+async function midiSeek(seconds) {
+  const b = midi.base, id = midi.data && midi.data.player && midi.data.player.id; if (!b || !id) return;
+  seconds = Math.max(0, Math.min(b.length, seconds));
+  midi.base = { position: seconds, length: b.length, at: performance.now(), playing: true }; midi.hold = performance.now() + 1500; tickMidi();
+  await midiAct({ action: "seek", id, position: seconds });
+}
 function renderMidi() {
   const d = midi.data; if (!d) return;
   const imp = d.importing, working = imp.state === "copying" || imp.state === "verifying", p = d.player;
   const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  // the player
-  const box = $("midiPlayer"); box.textContent = "";
-  const line = mk("p", p.state === "unavailable" ? "hint warn" : "wnote");
-  if (p.state === "playing") { line.className = "wnote ok"; line.textContent = fmt(tr("midi_playing"), { title: p.title || "", pos: clock(p.position), len: clock(p.length) }); }
-  else if (p.state === "unavailable") line.textContent = tr("midi_unavailable");
-  else line.textContent = p.reason ? p.reason : tr("midi_idle");
-  box.append(line);
-  if (p.state === "playing") {
-    const bar = document.createElement("progress"); bar.max = Math.max(1, p.length || 1); bar.value = p.position || 0; bar.style.width = "100%"; box.append(bar);
-    const stop = mk("button", "secondary", tr("midi_stop")); stop.addEventListener("click", () => midiAct({ action: "stop" })); box.append(stop);
-  }
+  // the player: built when the piece or the state changes, then only its numbers are updated (a slider that is rebuilt every second cannot be dragged)
+  renderPlayer(p);
   // the library
   const lib = $("midiLibrary"); const keepLoop = $("midiLoop") ? $("midiLoop").checked : false; lib.textContent = "";
   lib.append(mk("h3", "", tr("midi_lib")));
@@ -691,10 +752,13 @@ async function importFile(name, drive) {
   try { await api("/api/usb", { action: "import", name, drive }); await pollUsb(); }
   catch (e) { $("usbStatus").className = "err"; $("usbStatus").textContent = tr("err") + ": " + e.message; }
 }
-async function deleteImport(id, name) {
-  if (!window.confirm(fmt(tr("usb_confirm_delete"), { name }))) return;
-  try { await api("/api/usb", { action: "delete", id }); refresh(); }
-  catch (e) { $("bankStatus").className = "err"; $("bankStatus").textContent = tr("err") + ": " + e.message; }
+async function deleteBank(id, name, imported) {
+  if (!window.confirm(fmt(tr(imported ? "usb_confirm_delete" : "bank_confirm_delete"), { name }))) return;
+  try {
+    const r = await api("/api/bank", { action: "delete", id });
+    bankNote = fmt(tr("bank_deleted"), { name, freed: r.freed ? mb(r.freed) : "" }).trim();
+    await refresh(); renderBanks(true);
+  } catch (e) { $("bankStatus").className = "err"; $("bankStatus").textContent = tr("err") + ": " + e.message; }
 }
 
 async function useBank(id) {
@@ -1109,6 +1173,7 @@ function initMon() {
   setInterval(pollMon, 1000);
   setInterval(pollUsb, 2000);
   setInterval(pollMidi, 1000);
+  setInterval(tickMidi, 250);
   setInterval(() => pollHome(false), 3000);
   window.addEventListener("resize", () => { if (!$("paneMon").hidden && mon.points.length) renderMonCharts(); });
 }

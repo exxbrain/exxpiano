@@ -42,6 +42,9 @@ def _vlq(data, pos):
     raise MidiError('a time value is too long')
 
 
+GENERIC_TITLE_RE = re.compile(r'^(control track|conductor|tempo(?: track)?|track[ _-]?\d*|untitled|unnamed|midi)$', re.I)     # what sequencers write instead of a name
+
+
 def _title(raw):
     text = raw.decode('latin-1', 'replace').replace('\x00', '').strip()
     return ''.join(c for c in text if c.isprintable())[:TITLE_MAX]
@@ -210,13 +213,15 @@ def delete_file(library_dir, midi_id, keep_ids=()):
     bankimport.remove_entry(library_dir, midi_id)
 
 
-def import_midi(src_path, display_name, library_dir, progress=None, statvfs=os.statvfs, opener=open):
-    """Copy a MIDI file into the library as one transaction. -> (id, already_there)."""
+def import_midi(src_path, display_name, library_dir, progress=None, statvfs=os.statvfs, opener=open, title=None):
+    """Copy a MIDI file into the library as one transaction. -> (id, already_there). `title` is the name to show instead of the file's own."""
     def validate(path):
         try:
             info = inspect(path)
         except MidiError as exc:
             raise bankimport.ImportFailed(str(exc)) from exc
-        return dict(name=info['title'] or os.path.splitext(display_name)[0][:TITLE_MAX], length=round(info['length'], 1), notes=info['notes'])
+        stem = re.sub(r'\s+', ' ', re.sub(r'[_-]+', ' ', os.path.splitext(display_name)[0])).strip()[:TITLE_MAX]
+        own = info['title'] if info['title'] and not GENERIC_TITLE_RE.match(info['title'].strip()) else ''
+        return dict(name=(title or '')[:TITLE_MAX] or own or stem, length=round(info['length'], 1), notes=info['notes'])
     return bankimport.import_file(src_path, display_name, library_dir, prefix=ID_PREFIX, data_name='song.mid', validate=validate,
                                   max_bytes=MAX_BYTES, progress=progress, statvfs=statvfs, opener=opener)

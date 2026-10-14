@@ -51,18 +51,18 @@ class Demo:
 
 class DemoTests(unittest.TestCase):
     def test_the_page_and_every_part_of_the_api_answer_without_a_pi(self):
-        demo = Demo('--installation-id', '1111222233334444')
+        demo = Demo('--installation-id', '111222')
         self.addCleanup(demo.stop)
         self.assertIn(b'id="drawer"', demo.get('/'))
         state = demo.json('/api/state')
-        self.assertEqual((state['hostname'], state['device']['installation_id']), ('exxpiano', '1111222233334444'))
+        self.assertEqual((state['hostname'], state['device']['installation_id']), ('exxpiano', '111222'))
         self.assertEqual([b['id'] for b in state['banks']['banks']], ['Salamander Grand.sf2', 'Upright.sf2'])
         self.assertEqual(state['status']['synth'], 'active')
         mon = demo.json('/api/monitor')
         self.assertGreater(mon['now']['cpu'], 0)
         self.assertEqual(mon['now']['audio'][0]['buffer'], 192)
         self.assertEqual(demo.json('/api/wifi')['mode'], 'client')
-        self.assertEqual(demo.json('/api/qr?kind=join')['text'], 'WIFI:T:WPA;S:exxpiano-Setup-1111222233334444;P:exxpianosetup;;')
+        self.assertEqual(demo.json('/api/qr?kind=join')['text'], 'WIFI:T:WPA;S:exxpiano-Setup-111222;P:exxpianosetup;;')
 
     def test_settings_the_bank_the_name_and_wifi_work_on_the_simulation(self):
         demo = Demo()
@@ -95,9 +95,9 @@ class DemoTests(unittest.TestCase):
         demo = Demo('--mode', 'ap')
         self.addCleanup(demo.stop)
         wifi = demo.json('/api/wifi')
-        self.assertEqual((wifi['mode'], wifi['ap']['ssid']), ('ap', 'exxpiano-Setup-0123456789ABCDEF'))
+        self.assertEqual((wifi['mode'], wifi['ap']['ssid']), ('ap', 'exxpiano-Setup-012ABC'))
         device = demo.json('/api/state')['device']
-        self.assertEqual(device, {'installation_id': '0123456789ABCDEF'})
+        self.assertEqual(device, {'installation_id': '012ABC'})
 
 
 if __name__ == '__main__':

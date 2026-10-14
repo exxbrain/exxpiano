@@ -50,6 +50,11 @@ install -m 644 "$HERE/bankimport.py" "$PREFIX/bankimport.py"
 install -m 644 "$HERE/usblib.py" "$PREFIX/usblib.py"
 install -m 644 "$HERE/midilib.py" "$PREFIX/midilib.py"
 install -m 644 "$HERE/midiplayer.py" "$PREFIX/midiplayer.py"
+install -m 755 "$HERE/exxpiano-demo-midi.py" "$PREFIX/exxpiano-demo-midi.py"
+install -d /usr/share/exxpiano/midi
+install -m 644 "$HERE/../assets/midi/liszt-un-sospiro-2011.mid" /usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid
+install -m 644 "$HERE/../assets/midi/NOTICE.md" /usr/share/exxpiano/midi/NOTICE.md
+python3 "$PREFIX/exxpiano-demo-midi.py" >/dev/null 2>&1 || true              # the demonstration piece goes into the MIDI library once
 install -m 755 "$HERE/exxpiano-usb.py" "$PREFIX/exxpiano-usb.py"
 install -m 644 "$HERE/profiles.py" "$PREFIX/profiles.py"
 install -m 644 "$HERE/sysmon.py" "$PREFIX/sysmon.py"

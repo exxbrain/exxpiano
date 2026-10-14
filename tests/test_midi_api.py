@@ -92,6 +92,14 @@ class MidiApiTests(ServerCase):
         code, r = self.jcall('/api/midi', {'action': 'delete', 'id': midi_id})
         self.assertEqual(code, 400)
         self.assertIn('playing', r['error'])
+        code, r = self.jcall('/api/midi', {'action': 'seek', 'id': midi_id, 'position': 1.25})
+        self.assertEqual((code, r['accepted']), (200, True))
+        req = self.request()
+        self.assertEqual((req['op'], req['id'], req['position']), ('seek', midi_id, 1.25))
+        for bad in ('1', None, -1, True, 100000, float('inf')):
+            with self.subTest(bad):
+                self.assertEqual(self.jcall('/api/midi', {'action': 'seek', 'id': midi_id, 'position': bad})[0], 400)
+        self.assertEqual(self.jcall('/api/midi', {'action': 'seek', 'id': 'm-0000000000000000', 'position': 1})[0], 400)
         self.assertEqual(self.jcall('/api/midi', {'action': 'stop'})[0], 200)
         self.assertEqual(self.request()['op'], 'stop')
         self.assertGreater(self.request()['nonce'], first_nonce)                              # every request is a new one
@@ -159,6 +167,8 @@ class MidiApiTests(ServerCase):
         self.assertIn('midi: "paneMidi"', page)
         # the page only asks and shows: the one place that sends a stop is the Stop button
         self.assertEqual(page.count('action: "stop"'), 1)
+        self.assertEqual(page.count('action: "seek"'), 1)                 # the slider and the ±10 s buttons send a seek through one function
+        self.assertIn('type = "range"', page)
 
     def test_the_token_protects_the_midi_api_too(self):
         self.start(self.conf_text_base + 'WEB_TOKEN=secret\n')

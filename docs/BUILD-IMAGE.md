@@ -73,7 +73,7 @@ Ordinary pushes and pull requests run only the fast tests. The complete stand-in
 1. In Raspberry Pi Imager choose “Choose OS” → “Use custom” and select the ZIP, or select it in balenaEtcher.
 2. Flash a clean SD card, put it in a Raspberry Pi 2, 3 or 4, and power it on.
 3. First boot takes several minutes and needs no internet, Ethernet, or saved Wi-Fi.
-4. The installation creates a persistent random 16-character hexadecimal ID in `/var/lib/exxpiano/installation-id`.
+4. The installation creates a persistent random 6-character hexadecimal ID in `/var/lib/exxpiano/installation-id`.
 5. The ID produces a unique `exxpiano-Setup-<ID>` network and `exxpiano-<lowercase-id>` hostname. Join the setup network and open `http://10.42.0.1:8080/`; the web UI shows the exact ID, network name, and QR codes.
 
 Cards cloned from the same ZIP receive different IDs on their own first boot. ID creation is atomic and the stored value is reused, so rebooting does not change Wi-Fi or hostname.

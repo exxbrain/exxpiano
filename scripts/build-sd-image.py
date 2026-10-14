@@ -198,7 +198,7 @@ Writing the card
   1. Raspberry Pi Imager: "Choose OS" -> "Use custom" -> pick the zip (it is used as it is). Or balenaEtcher: "Flash from file" -> the zip.
   2. Put the card in a compatible {label} and switch it on. The first start takes several minutes (DietPi sets itself up, then the card grows to its size).
      The first start is offline: it needs neither Internet nor an Ethernet cable.
-  3. The installation creates and permanently saves its own 16-character hexadecimal ID.
+  3. The installation creates and permanently saves its own 6-character hexadecimal ID.
 
 Without a saved network the device starts Wi-Fi exxpiano-Setup-<INSTALLATION-ID> (password: {ap_pw}).
 Its hostname is exxpiano-<installation-id-in-lowercase>; open http://<hostname>.local:8080/ or use the address from the router's client list.
@@ -297,8 +297,8 @@ def build_one(args, inputs, plan):
         schema_version=2, product='exxpiano', target_family=plan['target'],
         product_version=plan['version'], dietpi_version=plan['dietpi_version'],
         dietpi_source=os.path.basename(inputs['dietpi']), dietpi_sha256=plan['dietpi_sha256'],
-        installation_identity='generated-at-first-boot', setup_ssid_pattern='exxpiano-Setup-<16-hex-installation-id>',
-        hostname_pattern='exxpiano-<16-hex-installation-id-lowercase>', banks=plan['banks'],
+        installation_identity='generated-at-first-boot', setup_ssid_pattern='exxpiano-Setup-<6-hex-installation-id>',
+        hostname_pattern='exxpiano-<6-hex-installation-id-lowercase>', banks=plan['banks'],
         image=zip_name, image_sha256=zip_hash, raw_image_sha256=raw_image_hash, built_at=plan['when']))
     print('\nDone:')
     print('  card image : %s (%.0f MB)' % (zip_path, os.path.getsize(zip_path) / 1e6))

@@ -183,5 +183,21 @@ class BankLibTests(unittest.TestCase):
         self.assertEqual(banklib.list_banks(os.path.join(self.dir, 'nope')), [])
 
 
+class MemoryInfoTests(unittest.TestCase):
+    def test_limits_reserve_current_bank_and_free_space(self):
+        with tempfile.TemporaryDirectory() as d:
+            cur = os.path.join(d, 'cur.sf2')
+            with open(cur, 'wb') as f:
+                f.write(b'x' * 1000)
+            fake = lambda path: type('S', (), dict(f_bavail=10, f_frsize=4096))()          # noqa: E731
+            m = banklib.memory_info(d, 1000 << 20, 40 << 20, cur, statvfs=fake)
+            self.assertEqual((m['total'], m['mech'], m['current'], m['disk_free']), (1000 << 20, 40 << 20, 1000, 40960))
+            self.assertEqual((m['reserve'], m['limit']), (200 << 20, (1000 - 200 - 40) << 20))
+            small = banklib.memory_info(d, 400 << 20, 0, None)
+            self.assertEqual((small['reserve'], small['current']), (int((400 << 20) * 0.28), None))
+            unknown = banklib.memory_info('/nonexistent', None, 0, '/nonexistent/x.sf2')
+            self.assertEqual((unknown['limit'], unknown['reserve'], unknown['current'], unknown['disk_free']), (None, None, None, None))
+
+
 if __name__ == '__main__':
     unittest.main()

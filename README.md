@@ -168,7 +168,7 @@ Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as
 its partitions, which only an image carries. Switch the Pi on without preparing a network: the product image skips DietPi's online first-run update. The device is
 `http://exxpiano-<id>.local:8080/`; with no Ethernet or saved Wi-Fi it starts its unique setup network (see "Connecting to a new Wi-Fi").
 
-- **Installation identity.** The ID is generated once from 64 cryptographically random bits and stored in `/var/lib/exxpiano/installation-id`. The full ID is present in the setup SSID and QR codes, making collisions extremely unlikely. Step by step: **[docs/BUILD-IMAGE.md](docs/BUILD-IMAGE.md)**.
+- **Installation identity.** The ID is generated once from 24 cryptographically random bits (6 hexadecimal characters) and stored in `/var/lib/exxpiano/installation-id`. The full ID is present in the setup SSID and QR codes, so two devices in one room almost never share a name (a copy made by an earlier version keeps its longer ID). Step by step: **[docs/BUILD-IMAGE.md](docs/BUILD-IMAGE.md)**.
 - **How it is made.** In a Linux container (Docker Desktop must be running; on Linux with root use `--no-docker`): the image is opened, the package and its dependencies are
   installed into it (`apt`, no recommended packages), the banks are copied, and DietPi is configured as a pre-installed offline system. DietPi does not own `wlan0`, wait for
   a network, or run update checks at first boot; `exxpiano-wifi` owns the radio and starts the setup AP. The finished image is read back and its web service is started in a
@@ -261,6 +261,8 @@ up, the previous one is put back automatically and the web interface says so. A 
 for the device's memory (on a Pi 3: about 500 MB). If the bank has several presets the card also offers a **Preset** drop-down (applied at once);
 bank 0 programs 1-6 are not offered because the mechanics bank answers there.
 
+The card also shows the memory: how much the device has, the largest bank that fits (the system keeps a reserve, and the mechanics bank takes its share), the free space on the card, a bar with the current bank and, for every bank, its share of that limit. **Delete** removes a bank that is not in use, an installed one as well as an imported one, to free space: the current bank, the last good one and the mechanics bank are never deleted, nothing is deleted while a bank is switching, and the question warns that it cannot be undone (an installed bank comes back only by installing it again or writing a new card). Not tried on a real Raspberry Pi: pressing **Delete** there; the rules are covered by automatic tests.
+
 If the chosen bank is later missing or damaged (a deleted file), the module starts with `PIANO_SF2_LAST_GOOD`, the last bank that worked,
 instead of staying silent. Only file names that the library folder lists can be chosen: the web interface never sends a path.
 
@@ -282,7 +284,9 @@ How it is kept safe: the drive is mounted read only (`ro,nosuid,nodev,noexec`) a
 
 ### Playing MIDI files from a USB drive
 
-Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a USB drive (the same drive as for the banks, FAT32, exFAT or ext4) and open the **MIDI player** section of the web interface (its own item in the menu): it lists them. **Import** copies the chosen file into the device's own library (`/var/lib/exxpiano/midi/`), only when you press the button; the copy is a transaction like the bank import (a temporary file, a check, one atomic publication), so a drive pulled out or a full card leaves no half-copied file. After that the drive is not needed. **Play** plays the file on **the piano you have chosen** (the current bank and preset), with the hammer, damper, resonance and pedal noises of the mechanics and with your touch curve, exactly as if you played it; **Stop** silences it at once; **Repeat** plays it again and again. You can play the keyboard over it: the sounds mix. The piece goes on when you open another section (the Monitor, say): the player is part of the mechanics bridge, not of the page, and the Home section shows what is playing and where.
+Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a USB drive (the same drive as for the banks, FAT32, exFAT or ext4) and open the **MIDI player** section of the web interface (its own item in the menu): it lists them. **Import** copies the chosen file into the device's own library (`/var/lib/exxpiano/midi/`), only when you press the button; the copy is a transaction like the bank import (a temporary file, a check, one atomic publication), so a drive pulled out or a full card leaves no half-copied file. After that the drive is not needed. **Play** plays the file on **the piano you have chosen** (the current bank and preset), with the hammer, damper, resonance and pedal noises of the mechanics and with your touch curve, exactly as if you played it; **Stop** silences it at once; a slider and the **−10 s / +10 s** buttons move to any moment of the piece without stopping it (the notes that sound at that moment are let go, the pedal gets the state the file has there), and the time shows elapsed / total / left; **Repeat** plays it again and again. You can play the keyboard over it: the sounds mix. The piece goes on when you open another section (the Monitor, say): the player is part of the mechanics bridge, not of the page, and the Home section shows what is playing and where.
+
+**A piece comes with the device.** The package and the images carry one recording of a real pianist, Liszt's *Un Sospiro* played at the International Piano-e-Competition 2011 (`assets/midi/liszt-un-sospiro-2011.mid`), and put it into the library once, at the first installation; a piece you delete does not come back with an update. The recording is from the MAESTRO dataset (Google, taken unchanged) and is licensed **CC BY-NC-SA 4.0**: non-commercial use, with attribution, shared under the same license; the rest of exxpiano stays MIT. If you use exxpiano commercially, delete the piece (the **Delete** button of the MIDI player). Details: `assets/midi/NOTICE.md`.
 
 What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Changing the bank or restarting the synthesizer stops the piece; start it again after the new instrument has loaded. Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
 
@@ -296,7 +300,7 @@ python3 scripts/demo-web.py --open            # http://127.0.0.1:8080/
 
 The real web interface and the real server code run on your computer against a **simulated device** (services, CPU and temperature that move, Wi-Fi networks, three banks, the audio
 interface). Change the sliders, switch the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" does not connect, "Cafe" is open), scan the QR codes. Options:
-`--mode ap` (setup mode: the device with no network), `--installation-id 0123456789ABCDEF`, `--hostname NAME`, `--throttled`,
+`--mode ap` (setup mode: the device with no network), `--installation-id 012ABC`, `--hostname NAME`, `--throttled`,
 `--bind 0.0.0.0` (to look from a phone on the same network), `--token SECRET`. Nothing is written outside a temporary folder.
 
 ## Interface for controlling the instrument and monitoring the device
@@ -340,14 +344,14 @@ the synthesizer; hardening that is a task for a real product.
 
 ## Several devices
 
-At first boot every installation gets a persistent random ID such as `0123456789ABCDEF`. Cards flashed from the same ZIP therefore get different setup networks
-`exxpiano-Setup-0123456789ABCDEF` and hostnames `exxpiano-0123456789abcdef`. The ID appears in the menu and the QR code of the web interface; the web interface warns if a QR code belongs to another installation. The **Device name** box may set a friendlier hostname.
+At first boot every installation gets a persistent random ID such as `012ABC`. Cards flashed from the same ZIP therefore get different setup networks
+`exxpiano-Setup-012ABC` and hostnames `exxpiano-012abc`. The ID appears in the menu and the QR code of the web interface; the web interface warns if a QR code belongs to another installation. The **Device name** box may set a friendlier hostname.
 
 ## Connecting to a new Wi-Fi
 
 When the Pi has **no network** (no Ethernet cable and no Wi-Fi it knows: a new device, a new router, you moved) it starts **its own Wi-Fi network** and waits:
 
-1. On a phone join **`exxpiano-Setup-<16-character ID>`**, password **`exxpianosetup`**, or scan the first QR code shown by the web UI.
+1. On a phone join **`exxpiano-Setup-<6-character ID>`**, password **`exxpianosetup`**, or scan the first QR code shown by the web UI.
 2. The phone shows its "sign in to network" window with the web interface; if not, scan the second QR code or open `http://10.42.0.1:8080/#/wifi`. The **Wi-Fi** section opens by itself.
 3. Pick your home network, type its password, press **Connect**. The setup network disappears; join your own Wi-Fi again and open
    `http://<host name>.local:8080/` (the host name is shown in the web interface; `avahi-daemon` provides it) or find the address in the router's client list.

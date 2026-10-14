@@ -11,6 +11,7 @@ check_required_layout() {
   [ "${SD_ONBOARD_AUDIO:-1}" != 1 ] || required "the onboard sound is on (no snd_bcm2835 blacklist, dtparam=audio=on)" "[ ! -e '$root/etc/modprobe.d/dietpi-disable_rpi_audio.conf' ] && grep -qx 'dtparam=audio=on' '$boot/config.txt' && grep -qx 'CONFIG_SOUNDCARD=rpi-bcm2835-3.5mm' '$boot/dietpi.txt'"
   required "the console shows a status screen, not a login prompt" "[ -x '$root/usr/local/sbin/exxpiano-console' ] && grep -qx 'ExecStart=/usr/local/sbin/exxpiano-console' '$root/etc/systemd/system/getty@tty1.service.d/exxpiano-console.conf'"
   required "the installed application" "[ -x '$root/opt/exxpiano/exxpiano-web.py' ] && [ -x '$root/opt/exxpiano/exxpiano-wifi.py' ] && [ -f '$root/lib/systemd/system/exxpiano.service' ]"
+  required "the demonstration MIDI piece is in the library, with its notice" "[ -s '$root/usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid' ] && [ -s '$root/usr/share/exxpiano/midi/NOTICE.md' ] && ls '$root'/var/lib/exxpiano/midi/m-*/song.mid >/dev/null 2>&1"
   required "both mandatory banks" "[ -s '$root/opt/exxpiano/soundfonts/piano.sf2' ] && [ -s '$root/opt/exxpiano/soundfonts/mech.sf2' ]"
   required "the mandatory bank configuration" "grep -qx 'PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2' '$root/etc/exxpiano.conf' && grep -qx 'MECH_SF2=/opt/exxpiano/soundfonts/mech.sf2' '$root/etc/exxpiano.conf'"
   required "no identity is baked into the reusable image" "[ ! -e '$root/var/lib/exxpiano/installation-id' ] && ! grep -Eq '^DEVICE_(NUMBER|SERIAL)=' '$root/etc/exxpiano.conf'"

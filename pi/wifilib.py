@@ -17,7 +17,7 @@ AP_DEFAULT_PASSWORD = 'exxpianosetup'
 AP_DEFAULT_PREFIX = 'exxpiano-Setup'
 AP_NETWORK = '10.42.0.0/24'
 INSTALLATION_ID_PATH = os.environ.get('EXXPIANO_INSTALLATION_ID_PATH', '/var/lib/exxpiano/installation-id')
-INSTALLATION_ID_RE = re.compile(r'^[0-9A-F]{16}$')
+INSTALLATION_ID_RE = re.compile(r'^(?:[0-9A-F]{6}|[0-9A-F]{16})$')   # new copies get 6 digits; a longer ID made by an earlier version is kept
 
 
 # ---- validation and keys
@@ -263,7 +263,7 @@ GENERIC_HOSTNAMES = ('dietpi', 'raspberrypi', 'raspberry', 'piano', 'debian', 'l
 
 
 def installation_id(path=INSTALLATION_ID_PATH, random_hex=None):
-    """A persistent random 64-bit identifier for this installed copy. Created atomically on first use."""
+    """A persistent random identifier (6 hex digits) for this installed copy. Created atomically on first use."""
     try:
         with open(path, encoding='ascii') as f:
             value = f.read().strip().upper()
@@ -273,9 +273,9 @@ def installation_id(path=INSTALLATION_ID_PATH, random_hex=None):
     except FileNotFoundError:
         pass
     os.makedirs(os.path.dirname(os.path.abspath(path)), mode=0o755, exist_ok=True)
-    value = (random_hex() if random_hex else secrets.token_hex(8)).upper()
+    value = (random_hex() if random_hex else secrets.token_hex(3)).upper()
     if not INSTALLATION_ID_RE.fullmatch(value):
-        raise ValueError('an installation ID must be 16 hexadecimal characters')
+        raise ValueError('an installation ID must be 6 hexadecimal characters (16 for a copy made by an earlier version)')
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
     except FileExistsError:                                      # another service won the first-start race
@@ -295,10 +295,10 @@ def _ssid_prefix(prefix, max_bytes):
 
 
 def ap_ssid(prefix, install_id):
-    """A setup SSID whose 16-hex suffix uniquely identifies this installed copy."""
+    """A setup SSID whose hex suffix identifies this installed copy."""
     install_id = str(install_id or '').upper()
     if not INSTALLATION_ID_RE.fullmatch(install_id):
-        raise ValueError('an installation ID must be 16 hexadecimal characters')
+        raise ValueError('an installation ID must be 6 hexadecimal characters (16 for a copy made by an earlier version)')
     return '%s-%s' % (_ssid_prefix(prefix, SSID_MAX_BYTES - len(install_id) - 1), install_id)
 
 

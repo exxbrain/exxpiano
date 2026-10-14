@@ -39,6 +39,7 @@ class FakeActions:
         self.gains = []
         self.gain_ok = True
         self.mem = 954 << 20
+        self.mem_free = 300 << 20
         self.ready = [True, True, True]     # answers of wait_synth_ready, one per switch attempt
         self.waits = 0
         self.gate = None                     # an Event: wait_synth_ready blocks until it is set
@@ -57,6 +58,9 @@ class FakeActions:
 
     def mem_total(self):
         return self.mem
+
+    def mem_available(self):
+        return self.mem_free
 
     def synth_pid(self):
         return self.pid
@@ -114,7 +118,7 @@ class FakeActions:
         return self.nm
 
     def installation_id(self):
-        return '0123456789ABCDEF'
+        return '012ABC'
 
     def hostname(self):
         return self.host
@@ -379,6 +383,66 @@ class BankWebTests(ServerCase):
         banks = {x['id']: x for x in self.jcall('/api/state')[1]['banks']['banks']}
         self.assertFalse(banks['new.sf2']['fits'])
 
+    def test_the_state_tells_what_the_memory_allows_and_how_much_of_it_the_current_bank_takes(self):
+        m = self.jcall('/api/state')[1]['banks']['memory']
+        mech = os.path.getsize(self.mech)
+        self.assertEqual((m['total'], m['mech'], m['current']), (954 << 20, mech, os.path.getsize(self.old)))
+        self.assertEqual(m['limit'], (954 << 20) - 200 * (1 << 20) - mech)                # the reserve of a board with enough memory
+        self.assertEqual(m['reserve'], 200 * (1 << 20))
+        self.assertEqual(m['used'], (954 - 300) << 20)                                    # what the Monitor shows as used
+        self.assertGreater(m['disk_free'], 0)
+        self.actions.mem = 400 << 20                                                       # a small board keeps a share
+        m = self.jcall('/api/state')[1]['banks']['memory']
+        self.assertEqual(m['reserve'], int((400 << 20) * 0.28))
+        self.actions.mem = None                                                            # unknown memory: no claims
+        m = self.jcall('/api/state')[1]['banks']['memory']
+        self.assertEqual((m['total'], m['limit'], m['reserve']), (None, None, None))
+
+    def test_an_installed_bank_that_is_not_in_use_can_be_deleted(self):
+        before = self.conf_text()
+        size = os.path.getsize(self.gm)
+        code, r = self.jcall('/api/bank', {'action': 'delete', 'id': 'odd.sf2'})
+        self.assertEqual((code, r['deleted'], r['freed']), (200, True, size))
+        self.assertFalse(os.path.exists(self.gm))
+        self.assertEqual(sorted(x['id'] for x in self.jcall('/api/state')[1]['banks']['banks']), ['new.sf2', 'old.sf2'])
+        self.assertEqual([n for n in os.listdir(self.bank_dir) if n.startswith('.')], [])
+        self.assertEqual(self.conf_text(), before)
+        self.assertEqual(self.actions.restarts, 0)                                   # nothing that plays is touched
+        self.assertEqual(self.jcall('/api/bank', {'action': 'delete', 'id': 'odd.sf2'})[0], 400)       # a second time: it is gone
+
+    def test_the_current_bank_the_last_good_one_and_the_mechanics_bank_are_never_deleted(self):
+        self.start(self.conf_text_base.replace('PIANO_SF2="%s"' % self.old, 'PIANO_SF2="%s"' % self.new) + 'PIANO_SF2_LAST_GOOD="%s"\n' % self.old)
+        for name in ('new.sf2', 'old.sf2', 'mech.sf2'):                              # current, last good, mechanics
+            with self.subTest(name):
+                code, r = self.jcall('/api/bank', {'action': 'delete', 'id': name})
+                self.assertEqual(code, 400, r)
+                self.assertTrue(os.path.exists(os.path.join(self.bank_dir, name)))
+        self.assertEqual(self.jcall('/api/bank', {'action': 'delete', 'id': 'odd.sf2'})[0], 200)
+
+    def test_a_delete_refuses_names_that_are_not_plain_files_of_the_library(self):
+        outside = os.path.join(os.path.dirname(self.bank_dir), 'outside-%d.sf2' % os.getpid())
+        make_sf2(outside, name='Outside')
+        self.addCleanup(lambda: os.path.exists(outside) and os.remove(outside))
+        link = os.path.join(self.bank_dir, 'link.sf2')
+        os.symlink(outside, link)
+        for bad in ('../' + os.path.basename(outside), outside, 'link.sf2', 'missing.sf2', 'notes.txt', '', None, 7, 'i-0123456789abcdef'):
+            with self.subTest(bad):
+                self.assertEqual(self.jcall('/api/bank', {'action': 'delete', 'id': bad})[0], 400)
+        self.assertTrue(os.path.exists(outside))
+
+    def test_no_bank_is_deleted_while_a_switch_runs_and_the_token_protects_it(self):
+        self.actions.gate = threading.Event()
+        self.jcall('/api/bank', {'id': 'new.sf2'})
+        try:
+            self.assertEqual(self.jcall('/api/bank', {'action': 'delete', 'id': 'odd.sf2'})[0], 409)
+            self.assertTrue(os.path.exists(self.gm))
+        finally:
+            self.actions.gate.set()
+            self.finish_switch()
+        self.start(self.conf_text_base + 'WEB_TOKEN=s3cret\n')
+        self.assertEqual(self.call('/api/bank', {'action': 'delete', 'id': 'odd.sf2'})[0], 401)
+        self.assertTrue(os.path.exists(self.gm))
+
     def test_choosing_the_bank_already_in_use_does_nothing(self):
         code, r = self.jcall('/api/bank', {'id': 'old.sf2'})
         self.assertEqual((code, r['started']), (200, False))
@@ -592,12 +656,12 @@ class DeviceNameTests(ServerCase):
         self.start()
         r = self.jcall('/api/state')[1]
         self.assertEqual(r['hostname'], 'exxpiano')
-        self.assertEqual(r['device'], dict(installation_id='0123456789ABCDEF'))
+        self.assertEqual(r['device'], dict(installation_id='012ABC'))
 
     def test_the_installation_id_is_used_everywhere_without_configuration(self):
         self.start()
-        self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'exxpiano-Setup-0123456789ABCDEF')
-        self.assertEqual(self.jcall('/api/qr?kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0123456789ABCDEF#/wifi')
+        self.assertEqual(self.jcall('/api/qr?kind=join')[1]['ssid'], 'exxpiano-Setup-012ABC')
+        self.assertEqual(self.jcall('/api/qr?kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=012ABC#/wifi')
 
     def test_rename_stores_a_clean_name_and_the_state_follows(self):
         self.start()
@@ -646,33 +710,33 @@ class QrApiTests(ServerCase):
         self.start()
         code, r = self.qr('kind=join')
         self.assertEqual(code, 200)
-        self.assertEqual((r['ssid'], r['password']), ('exxpiano-Setup-0123456789ABCDEF', 'exxpianosetup'))
-        self.assertEqual(r['text'], 'WIFI:T:WPA;S:exxpiano-Setup-0123456789ABCDEF;P:exxpianosetup;;')
+        self.assertEqual((r['ssid'], r['password']), ('exxpiano-Setup-012ABC', 'exxpianosetup'))
+        self.assertEqual(r['text'], 'WIFI:T:WPA;S:exxpiano-Setup-012ABC;P:exxpianosetup;;')
         self.assertTrue(r['svg'].startswith('<svg') and 'viewBox' in r['svg'])
         png = base64.b64decode(r['png'])                                                          # the page offers it as a download: a real PNG
         self.assertEqual(png[:8], b'\x89PNG\r\n\x1a\n')
-        self.assertEqual(r['filename'], 'exxpiano-join-wifi-0123456789ABCDEF')
+        self.assertEqual(r['filename'], 'exxpiano-join-wifi-012ABC')
         for kind, name in (('setup', 'setup-page'), ('page', 'page')):
-            self.assertEqual(self.qr('kind=' + kind)[1]['filename'], 'exxpiano-%s-0123456789ABCDEF' % name)
+            self.assertEqual(self.qr('kind=' + kind)[1]['filename'], 'exxpiano-%s-012ABC' % name)
 
     def test_a_changed_name_and_password_and_a_bad_password(self):
         self.start(CONF + 'WIFI_AP_SSID=My-Piano\nWIFI_AP_PASSWORD="much better; secret"\n')
-        self.assertEqual(self.qr('kind=join')[1]['text'], 'WIFI:T:WPA;S:My-Piano-0123456789ABCDEF;P:much better\\; secret;;')
+        self.assertEqual(self.qr('kind=join')[1]['text'], 'WIFI:T:WPA;S:My-Piano-012ABC;P:much better\\; secret;;')
         self.start(CONF + 'WIFI_AP_PASSWORD=short\n')
         self.assertEqual(self.qr('kind=join')[1]['password'], 'exxpianosetup')                  # the same fallback the supervisor makes
 
     def test_setup_page_code_uses_the_web_port(self):
         self.start(CONF + 'WEB_PORT=9090\n')
-        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:9090/?d=0123456789ABCDEF#/wifi')
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:9090/?d=012ABC#/wifi')
         self.start()
-        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=0123456789ABCDEF#/wifi')
+        self.assertEqual(self.qr('kind=setup')[1]['text'], 'http://10.42.0.1:8080/?d=012ABC#/wifi')
 
     def test_page_code_is_the_address_the_browser_used_or_the_known_ip(self):
         self.start()
-        self.assertEqual(self.qr('kind=page', 'exxpiano.local:8080')[1]['text'], 'http://exxpiano.local:8080/?d=0123456789ABCDEF#/wifi')
-        self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/?d=0123456789ABCDEF#/wifi')
+        self.assertEqual(self.qr('kind=page', 'exxpiano.local:8080')[1]['text'], 'http://exxpiano.local:8080/?d=012ABC#/wifi')
+        self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/?d=012ABC#/wifi')
         r = self.qr('kind=page', 'evil.example/<script>')[1]                                  # an odd Host header is not copied into a code
-        self.assertEqual(r['text'], 'http://192.168.1.9:8080/?d=0123456789ABCDEF#/wifi')
+        self.assertEqual(r['text'], 'http://192.168.1.9:8080/?d=012ABC#/wifi')
 
     def test_unknown_kinds_and_the_token(self):
         self.start(CONF + 'WEB_TOKEN=s3cret\n')

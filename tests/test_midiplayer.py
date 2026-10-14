@@ -88,6 +88,49 @@ class PlayerTests(unittest.TestCase):
         self.assertEqual((s1['state'], s1['title'], s1['id'], s1['length']), ('playing', 'Etude', r.id, 4.0))
         self.assertGreater(s2['position'], s1['position'])
 
+    def test_seek_jumps_to_the_position_keeps_the_pedal_of_the_file_and_plays_on_from_there(self):
+        r = Rig(self, notes=[(0, 60, 80, 1), (2, 62, 80, 1), (4, 64, 80, 1), (6, 66, 80, 1)], pedal=[(0, 127), (10, 0)])
+        r.ask(op='play', id=r.id)
+        r.advance(0.6)
+        r.events.clear()
+        r.ask(op='seek', id=r.id, position=2.5)                           # the notes at 0 s, 1 s and 2 s are behind
+        r.advance(0.4)
+        self.assertEqual(r.released, [True])                              # whatever sounded is let go, the pedal included
+        self.assertEqual(r.events[0][1:], ('pedal', 127, 0))              # the file has the pedal down there: it is pressed again
+        s = r.status()
+        self.assertEqual(s['state'], 'playing')
+        self.assertAlmostEqual(s['position'], 2.7, delta=0.45)
+        r.events.clear()
+        r.advance(1.0)
+        self.assertEqual([(k, a) for _, k, a, _ in r.events], [('on', 66), ('off', 66)])          # the note at 3 s comes at its time
+        r.ask(op='seek', id=r.id, position=0)                             # back to the beginning: the first note sounds again
+        r.events.clear()
+        r.advance(0.4)
+        self.assertIn(('on', 60), [(k, a) for _, k, a, _ in r.events])
+
+    def test_seek_after_the_last_note_and_to_the_end_finishes_the_piece(self):
+        r = Rig(self)
+        r.ask(op='play', id=r.id)
+        r.advance(0.3)
+        r.ask(op='seek', id=r.id, position=999)
+        r.advance(0.6)
+        self.assertEqual((r.status()['state'], r.status()['reason']), ('idle', 'finished'))
+
+    def test_a_seek_for_nothing_that_plays_or_with_nonsense_is_ignored(self):
+        r = Rig(self, notes=[(0, 60, 80, 10)], pedal=[])
+        r.ask(op='seek', id=r.id, position=1)                             # nothing plays
+        r.advance(0.5)
+        self.assertEqual(r.status()['state'], 'idle')
+        r.ask(op='play', id=r.id)
+        r.advance(0.3)
+        for bad in ('1', None, True, float('nan'), [1]):
+            r.ask(op='seek', id=r.id, position=bad)
+            r.advance(0.3)
+        r.ask(op='seek', id='m-0000000000000000', position=1.0)           # another piece than the one that plays
+        r.advance(0.3)
+        self.assertEqual(r.status()['state'], 'playing')
+        self.assertLess(r.status()['position'], 1.8)
+
     def test_stop_in_the_middle_silences_everything_and_lets_the_pedal_go(self):
         r = Rig(self, pedal=[(0, 127), (4, 0)])
         r.ask(op='play', id=r.id)
