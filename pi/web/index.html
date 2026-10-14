@@ -142,6 +142,7 @@
   <div class="drawer-head"><b id="title">exxpiano</b><b id="devName" class="devname"></b><small id="ver"></small></div>
   <a href="#/home" data-page="home" data-t="nav_home">Home</a>
   <a href="#/bank" data-page="bank" data-t="nav_bank">Piano bank</a>
+  <a href="#/midi" data-page="midi" data-t="nav_midi">MIDI player</a>
   <a href="#/sound" data-page="sound" data-t="nav_sound">Touch and mechanics</a>
   <a href="#/audio" data-page="audio" data-t="nav_audio">Audio output</a>
   <a href="#/mon" data-page="mon" data-t="nav_mon">Monitor</a>
@@ -169,6 +170,10 @@
       <a class="linkbtn" href="#/bank" data-t="home_change">Change</a>
     </div>
     <p class="hint" id="nowStatus" role="status"></p>
+    <div class="now" id="nowMidi" style="display:none">
+      <div class="meta"><b id="nowMidiTitle"></b><small id="nowMidiPos"></small></div>
+      <a class="linkbtn" href="#/midi" data-t="home_midi">MIDI player</a>
+    </div>
   </div>
 
   <div class="card">
@@ -202,6 +207,10 @@
     <div id="usbList"></div>
     <p id="usbStatus" role="status"></p>
   </div>
+
+  </section>
+
+  <section id="paneMidi" hidden>
   <div class="card">
     <h2 data-t="midi_title">MIDI files</h2>
     <p class="hint" data-t="midi_hint">Put MIDI files (.mid) into the folder piano-midi of a USB drive and import them: a file plays on the piano you have chosen, with the hammer, damper and pedal noises. The drive is not needed afterwards.</p>
@@ -210,7 +219,6 @@
     <div id="midiDrive"></div>
     <p id="midiStatus" role="status"></p>
   </div>
-
   </section>
 
   <section id="paneSound" hidden>
@@ -310,8 +318,8 @@ const T = {
     a_none: "No stream is open: the synthesizer is not playing right now.", a_card: "Card", a_state: "State", a_format: "Format", a_channels: "Channels", a_rate: "Sample rate",
     a_period: "Period", a_buffer: "Buffer (latency)", a_delay: "Queued now", a_clock: "USB clock", a_rates: "Supported rates",
     a_asked: "Asked for {p} × {n} frames; the driver gave {rp} × {rn}.", a_frames: "{n} frames", a_bit: "{n} bit",
-    nav_home: "Home", nav_bank: "Piano bank", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", menu: "Menu",
-    home_now: "Now playing", home_change: "Change", home_health: "Device", home_more: "Details", h_power: "Power", h_net: "Network",
+    nav_home: "Home", nav_bank: "Piano bank", nav_midi: "MIDI player", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", menu: "Menu",
+    home_now: "Now playing", home_midi: "MIDI player", home_midi_now: "MIDI: {pos} of {len}", home_change: "Change", home_health: "Device", home_more: "Details", h_power: "Power", h_net: "Network",
     h_power_ok: "OK", h_power_now: "Problem", h_power_past: "Earlier", h_net_ap: "Setup mode", h_net_none: "No network", h_loading: "Loading {bank}…",
     w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (exxpiano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
     w_setup_started: "Starting the setup network… join it from your phone: its name begins with exxpiano-Setup.",
@@ -367,8 +375,8 @@ const T = {
     a_none: "Ни один поток не открыт: синтезатор сейчас не играет.", a_card: "Карта", a_state: "Состояние", a_format: "Формат", a_channels: "Каналы", a_rate: "Частота дискретизации",
     a_period: "Период", a_buffer: "Буфер (задержка)", a_delay: "В очереди сейчас", a_clock: "Тактирование USB", a_rates: "Поддерживаемые частоты",
     a_asked: "Запрошено {p} × {n} кадров; драйвер дал {rp} × {rn}.", a_frames: "{n} кадров", a_bit: "{n} бит",
-    nav_home: "Главная", nav_bank: "Банк рояля", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", menu: "Меню",
-    home_now: "Сейчас играет", home_change: "Сменить", home_health: "Устройство", home_more: "Подробнее", h_power: "Питание", h_net: "Сеть",
+    nav_home: "Главная", nav_bank: "Банк рояля", nav_midi: "MIDI-плеер", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", menu: "Меню",
+    home_now: "Сейчас играет", home_midi: "MIDI-плеер", home_midi_now: "MIDI: {pos} из {len}", home_change: "Сменить", home_health: "Устройство", home_more: "Подробнее", h_power: "Питание", h_net: "Сеть",
     h_power_ok: "В порядке", h_power_now: "Проблема", h_power_past: "Было", h_net_ap: "Режим настройки", h_net_none: "Нет сети", h_loading: "Загружается {bank}…",
     w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (exxpiano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
     w_setup_started: "Запускаю сеть настройки… подключитесь к ней с телефона: имя начинается с exxpiano-Setup.",
@@ -632,7 +640,7 @@ function renderMidi() {
   else { st.className = ""; st.textContent = ""; }
 }
 async function pollMidi() {
-  if (midi.busy || $("paneBank").hidden || document.hidden) return;
+  if (midi.busy || $("paneMidi").hidden || document.hidden) return;   // only the page is idle when another section is open: the piece goes on in the bridge
   midi.busy = true;
   try { midi.data = await api("/api/midi"); renderMidi(); } catch (e) { /* the next tick tries again */ } finally { midi.busy = false; }
 }
@@ -879,7 +887,7 @@ async function pollMon() {
   } catch (e) { /* the next tick tries again */ } finally { mon.busy = false; }
 }
 // ---- pages and the menu: the address (#/wifi, #/bank ...) says which page is open, so Back, a bookmark and a link all work
-const PAGES = { home: "paneHome", bank: "paneBank", sound: "paneSound", audio: "paneAudio", mon: "paneMon", wifi: "paneWifi" };
+const PAGES = { home: "paneHome", bank: "paneBank", midi: "paneMidi", sound: "paneSound", audio: "paneAudio", mon: "paneMon", wifi: "paneWifi" };
 let currentPage = "home";
 function pageFromHash() { const m = /^#\/?([a-z]+)/.exec(location.hash); return m && PAGES[m[1]] ? m[1] : null; }
 function setDrawer(open) {
@@ -899,7 +907,8 @@ function showPage(name) {
   window.scrollTo(0, 0);
   if (name === "home") pollHome(true);
   if (name === "mon") pollMon();
-  if (name === "bank") { pollUsb(); pollMidi(); }
+  if (name === "bank") pollUsb();
+  if (name === "midi") pollMidi();
   if (name === "wifi") pollWifi(true);
   if (name === "sound") drawCurve(state.settings.velocity_curve);
 }
@@ -941,8 +950,11 @@ async function pollHome(force) {
   if (home.busy || currentPage !== "home" || (document.hidden && !force)) return;
   home.busy = true;
   try {
-    const [m, w] = await Promise.all([api("/api/monitor?since=99999999999999"), api("/api/wifi").catch(() => null)]);
+    const [m, w, mi] = await Promise.all([api("/api/monitor?since=99999999999999"), api("/api/wifi").catch(() => null), api("/api/midi").catch(() => null)]);
     renderHome(m.now, w);
+    const playing = mi && mi.player && mi.player.state === "playing";            // a piece started in the MIDI player goes on while other sections are open
+    $("nowMidi").style.display = playing ? "flex" : "none";
+    if (playing) { $("nowMidiTitle").textContent = mi.player.title || ""; $("nowMidiPos").textContent = fmt(tr("home_midi_now"), { pos: clock(mi.player.position), len: clock(mi.player.length) }); }
   } catch (e) { /* the next tick tries again */ } finally { home.busy = false; }
 }
 

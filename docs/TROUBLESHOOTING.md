@@ -53,7 +53,7 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 
 | Symptom | Cause and fix |
 |---|---|
-| The MIDI card says the player is not running | The player is part of the mechanics bridge: `systemctl status exxpiano-fx`, `journalctl -u exxpiano-fx -b` |
+| The MIDI player section says the player is not running | The player is part of the mechanics bridge: `systemctl status exxpiano-fx`, `journalctl -u exxpiano-fx -b` |
 | Play does nothing and the card says the synthesizer is not running | Wait until the bank has loaded (about a minute after a restart) and press Play again |
 | The import fails | The message says why: not a standard MIDI file, too big (4 MB), too long (30 minutes), too many events, not enough space |
 | The file plays without hammer and pedal noises | The mechanics are the same as for the keyboard: check their levels in **Touch and mechanics** |

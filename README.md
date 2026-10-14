@@ -262,7 +262,7 @@ How it is kept safe: the drive is mounted read only (`ro,nosuid,nodev,noexec`) a
 
 ### Playing MIDI files from a USB drive
 
-Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a USB drive (the same drive as for the banks, FAT32, exFAT or ext4) and open the **Piano bank** section of the web interface: the card **MIDI files** lists them. **Import** copies the chosen file into the device's own library (`/var/lib/exxpiano/midi/`), only when you press the button; the copy is a transaction like the bank import (a temporary file, a check, one atomic publication), so a drive pulled out or a full card leaves no half-copied file. After that the drive is not needed. **Play** plays the file on **the piano you have chosen** (the current bank and preset), with the hammer, damper, resonance and pedal noises of the mechanics and with your touch curve, exactly as if you played it; **Stop** silences it at once; **Repeat** plays it again and again. You can play the keyboard over it: the sounds mix.
+Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a USB drive (the same drive as for the banks, FAT32, exFAT or ext4) and open the **MIDI player** section of the web interface (its own item in the menu): it lists them. **Import** copies the chosen file into the device's own library (`/var/lib/exxpiano/midi/`), only when you press the button; the copy is a transaction like the bank import (a temporary file, a check, one atomic publication), so a drive pulled out or a full card leaves no half-copied file. After that the drive is not needed. **Play** plays the file on **the piano you have chosen** (the current bank and preset), with the hammer, damper, resonance and pedal noises of the mechanics and with your touch curve, exactly as if you played it; **Stop** silences it at once; **Repeat** plays it again and again. You can play the keyboard over it: the sounds mix. The piece goes on when you open another section (the Monitor, say): the player is part of the mechanics bridge, not of the page, and the Home section shows what is playing and where.
 
 What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Changing the bank or restarting the synthesizer stops the piece; start it again after the new instrument has loaded. Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
 
@@ -289,9 +289,9 @@ glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch
 |---|---|---|
 | ![Home](docs/images/ui-home.png) | ![Piano bank](docs/images/ui-bank.png) | ![Touch and mechanics](docs/images/ui-sound.png) |
 
-| Monitor | Wi-Fi | MIDI files (and banks from a USB drive) |
+| Monitor | Wi-Fi | MIDI player |
 |---|---|---|
-| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-bank-midi.png) |
+| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
 
 *The pictures are taken from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the USB drive are made up), at the width of a phone.*
 

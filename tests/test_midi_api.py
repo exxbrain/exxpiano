@@ -150,6 +150,16 @@ class MidiApiTests(ServerCase):
         self.assertEqual(d['files'], [])                                                    # no banks on this drive
         self.assertEqual([f['name'] for f in d['midi_files']], ['broken.midi', 'Prelude.mid'])
 
+    def test_the_player_has_its_own_section_and_nothing_in_the_page_stops_it(self):
+        code, body = self.call('/')
+        page = body.decode()
+        self.assertEqual(code, 200)
+        self.assertIn('id="paneMidi"', page)
+        self.assertIn('data-page="midi"', page)
+        self.assertIn('midi: "paneMidi"', page)
+        # the page only asks and shows: the one place that sends a stop is the Stop button
+        self.assertEqual(page.count('action: "stop"'), 1)
+
     def test_the_token_protects_the_midi_api_too(self):
         self.start(self.conf_text_base + 'WEB_TOKEN=secret\n')
         self.assertEqual(self.call('/api/midi')[0], 401)
