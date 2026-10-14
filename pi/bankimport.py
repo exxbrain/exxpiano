@@ -46,8 +46,31 @@ def stale_cleanup(import_dir, max_age=3600, now=None):
                 pass
 
 
+def remove_entry(import_dir, entry_id):
+    """Take a published entry out of its library (out of the catalog first, then the files)."""
+    folder = os.path.join(import_dir, entry_id)
+    gone = os.path.join(import_dir, '.deleting-' + entry_id)
+    os.rename(folder, gone)
+    shutil.rmtree(gone, ignore_errors=True)
+
+
 def import_bank(src_path, display_name, import_dir, mem_limit=None, progress=None, statvfs=os.statvfs, opener=open):
-    """Copy `src_path` into the library. -> (id, already_there). `progress(done_bytes, total_bytes, phase)` is called while it works."""
+    """Copy a SoundFont into the library of imported banks. -> (id, already_there)."""
+    def validate(path):
+        try:
+            info = sf2info.read_info(path)
+        except sf2info.Sf2Error as exc:
+            raise ImportFailed('not a usable SoundFont: %s' % exc) from exc
+        return dict(name=info.get('name') or display_name)
+    return import_file(src_path, display_name, import_dir, prefix=ID_PREFIX, data_name='bank' + os.path.splitext(src_path)[1].lower(),
+                       validate=validate, mem_limit=mem_limit, progress=progress, statvfs=statvfs, opener=opener)
+
+
+def import_file(src_path, display_name, import_dir, prefix, data_name, validate, mem_limit=None, max_bytes=None, progress=None,
+                statvfs=os.statvfs, opener=open):
+    """The transaction: copy `src_path` into `<import_dir>/<prefix><16 hex of SHA-256>/<data_name>` plus meta.json. -> (id, already_there).
+    `validate(path)` checks the copy and returns more fields of meta.json (ImportFailed when the content is not usable).
+    `progress(done_bytes, total_bytes, phase)` is called while it works."""
     progress = progress or (lambda done, total, phase: None)
     os.makedirs(import_dir, exist_ok=True)
     try:
@@ -60,6 +83,8 @@ def import_bank(src_path, display_name, import_dir, mem_limit=None, progress=Non
     total = st.st_size
     if total <= 0:
         raise ImportFailed('the file is empty')
+    if max_bytes is not None and total > max_bytes:
+        raise ImportFailed('the file is too big (at most %d MB)' % (max_bytes >> 20))
     if mem_limit is not None and total > mem_limit:
         raise ImportFailed('too large for this device: %d MB, at most %d MB fit in memory' % (total >> 20, mem_limit >> 20))
     try:
@@ -74,7 +99,7 @@ def import_bank(src_path, display_name, import_dir, mem_limit=None, progress=Non
     try:
         sha = hashlib.sha256()
         done = 0
-        target = os.path.join(tmp, 'bank' + os.path.splitext(src_path)[1].lower())
+        target = os.path.join(tmp, data_name)
         progress(0, total, 'copying')
         try:
             with opener(src_path, 'rb') as src, open(target, 'wb') as dst:
@@ -93,17 +118,14 @@ def import_bank(src_path, display_name, import_dir, mem_limit=None, progress=Non
         if done != total:
             raise ImportFailed('the file changed while it was copied')
         progress(done, total, 'verifying')
-        try:
-            info = sf2info.read_info(target)
-        except sf2info.Sf2Error as exc:
-            raise ImportFailed('not a usable SoundFont: %s' % exc) from exc
+        extra = validate(target)
         digest = sha.hexdigest()
-        new_id = bank_id(digest)
+        new_id = prefix + digest[:16]
         final = os.path.join(import_dir, new_id)
         if os.path.isdir(final):
-            return new_id, True                                   # the same bank is already there: no second copy
-        meta = dict(id=new_id, name=info.get('name') or display_name, original_name=display_name, size=total, sha256=digest,
-                    file=os.path.basename(target), imported_at=int(time.time()))
+            return new_id, True                                   # the same file is already there: no second copy
+        meta = dict(extra, id=new_id, original_name=display_name, size=total, sha256=digest, file=os.path.basename(target),
+                    imported_at=int(time.time()))
         with open(os.path.join(tmp, 'meta.json'), 'w', encoding='utf-8') as f:
             json.dump(meta, f, ensure_ascii=False, indent=2, sort_keys=True)
             f.flush()

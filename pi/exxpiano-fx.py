@@ -206,6 +206,22 @@ class Bridge:
             self.out = None
             self.out_name = None
 
+    def play_event(self, kind, a, b):
+        """A note or the sustain pedal of a MIDI file, on the road of a keyboard's messages: the touch curve, the piano and the mechanics."""
+        mido = self.mido
+        if kind == 'pedal':
+            msg = mido.Message('control_change', channel=0, control=64, value=a)
+        else:
+            msg = mido.Message('note_on' if kind == 'on' else 'note_off', channel=0, note=a, velocity=b)
+        self.on_msg(msg)
+
+    def release_all(self, pedal_was_down):
+        """Silence after a MIDI file: let the pedal go (when it was down) and switch every note off, in the synthesizer and in the mechanics."""
+        mido = self.mido
+        if pedal_was_down:
+            self.on_msg(mido.Message('control_change', channel=0, control=64, value=0))
+        self.on_msg(mido.Message('control_change', channel=0, control=123, value=0))
+
     def select_piano(self):
         """Bank select + program change for the piano on channel 0 (the caller holds the lock or runs before playing)."""
         bank, prog = self.core.piano_bank, self.core.piano_prog
@@ -321,6 +337,26 @@ class Bridge:
             time.sleep(1)
 
 
+def start_midi_player(bridge):
+    """The player of the imported MIDI files (asked through /run/exxpiano-midi); a problem in it must never stop the keyboard."""
+    try:
+        import midiplayer
+        conf = bridge.exxpianoconf.parse_conf(bridge.conf_path)
+        player = midiplayer.Player(conf.get('MIDI_DIR') or '/var/lib/exxpiano/midi', conf.get('MIDI_RUN_DIR') or midiplayer.RUN_DIR,
+                                   bridge.play_event, bridge.release_all, lambda: bridge.out_name)
+
+        def run():
+            while True:
+                try:
+                    player.run()
+                except Exception as exc:                              # noqa: BLE001
+                    print('midi player failed:', exc, file=sys.stderr, flush=True)
+                    time.sleep(2)
+        threading.Thread(target=run, daemon=True).start()
+    except Exception as exc:                                          # noqa: BLE001
+        print('midi player not started:', exc, file=sys.stderr, flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--hammer-boost', type=float, default=10.0, help='dB louder than the SFZ level (default 10)')
@@ -338,7 +374,9 @@ def main():
     core = FXCore(args.hammer_boost, args.res_boost, args.pedal_boost, hammer_exp=args.hammer_exp,
                   randomness=args.random, velocity_curve=args.velocity_curve,
                   piano_bank=args.piano_bank, piano_prog=args.piano_prog)
-    Bridge(core).run()
+    bridge = Bridge(core)
+    start_midi_player(bridge)
+    bridge.run()
 
 
 if __name__ == '__main__':

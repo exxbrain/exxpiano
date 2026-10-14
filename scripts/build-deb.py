@@ -165,6 +165,8 @@ def main():
         ('opt/exxpiano/banklib.py', src('pi', 'banklib.py'), 0o644),
         ('opt/exxpiano/bankimport.py', src('pi', 'bankimport.py'), 0o644),
         ('opt/exxpiano/usblib.py', src('pi', 'usblib.py'), 0o644),
+        ('opt/exxpiano/midilib.py', src('pi', 'midilib.py'), 0o644),
+        ('opt/exxpiano/midiplayer.py', src('pi', 'midiplayer.py'), 0o644),
         ('opt/exxpiano/exxpiano-usb.py', src('pi', 'exxpiano-usb.py'), 0o755),
         ('lib/systemd/system/exxpiano-usb@.service', src('pi', 'exxpiano-usb@.service'), 0o644),
         ('opt/exxpiano/profiles.py', src('pi', 'profiles.py'), 0o644),

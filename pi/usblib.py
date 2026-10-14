@@ -12,6 +12,8 @@ import tempfile
 MOUNT_ROOT = '/run/exxpiano-usb'
 STATUS_FILE = os.path.join(MOUNT_ROOT, 'status.json')
 BANK_FOLDER = 'piano-banks'
+MIDI_FOLDER = 'piano-midi'
+MIDI_EXT = ('.mid', '.midi')
 SUPPORTED_FS = ('vfat', 'exfat', 'ext4')
 MOUNT_OPTIONS = 'ro,nosuid,nodev,noexec'
 DEVICE_RE = re.compile(r'^/dev/(sd[a-z]{1,2}[0-9]{0,2}|mmcblk[0-9]p[0-9]+|nvme[0-9]n[0-9]p[0-9]+)$')
@@ -50,9 +52,10 @@ def read_status(path=STATUS_FILE):
     return dict(drives=drives)
 
 
-def list_candidates(mountpoint):
-    """The SoundFont files of `piano-banks/` on a mounted drive: [{name, size}]. Plain files only: no links, no folders, nothing hidden."""
-    folder = os.path.join(mountpoint, BANK_FOLDER)
+def list_candidates(mountpoint, folder_name=BANK_FOLDER, exts=BANK_EXT):
+    """The files of a folder of a mounted drive (by default the SoundFont files of `piano-banks/`): [{name, size}].
+    Plain files only: no links, no folders, nothing hidden."""
+    folder = os.path.join(mountpoint, folder_name)
     try:
         if os.path.islink(folder) or not os.path.isdir(folder):
             return []
@@ -61,9 +64,9 @@ def list_candidates(mountpoint):
         return []
     out = []
     for name in names:
-        if name.startswith('.') or not NAME_RE.match(name) or not name.lower().endswith(BANK_EXT):
+        if name.startswith('.') or not NAME_RE.match(name) or not name.lower().endswith(exts):
             continue
-        if name.lower() in ('mech.sf2', 'mech.sf3'):             # the mechanics bank is not replaced from a drive
+        if folder_name == BANK_FOLDER and name.lower() in ('mech.sf2', 'mech.sf3'):      # the mechanics bank is not replaced from a drive
             continue
         try:
             st = os.lstat(os.path.join(folder, name))
@@ -76,11 +79,11 @@ def list_candidates(mountpoint):
     return out
 
 
-def resolve_candidate(mountpoint, name):
+def resolve_candidate(mountpoint, name, folder_name=BANK_FOLDER, exts=BANK_EXT):
     """The path of a file the drive really lists (ValueError otherwise): a name from the browser is only ever compared with the listing."""
-    if not isinstance(name, str) or not any(c['name'] == name for c in list_candidates(mountpoint)):
+    if not isinstance(name, str) or not any(c['name'] == name for c in list_candidates(mountpoint, folder_name, exts)):
         raise ValueError('that file is not on the drive')
-    return os.path.join(mountpoint, BANK_FOLDER, name)
+    return os.path.join(mountpoint, folder_name, name)
 
 
 def drive_state(drive):
@@ -89,7 +92,9 @@ def drive_state(drive):
     ready = bool(drive.get('mounted') and mount and os.path.isdir(mount))
     return dict(id=drive.get('id'), label=drive.get('label') or 'USB', fs=drive.get('fs'), ready=ready,
                 reason=drive.get('reason') if not ready else None, has_folder=bool(ready and os.path.isdir(os.path.join(mount, BANK_FOLDER))),
-                files=list_candidates(mount) if ready else [])
+                files=list_candidates(mount) if ready else [],
+                midi_files=list_candidates(mount, MIDI_FOLDER, MIDI_EXT) if ready else [],
+                has_midi_folder=bool(ready and os.path.isdir(os.path.join(mount, MIDI_FOLDER))))
 
 
 # ---- the privileged side: mount and unmount (used by exxpiano-usb.py, run by udev/systemd as root)

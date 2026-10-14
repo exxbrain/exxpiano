@@ -28,7 +28,10 @@ sys.path.insert(0, os.path.join(ROOT, 'tests'))
 spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'exxpiano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
+import midilib  # noqa: E402
+import midiplayer  # noqa: E402
 import usblib  # noqa: E402
+from midifixture import make_midi  # noqa: E402
 from sf2fixture import make_sf2  # noqa: E402
 
 
@@ -192,19 +195,28 @@ def main():
     os.makedirs(os.path.join(drive, 'piano-banks'))
     make_sf2(os.path.join(drive, 'piano-banks', 'Kawai Grand.sf2'), presets=[('Kawai Grand', 0, 0)], name='Kawai Grand', sample_bytes=600000)
     make_sf2(os.path.join(drive, 'piano-banks', 'Electric Piano.sf2'), presets=[('Electric', 0, 4)], name='Electric Piano', sample_bytes=250000)
+    os.makedirs(os.path.join(drive, 'piano-midi'))
+    melody = [(i * 0.5, n, 70 + (i % 4) * 10, 0.5) for i, n in enumerate([60, 64, 67, 72, 71, 67, 64, 60, 62, 65, 69, 74, 72, 69, 65, 62])]
+    make_midi(os.path.join(drive, 'piano-midi', 'Arpeggio.mid'), melody, tempo=500000, pedal=[(0, 127), (7.5, 0), (8, 127), (15.5, 0)], title='Arpeggio')
+    make_midi(os.path.join(drive, 'piano-midi', 'Slow chords.mid'), [(0, 48, 60, 4), (0, 55, 60, 4), (0, 64, 60, 4), (4, 50, 70, 4), (4, 57, 70, 4), (4, 65, 70, 4)],
+              tempo=700000, title='Slow chords')
     usb_status = os.path.join(tmp, 'usb-status.json')
     usblib._write_json(usb_status, dict(drives=[dict(id='/dev/sda1', label='PIANO-BANKS', fs='vfat', mounted=True, mountpoint=drive, reason=None)]))
     conf = os.path.join(tmp, 'exxpiano.conf')
     lines = ['PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'), 'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'), 'BANK_DIR=%s' % banks, 'ALSA_DEVICE=auto',
              'GAIN=1.0', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--hammer-boost 0 --hammer-exp 0.8 --random 1"',
              'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'WEB_PORT=%d' % args.port,
-             'IMPORT_DIR=%s' % os.path.join(tmp, 'library'), 'USB_STATUS=%s' % usb_status]
+             'IMPORT_DIR=%s' % os.path.join(tmp, 'library'), 'USB_STATUS=%s' % usb_status,
+             'MIDI_DIR=%s' % os.path.join(tmp, 'midi'), 'MIDI_RUN_DIR=%s' % os.path.join(tmp, 'midi-run')]
     if args.token:
         lines.append('WEB_TOKEN=%s' % args.token)
     with open(conf, 'w') as f:
         f.write('\n'.join(lines) + '\n')
 
     app = web.App(conf, DemoActions(args))
+    # the real player of the bridge, with a synthesizer that is not there: it reads the requests and publishes the status as on the device
+    player = midiplayer.Player(os.path.join(tmp, 'midi'), os.path.join(tmp, 'midi-run'), lambda *e: None, lambda pedal: None, lambda: 'demo')
+    threading.Thread(target=player.run, daemon=True).start()
     server = ThreadingHTTPServer((args.bind, args.port), web.make_handler(app))
     url = 'http://%s:%d/%s' % ('127.0.0.1' if args.bind in ('0.0.0.0', '127.0.0.1') else args.bind, args.port, '#/wifi' if args.mode == 'ap' else '')
     print('Demo of exxpiano (a simulated device: nothing is changed on this computer)')

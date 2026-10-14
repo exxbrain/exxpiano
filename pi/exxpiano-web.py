@@ -8,6 +8,8 @@
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
   GET  /api/usb            the USB drive (label, state, the SoundFont files of piano-banks/) and the state of the import
   POST /api/usb            {"action": "import", "name": "<file listed on the drive>"} | {"action": "delete", "id": "i-<16 hex>"}  - copy a bank from the drive / remove an imported one
+  GET  /api/midi           MIDI files: the ones on the drive (piano-midi/), the library, the player (state, position), the import
+  POST /api/midi           {"action": "import", "name"} | {"action": "delete", "id"} | {"action": "play", "id", "loop"} | {"action": "stop"}
   GET  /api/wifi           Wi-Fi: link, saved networks, scan results, access point (the setup mode), result of the last change
   POST /api/device         {"name": "piano-kitchen"}  - rename the device (its network name, http://<name>.local:8080/); useful with several devices
   POST /api/wifi           {"action": "scan"} | {"action": "connect", "ssid", "password", "hidden"} | {"action": "forget", "ssid"}
@@ -34,6 +36,8 @@ from urllib.parse import parse_qs, urlsplit
 import bankimport
 import banklib
 import exxpianoconf
+import midilib
+import midiplayer
 import profiles
 import base64
 import qrlib
@@ -411,7 +415,7 @@ class ImportJob:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._state = dict(state='idle', done=0, total=0, error=None, bank_id=None, name=None, op=0, already=False)
+        self._state = dict(state='idle', done=0, total=0, error=None, bank_id=None, name=None, op=0, already=False, kind='bank')
 
     def snapshot(self):
         with self._lock:
@@ -421,13 +425,13 @@ class ImportJob:
         with self._lock:
             return self._state['state'] in ('copying', 'verifying')
 
-    def start(self, name, work):
+    def start(self, name, work, kind='bank'):
         """`work(progress)` returns (bank id, already there) or raises bankimport.ImportFailed. Busy when one is running."""
         with self._lock:
             if self._state['state'] in ('copying', 'verifying'):
                 raise Busy()
             op = self._state['op'] + 1
-            self._state = dict(state='copying', done=0, total=0, error=None, bank_id=None, name=name, op=op, already=False)
+            self._state = dict(state='copying', done=0, total=0, error=None, bank_id=None, name=name, op=op, already=False, kind=kind)
 
         def progress(done, total, phase):
             with self._lock:
@@ -465,6 +469,8 @@ class App:
         self.import_dir = conf.get('IMPORT_DIR') or banklib.IMPORT_DIR
         self.usb_status_path = conf.get('USB_STATUS') or usblib.STATUS_FILE
         self.importer = ImportJob()
+        self.midi_dir = conf.get('MIDI_DIR') or midilib.LIBRARY_DIR
+        self.midi_run_dir = conf.get('MIDI_RUN_DIR') or midiplayer.RUN_DIR
         bankimport.stale_cleanup(self.import_dir)
 
     def spec(self):
@@ -674,6 +680,80 @@ class App:
         self.importer.start(name, lambda progress: bankimport.import_bank(source, name, import_dir, mem_limit=limit, progress=progress))
         return dict(started=True)
 
+    # ---- MIDI files: the drive's files, the library, the player of the bridge
+    def midi_player(self):
+        """The status the bridge's player published; 'unavailable' when it is old (the bridge is not running)."""
+        try:
+            with open(os.path.join(self.midi_run_dir, 'status.json'), encoding='utf-8') as f:
+                st = json.load(f)
+            if time.time() - float(st.get('updated', 0)) > 6:
+                raise ValueError('old')
+            return st
+        except (OSError, ValueError, TypeError, AttributeError):
+            return dict(state='unavailable')
+
+    def midi_state(self):
+        drives = []
+        for d in usblib.read_status(self.usb_status_path)['drives']:
+            s = usblib.drive_state(d)
+            drives.append(dict(id=s['id'], label=s['label'], ready=s['ready'], reason=s['reason'], has_folder=s['has_midi_folder'], files=s['midi_files']))
+        return dict(drives=drives, library=midilib.list_library(self.midi_dir), player=self.midi_player(), importing=self.importer.snapshot())
+
+    def midi_action(self, body):
+        if not isinstance(body, dict):
+            raise ValueError('expected an object')
+        action = body.get('action')
+        if action == 'import':
+            return self._midi_import(body.get('name'), body.get('drive'))
+        if action == 'delete':
+            return self._midi_delete(body.get('id'))
+        if action == 'play':
+            return self._midi_request(dict(op='play', id=self._midi_id(body.get('id')), loop=bool(body.get('loop'))))
+        if action == 'stop':
+            return self._midi_request(dict(op='stop'))
+        raise ValueError('unknown action')
+
+    def _midi_id(self, midi_id):
+        midilib.resolve(self.midi_dir, midi_id)                        # ValueError -> 400
+        return midi_id
+
+    def _midi_request(self, req):
+        if req['op'] == 'play' and (self.importer.busy() or self.switcher.busy()):
+            raise Busy()
+        os.makedirs(self.midi_run_dir, exist_ok=True)
+        path = os.path.join(self.midi_run_dir, 'request.json')
+        tmp = path + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(dict(req, nonce=time.time_ns()), f)
+        os.replace(tmp, path)
+        return dict(accepted=True)
+
+    def _midi_import(self, name, drive_id):
+        if self.switcher.busy():
+            raise Busy()
+        source = None
+        for d in usblib.read_status(self.usb_status_path)['drives']:
+            state = usblib.drive_state(d)
+            if state['ready'] and (drive_id in (None, state['id'])):
+                try:
+                    source = usblib.resolve_candidate(d['mountpoint'], name, usblib.MIDI_FOLDER, usblib.MIDI_EXT)
+                    break
+                except ValueError:
+                    continue
+        if source is None:
+            raise ValueError('that file is not on a connected drive')
+        midi_dir = self.midi_dir
+        self.importer.start(name, lambda progress: midilib.import_midi(source, name, midi_dir, progress=progress), kind='midi')
+        return dict(started=True)
+
+    def _midi_delete(self, midi_id):
+        if self.importer.busy() or self.switcher.busy():
+            raise Busy()
+        player = self.midi_player()
+        keep = [player.get('id')] if player.get('state') == 'playing' else []
+        midilib.delete_file(self.midi_dir, midi_id, keep_ids=keep)
+        return dict(deleted=True)
+
     def _usb_delete(self, bank_id):
         if self.importer.busy() or self.switcher.busy():
             raise Busy()
@@ -758,7 +838,7 @@ def make_handler(app):
 
         def log_request(self, code='-', size='-'):
             # the page polls the state and the monitor all the time: successful polls would only fill the journal with noise
-            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/usb', '/api/wifi', '/api/qr', '/api/ping'):
+            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/usb', '/api/midi', '/api/wifi', '/api/qr', '/api/ping'):
                 return
             super().log_request(code, size)
 
@@ -807,6 +887,10 @@ def make_handler(app):
                     return self._send(200, app.qr(parse_qs(url.query), self.headers.get('Host', '')))
                 except (ValueError, qrlib.QrError) as exc:
                     return self._send(400, dict(error=str(exc)))
+            if url.path == '/api/midi':
+                if not self._authorised():
+                    return self._send(401, dict(error='token required'))
+                return self._send(200, app.midi_state())
             if url.path == '/api/usb':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
@@ -839,6 +923,8 @@ def make_handler(app):
                 if self.path == '/api/restart':
                     app.actions.restart_synth()
                     return self._send(200, dict(ok=True))
+                if self.path == '/api/midi':
+                    return self._send(200, app.midi_action(self._body()))
                 if self.path == '/api/usb':
                     return self._send(200, app.usb_action(self._body()))
                 if self.path == '/api/wifi':

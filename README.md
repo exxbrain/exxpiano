@@ -260,6 +260,14 @@ How it is kept safe: the drive is mounted read only (`ro,nosuid,nodev,noexec`) a
 
 **What is tested and what is not.** The logic (listing, safety of names, the transaction, errors, the API, the interface in the demo `scripts/demo-web.py`) is covered by automatic tests. **Not tried on a real Raspberry Pi:** mounting FAT32, exFAT and ext4 drives, the udev rule (`90-exxpiano.rules`) and the unit `exxpiano-usb@.service`, pulling a drive out during the copy, and what a 400 MB copy does to playing and to the power supply (watch the Monitor section; use a powered hub if it shows under-voltage). Do not play while a big bank is being copied. If a drive is not offered, look at `journalctl -u 'exxpiano-usb@*'` and check that the file system is one of the three. NTFS is not supported. `bank.json` (author and licence of a bank) is not read yet.
 
+### Playing MIDI files from a USB drive
+
+Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a USB drive (the same drive as for the banks, FAT32, exFAT or ext4) and open the **Piano bank** section of the web interface: the card **MIDI files** lists them. **Import** copies the chosen file into the device's own library (`/var/lib/exxpiano/midi/`), only when you press the button; the copy is a transaction like the bank import (a temporary file, a check, one atomic publication), so a drive pulled out or a full card leaves no half-copied file. After that the drive is not needed. **Play** plays the file on **the piano you have chosen** (the current bank and preset), with the hammer, damper, resonance and pedal noises of the mechanics and with your touch curve, exactly as if you played it; **Stop** silences it at once; **Repeat** plays it again and again. You can play the keyboard over it: the sounds mix.
+
+What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Changing the bank or restarting the synthesizer stops the piece; start it again after the new instrument has loaded. Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
+
+**What is tested and what is not.** The reader of the files, the library, the import, the player (with a fake clock), the road through the touch curve and the mechanics, and the API are covered by automatic tests, and the interface works in the demo. **Not tried on a real Raspberry Pi:** how exact the timing is (Python timers, together with the mechanics), the load on the processor with a dense file, very dense files against the polyphony (they may drop notes), and everything about the USB drive that the bank import also leaves open. The player lives in the mechanics bridge (`exxpiano-fx`): when it is not running, the card says so.
+
 ## Look at the web interface without a Raspberry Pi
 
 ```bash
@@ -281,9 +289,9 @@ glance at the device: CPU, temperature, power, network), **Piano bank**, **Touch
 |---|---|---|
 | ![Home](docs/images/ui-home.png) | ![Piano bank](docs/images/ui-bank.png) | ![Touch and mechanics](docs/images/ui-sound.png) |
 
-| Monitor | Wi-Fi |
-|---|---|
-| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) |
+| Monitor | Wi-Fi | MIDI files (and banks from a USB drive) |
+|---|---|---|
+| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-bank-midi.png) |
 
 *The pictures are taken from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the USB drive are made up), at the width of a phone.*
 
