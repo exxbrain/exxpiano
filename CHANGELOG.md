@@ -2,6 +2,12 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.17
+
+- **MIDI player** (its own section of the menu): put `.mid` / `.midi` files into the folder `piano-midi/` of a USB drive, import them, and they play on the piano you have chosen, with the mechanics (hammers, dampers, resonance, pedal) and your touch curve. Stop and repeat; a piece goes on when another section is open, and Home shows what is playing. Only the notes and the sustain pedal of a file are played (no program or bank changes, no drums), and the files are limited (4 MB, 30 minutes). **Not tried on a real Raspberry Pi yet:** the exactness of the timing, the load of a dense file, the USB drive.
+- **Quicker start without a USB sound card:** `exxpiano-run` no longer waits up to 8 seconds for a USB sound card when none is on its way (nothing waiting for its driver, USB had time to enumerate); a USB keyboard that is a capture-only audio card does not hold the start back either. The start time was not measured on a real Pi.
+- The specifications are reorganized into a two-level tree (domain/capability) without changing a requirement.
+
 ## 1.10.16
 
 - **Wi-Fi scan on a board whose `wlan0` is down** (a freshly flashed card, or after the setup network): the scan said "Network is down (-100)" and the list of networks stayed empty. The interface is now brought up and the scan is repeated; if it still cannot be brought up, the Wi-Fi section says why (rfkill, the Wi-Fi country).
