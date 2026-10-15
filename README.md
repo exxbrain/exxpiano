@@ -47,9 +47,13 @@ Not yet tried on real hardware: the Pi 5 image, the import from a USB drive (see
 
 ## What it sounds like
 
-| *La Campanella* (from bar 1:48) | *Un Sospiro* |
-|---|---|
-| [![La Campanella](docs/media/la-campanella.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4) | [![Un Sospiro](docs/media/un-sospiro.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4) |
+***La Campanella* (from bar 1:48)** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4))
+
+https://github.com/user-attachments/assets/a6098e81-ecb5-4f6a-b3e4-fea3d509dc1e
+
+***Un Sospiro*** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4))
+
+https://github.com/user-attachments/assets/1ae16430-4d23-4692-b5fd-ce684c489c22
 
 *The two pieces that come with the device, played by its MIDI player on a Raspberry Pi and recorded from the device, with the `lite` bank, the mechanics and 256 voices (the 1.10.21 changes, before their release). Nothing was added to the sound but one gain to bring both recordings to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 
