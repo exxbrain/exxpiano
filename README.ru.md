@@ -47,9 +47,13 @@
 
 ## Как это звучит
 
-| «Кампанелла» (с такта на 1:48) | «Вздох» |
-|---|---|
-| [![Кампанелла](docs/media/la-campanella.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4) | [![Вздох](docs/media/un-sospiro.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4) |
+**«Кампанелла» (с такта на 1:48)** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4))
+
+https://github.com/user-attachments/assets/a6098e81-ecb5-4f6a-b3e4-fea3d509dc1e
+
+**«Вздох»** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4))
+
+https://github.com/user-attachments/assets/1ae16430-4d23-4692-b5fd-ce684c489c22
 
 *Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi, звук записан с устройства, с банком `lite`, механикой и 256 голосами (изменения 1.10.21 до их выпуска). К звуку ничего не добавлено, кроме одного усиления, чтобы обе записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
 
