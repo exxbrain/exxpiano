@@ -20,7 +20,7 @@ English | [Русский](README.ru.md)
 - **From a USB drive:** import sound banks and play MIDI files on the chosen piano, with the mechanics.
 - **Open and tested:** open source (scripts MIT, sounds CC-BY, the two demonstration recordings CC BY-NC-SA) with hundreds of automatic tests; what was not tried on a real board is marked as such.
 
-Not yet tried on real hardware: the Pi 5 image, the import from a USB drive, the MIDI player (see "Tested on" below).
+Not yet tried on real hardware: the Pi 5 image, the import from a USB drive (see "Tested on" below).
 
 ## What it looks like
 
@@ -33,6 +33,14 @@ Not yet tried on real hardware: the Pi 5 image, the import from a USB drive, the
 | ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
 
 *The pictures are made by `scripts/make-screenshots.py` from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the banks are made up; the pieces are the real recordings of `assets/midi/`), at the width of a phone.*
+
+## What it sounds like
+
+| *La Campanella* (from bar 1:48) | *Un Sospiro* |
+|---|---|
+| [![La Campanella](docs/media/la-campanella.jpg)](docs/media/la-campanella.mp4) | [![Un Sospiro](docs/media/un-sospiro.jpg)](docs/media/un-sospiro.mp4) |
+
+*The two pieces that come with the device, played by its MIDI player on a Raspberry Pi and recorded from the device, with the `lite` bank, the mechanics and 256 voices (the 1.10.21 changes, before their release). Nothing was added to the sound but one gain to bring both recordings to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 
 ## How it works
 
@@ -307,7 +315,7 @@ Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a 
 
 What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Changing the bank or restarting the synthesizer stops the piece; start it again after the new instrument has loaded. Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
 
-**What is tested and what is not.** The reader of the files, the library, the import, the player (with a fake clock), the road through the touch curve and the mechanics, and the API are covered by automatic tests, and the interface works in the demo. **Not tried on a real Raspberry Pi:** how exact the timing is (Python timers, together with the mechanics), the load on the processor with a dense file, very dense files against the polyphony (they may drop notes), and everything about the USB drive that the bank import also leaves open. The player lives in the mechanics bridge (`exxpiano-fx`): when it is not running, the card says so.
+**What is tested and what is not.** The reader of the files, the library, the import, the player (with a fake clock), the road through the touch curve and the mechanics, and the API are covered by automatic tests, and the interface works in the demo. **Tried on a real Raspberry Pi** with the two pieces that come with it (see "What it sounds like"): they play through to the end, the load average stayed at 0.3-0.7, and the final fortissimo of *La Campanella* needed 256 voices (with 192 the synthesizer cut sounding notes, which clicked). **Not measured:** how exact the timing is (Python timers, together with the mechanics), files denser than these two, and everything about the USB drive that the bank import also leaves open. The player lives in the mechanics bridge (`exxpiano-fx`): when it is not running, the card says so.
 
 ## Look at the web interface without a Raspberry Pi
 
@@ -420,4 +428,4 @@ The repository's scripts are MIT ([LICENSE](LICENSE)). The [Salamander Grand Pia
 ([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
 attribution.
 
-The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.
+The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The videos in `docs/media/` are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.
