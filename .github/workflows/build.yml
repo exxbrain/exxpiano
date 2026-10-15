@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing after the checkout pushes or calls GitHub with it
 
       - name: Install ffmpeg (the builder tests use it)
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
@@ -27,6 +29,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing after the checkout pushes or calls GitHub with it
 
       - name: Install ruff and shellcheck
         run: |

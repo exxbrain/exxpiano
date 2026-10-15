@@ -24,6 +24,8 @@ jobs:
         language: [python, actions]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing after the checkout pushes or calls GitHub with it
 
       - uses: github/codeql-action/init@v4
         with:

@@ -86,6 +86,13 @@ class PlayerTests(unittest.TestCase):
         self.assertEqual(r.status()['reason'], 'finished')
         self.assertEqual(r.released, [False])  # the pedal was up at the end
 
+    def test_a_file_that_ends_in_a_half_pedal_lets_the_pedal_go(self):
+        r = Rig(self, notes=[(0, 60, 80, 1)], pedal=[(0, 127), (0.5, 63)])  # the bridge plays 63 as down
+        r.ask(op='play', id=r.id)
+        r.advance(2.0)
+        self.assertEqual(r.status()['reason'], 'finished')
+        self.assertEqual(r.released, [True])
+
     def test_the_position_grows_and_the_status_names_the_piece(self):
         r = Rig(self, notes=[(0, 60, 80, 8)], pedal=[], title='Etude')
         r.ask(op='play', id=r.id)
@@ -290,6 +297,7 @@ class SameRoadTests(unittest.TestCase):
             b.play_event('pedal', value, 0)
         values = [m.value for m in b.out.sent if m.type == 'control_change' and m.control == 64]
         self.assertEqual(values, [127, 127, 127, 127, 0, 0])
+        self.assertEqual(fx.FILE_PEDAL_DOWN, midiplayer.FILE_PEDAL_DOWN)  # the player knows the pedal the bridge holds down
 
 
 if __name__ == '__main__':

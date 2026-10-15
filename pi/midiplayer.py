@@ -21,6 +21,7 @@ POLL = 0.25  # seconds between looks at the request file
 STATUS_PLAYING = 0.5  # seconds between status files while playing
 STATUS_IDLE = 2.0  # and while idle: the web interface counts a status older than 5 s as "the player is not running"
 LOOP_GAP = 0.8  # a pause before a repeated piece starts again
+FILE_PEDAL_DOWN = 40  # a sustain value of a file at or above this is "down": the bridge plays the half pedal of 40-63 as down (exxpiano-fx.py)
 
 
 class Player:
@@ -118,7 +119,7 @@ class Player:
         self._i = bisect.bisect_left(self._events, (position,))  # the first event at or after the position
         for _, kind, a, b in reversed(self._events[: self._i]):
             if kind == 'pedal':
-                if a >= 64:
+                if a >= FILE_PEDAL_DOWN:
                     self._pedal_down = True
                     self.on_event(kind, a, b)
                 break
@@ -146,7 +147,7 @@ class Player:
             _, kind, a, b = events[self._i]
             self._i += 1
             if kind == 'pedal':
-                self._pedal_down = a >= 64
+                self._pedal_down = a >= FILE_PEDAL_DOWN
             self.on_event(kind, a, b)
         if self._i >= len(events) and elapsed >= self.length:
             if self.loop:
