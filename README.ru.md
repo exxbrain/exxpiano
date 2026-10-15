@@ -49,7 +49,7 @@
 
 | «Кампанелла» (с такта на 1:48) | «Вздох» |
 |---|---|
-| [![Кампанелла](docs/media/la-campanella.jpg)](docs/media/la-campanella.mp4) | [![Вздох](docs/media/un-sospiro.jpg)](docs/media/un-sospiro.mp4) |
+| [![Кампанелла](docs/media/la-campanella.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4) | [![Вздох](docs/media/un-sospiro.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4) |
 
 *Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi, звук записан с устройства, с банком `lite`, механикой и 256 голосами (изменения 1.10.21 до их выпуска). К звуку ничего не добавлено, кроме одного усиления, чтобы обе записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
 
@@ -436,4 +436,4 @@ python3 -m unittest discover -s tests -v
 ([NOTICE.md](NOTICE.md)). Собранные из них файлы `.sf2` — производные работы, их распространение требует
 указания авторства.
 
-Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Видео в `docs/media/` сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. DietPi и пакеты Debian в образах остаются под своими лицензиями.
+Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Демонстрационные видео (pre-release [demo-videos](https://github.com/exxbrain/exxpiano/releases/tag/demo-videos)) сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. DietPi и пакеты Debian в образах остаются под своими лицензиями.

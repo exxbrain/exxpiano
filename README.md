@@ -49,7 +49,7 @@ Not yet tried on real hardware: the Pi 5 image, the import from a USB drive (see
 
 | *La Campanella* (from bar 1:48) | *Un Sospiro* |
 |---|---|
-| [![La Campanella](docs/media/la-campanella.jpg)](docs/media/la-campanella.mp4) | [![Un Sospiro](docs/media/un-sospiro.jpg)](docs/media/un-sospiro.mp4) |
+| [![La Campanella](docs/media/la-campanella.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4) | [![Un Sospiro](docs/media/un-sospiro.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4) |
 
 *The two pieces that come with the device, played by its MIDI player on a Raspberry Pi and recorded from the device, with the `lite` bank, the mechanics and 256 voices (the 1.10.21 changes, before their release). Nothing was added to the sound but one gain to bring both recordings to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 
@@ -441,4 +441,4 @@ The repository's scripts are MIT ([LICENSE](LICENSE)). The [Salamander Grand Pia
 ([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
 attribution.
 
-The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The videos in `docs/media/` are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.
+The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The demonstration videos (the pre-release [demo-videos](https://github.com/exxbrain/exxpiano/releases/tag/demo-videos)) are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.
