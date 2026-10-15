@@ -257,7 +257,8 @@ The exact installation ID, Wi-Fi name and QR code are shown by the device web pa
         dietpi_version=plan['dietpi_version'],
         dietpi_sha256=plan['dietpi_sha256'],
         banks=plan['banks_text'],
-        ap_pw=plan['ap_password'] or wifilib.AP_DEFAULT_PASSWORD,
+        # a password given with --ap-password stays out of the README: it is published next to the image
+        ap_pw='the one given with --ap-password at build time' if plan['ap_password'] else wifilib.AP_DEFAULT_PASSWORD,
         label=plan['label'],
         audio_note=''
         if plan['onboard_audio']

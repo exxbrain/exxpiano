@@ -236,13 +236,16 @@ class BuildTests(Case):
         for needle in (
             'creates and permanently saves its own 6-character hexadecimal ID',
             'exxpiano-Setup-<INSTALLATION-ID>',
-            'setup password 1',
+            'the one given with --ap-password at build time',
             'needs neither Internet nor an Ethernet cable',
             'DietPi: 10.7.0',
         ):
             self.assertIn(needle, text)
+        self.assertNotIn('setup password 1', text)  # the README is published next to the image
+        self.assertNotIn('root password 1', text)
         with open(os.path.join(self.out, 'manifest-rpi234.json'), encoding='utf-8') as f:
             manifest = json.load(f)
+        self.assertNotIn('password 1', json.dumps(manifest))
         self.assertEqual(
             (manifest['product_version'], manifest['dietpi_version'], manifest['installation_identity'], manifest['image']),
             (version, '10.7.0', 'generated-at-first-boot', stem + '-sd.zip'),
@@ -251,6 +254,12 @@ class BuildTests(Case):
         self.assertNotIn('device_number', manifest)
         self.assertRegex(manifest['dietpi_sha256'], r'^[0-9a-f]{64}$')
         self.assertRegex(manifest['image_sha256'], r'^[0-9a-f]{64}$')
+
+    def test_without_a_custom_setup_password_the_readme_names_the_public_default(self):
+        r = self.run_build()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        with open(os.path.join(self.out, 'README-rpi234.txt'), encoding='utf-8') as f:
+            self.assertIn('(password: exxpianosetup)', f.read())
 
     def test_the_container_gets_read_only_inputs_a_writable_output_and_the_passwords_in_the_environment(self):
         lite = self.touch('banks/piano-lite.sf2', b'l' * 10)
