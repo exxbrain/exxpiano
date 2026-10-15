@@ -12,10 +12,10 @@ English | [Русский](README.ru.md)
 
 ## Start in 4 steps (nothing to build)
 
-You need a Raspberry Pi 2, 3 or 4, an SD card, a **5.1 V / 2.5 A** power supply, a USB MIDI keyboard, and headphones or speakers.
+You need a Raspberry Pi 2, 3 or 4, a microSD card, a **5.1 V / 2.5 A** power supply, a USB MIDI keyboard, and headphones or speakers.
 
 1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi234-…-sd.zip` for a Pi 2/3/4 (`exxpiano-rpi5-…-sd.zip` for a Pi 5: not yet tried on a real Pi 5, and it needs a USB sound card).
-2. **Write it to the SD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
+2. **Write it to the microSD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and may take several minutes.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. With an Ethernet cable there is no setup network: open that address directly.
 
