@@ -277,5 +277,12 @@ class SameRoadTests(unittest.TestCase):
         self.assertEqual([(m.control, m.value) for m in b.out.sent[before:] if m.type == 'control_change' and m.channel == 0], [(123, 0)])
 
 
+    def test_a_half_pedal_dip_of_a_file_does_not_lift_the_pedal(self):
+        b = bridge()
+        for value in (127, 57, 63, 127, 21, 0):          # a dip to 57-63 (half pedal) and then a real lift
+            b.play_event('pedal', value, 0)
+        values = [m.value for m in b.out.sent if m.type == 'control_change' and m.control == 64]
+        self.assertEqual(values, [127, 127, 127, 127, 0, 0])
+
 if __name__ == '__main__':
     unittest.main()

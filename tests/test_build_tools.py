@@ -5,6 +5,7 @@ The tests make tiny synthetic sets with ffmpeg and are skipped when ffmpeg is no
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
 import importlib.util
+import math
 import os
 import shutil
 import struct
@@ -115,6 +116,30 @@ class BuilderPackageTests(unittest.TestCase):
             self.assertEqual(zone_count(split), 3 * zone_count(plain))
             self.assertLess(os.path.getsize(split) - os.path.getsize(plain), 4096)        # only the zone tables grew
 
+
+    def test_the_release_is_longer_in_the_bass(self):
+        spec = importlib.util.spec_from_file_location('build_piano_sf2', os.path.join(ROOT, 'tools', 'build_piano_sf2.py'))
+        b = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(b)
+        times = [b.key_release(k) for k in range(21, 109)]
+        self.assertTrue(all(x >= y for x, y in zip(times, times[1:])))           # never longer for a higher key
+        self.assertAlmostEqual(b.key_release(21), 2.6)
+        self.assertAlmostEqual(b.key_release(108), 0.7)
+        self.assertAlmostEqual(b.key_release(10), 2.6)                            # held flat outside the table
+        name, folder, sep, ext, codec, rate = self.CASES[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_set(tmp, folder, sep, ext, codec, rate)
+            out = os.path.join(tmp, 'p.sf2')
+            subprocess.run([sys.executable, '-I', os.path.join(ROOT, 'tools', 'build_piano_sf2.py'), tmp, out, '--layers', '2,5', '--tail', '8'],
+                           check=True, capture_output=True)
+            with open(out, 'rb') as f:
+                data = f.read()
+            i = data.index(b'igen')
+            n = struct.unpack('<I', data[i + 4:i + 8])[0]
+            gens = [struct.unpack('<Hh', data[i + 8 + j:i + 12 + j]) for j in range(0, n, 4)]
+            releases = [a for o, a in gens if o == 38]
+            self.assertIn(int(round(1200 * math.log2(b.key_release(21.5)))), releases)    # the zone of A0 (keys 21-22)
+            self.assertIn(int(round(1200 * math.log2(b.key_release(24)))), releases)      # the zone of C1 (keys 23-25)
 
 class ReleaseNotesTests(unittest.TestCase):
     def run_notes(self, version, changelog):

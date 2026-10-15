@@ -20,6 +20,24 @@ import sys
 
 NOTE_RE = re.compile(r'^([A-G]#?\d)v(\d+)\.(?:wav|flac)$')
 
+# Release time (s) after the key or the pedal lets go, by key: the dampers stop the thick bass strings more slowly than the treble.
+# One 0.7 s for every key cut the bass off abruptly when a pedal was lifted (heard on La Campanella). Between the points the time is
+# interpolated on a log scale.
+RELEASE_BY_KEY = ((21, 2.6), (48, 1.5), (72, 0.95), (108, 0.7))
+
+
+def key_release(key):
+    """Release time in seconds for a MIDI key (RELEASE_BY_KEY, log interpolation, held flat outside it)."""
+    import math
+    pts = RELEASE_BY_KEY
+    if key <= pts[0][0]:
+        return pts[0][1]
+    for (k0, r0), (k1, r1) in zip(pts, pts[1:]):
+        if key <= k1:
+            f = (key - k0) / float(k1 - k0)
+            return math.exp(math.log(r0) + f * (math.log(r1) - math.log(r0)))
+    return pts[-1][1]
+
 
 def parse_sfz(path):
     """Return {note_name: {layer: dict(lokey, hikey, root, tune, release)}}."""
@@ -288,8 +306,8 @@ def main():
         n_gen += 2
         if pan:
             igen += g(GEN_PAN, pan); n_gen += 1
-        if rel >= 5:
-            igen += g(GEN_REL, tc(rel)); n_gen += 1
+        # an SFZ release of 5 s or more is kept; otherwise the release follows the key (RELEASE_BY_KEY)
+        igen += g(GEN_REL, tc(rel if rel >= 5 else key_release((key[0] + key[1]) / 2.0))); n_gen += 1
         if tune:
             igen += g(GEN_FINE, tune); n_gen += 1
         if att:
