@@ -424,6 +424,8 @@ python3 -m unittest discover -s tests -v
 Оборудование не нужно. Обмен с ALSA в тестах не покрыт (проверялся на реальной Pi), а качество звука собранного банка проверялось
 вручную через FluidSynth.
 
+`scripts/lint.sh` запускает проверки кода: `ruff` для Python (синтаксические ошибки, неопределённые имена, неиспользуемые импорты и переменные; правила в `ruff.toml`), `shellcheck` для shell-скриптов и проверку, что в git нет файлов больше 5 МБ. CI запускает тесты и эти проверки при каждом push и pull request (`.github/workflows/build.yml`).
+
 ## Если что-то не работает
 
 См. [docs/TROUBLESHOOTING.ru.md](docs/TROUBLESHOOTING.ru.md). Если не помогло, [создайте issue](https://github.com/exxbrain/exxpiano/issues/new?template=problem.yml) (можно по-русски): форма спросит версию, плату, клавиатуру и звуковой выход — это то, что нужно, чтобы найти причину.

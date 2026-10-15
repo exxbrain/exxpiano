@@ -29,7 +29,6 @@ sys.path.insert(0, os.path.join(ROOT, 'tests'))
 spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'exxpiano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
-import midilib  # noqa: E402
 import midiplayer  # noqa: E402
 import usblib  # noqa: E402
 from sf2fixture import make_sf2  # noqa: E402

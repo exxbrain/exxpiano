@@ -1,0 +1,6 @@
+# Checked by scripts/lint.sh and the "lint" job of .github/workflows/build.yml.
+# Only real errors for now: syntax errors (E9) and pyflakes (F: undefined names, unused imports and variables, ...).
+line-length = 160
+
+[lint]
+select = ["E9", "F"]

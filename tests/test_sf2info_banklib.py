@@ -1,5 +1,4 @@
 """Tests for pi/sf2info.py (the SoundFont reader) and pi/banklib.py (the bank library)."""
-import importlib.util
 import os
 import struct
 import sys

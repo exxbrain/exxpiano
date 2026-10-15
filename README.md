@@ -429,6 +429,8 @@ different sample packages (44.1 kHz/16 bit and 48 kHz/24 bit, WAV and FLAC, diff
 `ffmpeg` and is skipped without it). No hardware is needed. The ALSA exchange is not covered by tests (checked on a real Pi),
 and the audio quality of a built bank was checked by hand through FluidSynth.
 
+`scripts/lint.sh` runs the code checks: `ruff` on the Python code (syntax errors, undefined names, unused imports and variables; rules in `ruff.toml`), `shellcheck` on the shell scripts, and no file over 5 MB in git. CI runs the tests and these checks on every push and pull request (`.github/workflows/build.yml`).
+
 ## If something does not work
 
 See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). If it does not help, [open an issue](https://github.com/exxbrain/exxpiano/issues/new?template=problem.yml): the form asks for the version, the board, the keyboard and the sound output, which is what it takes to find the cause.

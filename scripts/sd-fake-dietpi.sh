@@ -11,7 +11,7 @@ cleanup() { set +e; mountpoint -q "$W/root/boot/firmware" && umount "$W/root/boo
 trap cleanup EXIT
 IMG="$W/fake.img"; truncate -s "$(( BOOT_MB + ROOT_MB + 4 ))M" "$IMG"
 parted -s "$IMG" -- mklabel msdos mkpart primary fat32 4MiB "$(( BOOT_MB + 4 ))MiB" mkpart primary ext4 "$(( BOOT_MB + 4 ))MiB" 100%
-BOOT_OFF=$(( 4 * 1048576 )); BOOT_SIZE=$(( BOOT_MB * 1048576 )); ROOT_OFF=$(( (BOOT_MB + 4) * 1048576 )); ROOT_SIZE=$(( IMG_SIZE=$(stat -c %s "$IMG") - ROOT_OFF ))
+BOOT_OFF=$(( 4 * 1048576 )); BOOT_SIZE=$(( BOOT_MB * 1048576 )); ROOT_OFF=$(( (BOOT_MB + 4) * 1048576 )); ROOT_SIZE=$(( $(stat -c %s "$IMG") - ROOT_OFF ))
 loop() { local d; d="$(losetup --find --show --offset "$1" --sizelimit "$2" "$IMG")"; LOOPS+=("$d"); [ -b "$d" ] || mknod "$d" b 7 "${d#/dev/loop}"; LOOP_DEV="$d"; }
 loop "$BOOT_OFF" "$BOOT_SIZE"; BOOT="$LOOP_DEV"; loop "$ROOT_OFF" "$ROOT_SIZE"; ROOT="$LOOP_DEV"
 mkfs.vfat -F 32 -n DIETPISETUP "$BOOT" >/dev/null; mkfs.ext4 -q -L DietPi-ROOT "$ROOT"

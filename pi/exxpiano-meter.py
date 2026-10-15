@@ -9,7 +9,6 @@ exxpiano-run lets FluidSynth play through the ALSA device `exxpiano_tap` (see 60
 It must never be slower than the audio: while the pipe is not read, the synthesizer waits. That is why exxpiano-run starts it in a loop and
 holds the pipe open itself; a read here takes microseconds (the peaks come from max/min on the whole block, not from a loop over samples).
 """
-import array
 import json
 import math
 import os

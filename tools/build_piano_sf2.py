@@ -11,7 +11,6 @@ with a 2 s fade-out, optionally downmixes to mono, and writes a plain SF2
 (no loops, release/pedal/resonance noise samples are skipped).
 """
 import argparse
-import json
 import os
 import re
 import struct
