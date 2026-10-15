@@ -33,7 +33,6 @@ import midiplayer  # noqa: E402
 import usblib  # noqa: E402
 from sf2fixture import make_sf2  # noqa: E402
 
-
 spec = importlib.util.spec_from_file_location('exxpiano_demo_midi', os.path.join(PI, 'exxpiano-demo-midi.py'))
 demo_midi = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(demo_midi)

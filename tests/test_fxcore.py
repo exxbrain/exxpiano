@@ -235,7 +235,7 @@ class BridgeMappingTests(unittest.TestCase):
         import sys
         import types
         fake_mido = types.ModuleType('mido')
-        fake_mido.Message = lambda t, **kw: FakeMsg(t, **kw)
+        fake_mido.Message = FakeMsg
         sys.modules['mido'] = fake_mido
         sys.path.insert(0, os.path.join(HERE, '..', 'pi'))
         try:

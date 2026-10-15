@@ -79,8 +79,7 @@ class Case(unittest.TestCase):
         args = ['--dietpi', self.dietpi, '--out', self.out]
         if banks:
             args += ['--piano', self.piano, '--mech', self.mech]
-        r = subprocess.run([sys.executable, SCRIPT] + args + list(extra), capture_output=True, text=True, env=dict(self.env, **(env or {})))
-        return r
+        return subprocess.run([sys.executable, SCRIPT] + args + list(extra), capture_output=True, text=True, env=dict(self.env, **(env or {})))
 
     def docker_calls(self):
         try:
@@ -243,7 +242,7 @@ class BuildTests(Case):
         lite = self.touch('banks/piano-lite.sf2', b'l' * 10)
         self.run_build('--password', 'root password 1', '--ap-password', 'setup password 1', '--piano-lite', lite)
         calls = [c for c in self.docker_calls() if c['args'][:1] == ['run']]
-        build = [c for c in calls if 'sd-image-inner.sh' in ' '.join(c['args'])][0]
+        build = next(c for c in calls if 'sd-image-inner.sh' in ' '.join(c['args']))
         args = build['args']
         self.assertIn('--privileged', args)
         mounts = [args[i + 1] for i, a in enumerate(args) if a == '-v']
@@ -423,7 +422,8 @@ class ConfQuotingTests(unittest.TestCase):
     def test_a_tricky_password_comes_back_unchanged_through_the_programs_parser(self):
         sys.path.insert(0, os.path.join(ROOT, 'pi'))
         import exxpianoconf
-        src = open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')).read()
+        with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:
+            src = f.read()
         start = src.index('set_kv() {')
         end = src.index('\n}\n', start) + 3
         qstart = src.index('quote_conf() {')
@@ -551,7 +551,8 @@ class ShellScriptTests(unittest.TestCase):
             r = subprocess.run(['bash', '-n', os.path.join(ROOT, 'dietpi', name)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, name + r.stderr)
         # set_kv is copied out of the script and tried on a file (awk is on every machine)
-        src = open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')).read()
+        with open(os.path.join(ROOT, 'scripts', 'sd-image-inner.sh')) as f:
+            src = f.read()
         start = src.index('set_kv() {')
         end = src.index('\n}\n', start) + 3
         with tempfile.TemporaryDirectory() as d:

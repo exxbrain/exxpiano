@@ -16,8 +16,8 @@ Needs: python3-mido python3-rtmidi (apt).  Run:  exxpiano-fx.py [--hammer-boost 
 """
 import argparse
 import math
-import random
 import os
+import random
 import re
 import sys
 import threading
@@ -43,7 +43,7 @@ RES_LEVEL = {
 
 def res_level(ch, note, vel):
     """Expected loudness (dBFS, RMS) of the resonance voice (channel, key, velocity)."""
-    idx = min(34, max(0, int(round((note - 20) / 2.0))))
+    idx = min(34, max(0, round((note - 20) / 2.0)))
     return RES_LEVEL[ch][idx] - ATT_RANGE_DB * (1.0 - vel / 127.0)
 
 
@@ -103,13 +103,13 @@ class FXCore:
         g = self.velocity_curve
         if g == 1.0:
             return vel
-        return max(1, min(127, int(round(127.0 * (vel / 127.0) ** g))))
+        return max(1, min(127, round(127.0 * (vel / 127.0) ** g)))
 
     @staticmethod
     def _vel(att_db):
         if att_db < 0:
             att_db = 0.0
-        v = int(round(127 * (1.0 - att_db / ATT_RANGE_DB)))
+        v = round(127 * (1.0 - att_db / ATT_RANGE_DB))
         return v if v >= 1 else 0
 
     @staticmethod
@@ -225,8 +225,8 @@ SKIP_RE = re.compile(r'Through|DINTHRU|MCU|HUI|ALV|FLUID|Timer|Announce|System|R
 
 class Bridge:
     def __init__(self, core):
-        import mido
         import exxpianoconf
+        import mido
         self.mido = mido
         self.exxpianoconf = exxpianoconf
         self.conf_path = exxpianoconf.CONF_PATH

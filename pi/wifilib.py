@@ -189,7 +189,7 @@ def parse_scan(text):
         sig = re.search(r'(?m)^\s*signal: (-?\d+(?:\.\d+)?) dBm', chunk)
         freq = re.search(r'(?m)^\s*freq: (\d+)', chunk)
         secure = bool(re.search(r'(?m)^\s*(RSN|WPA):', chunk)) or bool(re.search(r'capability:.*\bPrivacy\b', chunk))
-        entry = dict(ssid=ssid, signal=int(round(float(sig.group(1)))) if sig else -100, secure=secure, freq=int(freq.group(1)) if freq else None)
+        entry = dict(ssid=ssid, signal=round(float(sig.group(1))) if sig else -100, secure=secure, freq=int(freq.group(1)) if freq else None)
         if ssid not in best or entry['signal'] > best[ssid]['signal']:
             best[ssid] = entry
     return sorted(best.values(), key=lambda e: -e['signal'])

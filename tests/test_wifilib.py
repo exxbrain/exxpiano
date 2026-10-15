@@ -77,9 +77,9 @@ class WpaConfTests(unittest.TestCase):
     def test_open_and_hidden_networks(self):
         text = wifilib.add_network(WPA, 'Cafe')
         self.assertIn('key_mgmt=NONE', text)
-        self.assertFalse([n for n in wifilib.networks(text) if n['ssid'] == 'Cafe'][0]['secure'])
+        self.assertFalse(next(n for n in wifilib.networks(text) if n['ssid'] == 'Cafe')['secure'])
         text = wifilib.add_network(WPA, 'Secret', HEX, hidden=True)
-        self.assertTrue([n for n in wifilib.networks(text) if n['ssid'] == 'Secret'][0]['hidden'])
+        self.assertTrue(next(n for n in wifilib.networks(text) if n['ssid'] == 'Secret')['hidden'])
 
     def test_a_network_can_be_forgotten_and_forgetting_the_unknown_is_harmless(self):
         text = wifilib.add_network(WPA, 'Other', HEX)

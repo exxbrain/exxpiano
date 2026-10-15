@@ -429,7 +429,7 @@ different sample packages (44.1 kHz/16 bit and 48 kHz/24 bit, WAV and FLAC, diff
 `ffmpeg` and is skipped without it). No hardware is needed. The ALSA exchange is not covered by tests (checked on a real Pi),
 and the audio quality of a built bank was checked by hand through FluidSynth.
 
-`scripts/lint.sh` runs the code checks: `ruff` on the Python code (syntax errors, undefined names, unused imports and variables; rules in `ruff.toml`), `shellcheck` on the shell scripts, and no file over 5 MB in git. CI runs the tests and these checks on every push and pull request (`.github/workflows/build.yml`).
+`scripts/lint.sh` runs the code checks: `ruff` on the Python code (errors, and cleanliness: likely bugs, needless code, files left open, sorted imports, naming; the rules and the house-style exceptions are in `ruff.toml`), `shellcheck` on the shell scripts, and no file over 5 MB in git. CI runs the tests and these checks on every push and pull request (`.github/workflows/build.yml`).
 
 ## If something does not work
 

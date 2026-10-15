@@ -192,7 +192,7 @@ class DriveTests(unittest.TestCase):
         run, calls = self.runner('TYPE=exfat\nLABEL=My piano / banks\n')
         entry = usblib.add('/dev/sda1', run, status, root)
         self.assertTrue(entry['mounted'])
-        mount = [c for c in calls if c[0] == 'mount'][0]
+        mount = next(c for c in calls if c[0] == 'mount')
         self.assertEqual(mount[:5], ['mount', '-t', 'exfat', '-o', 'ro,nosuid,nodev,noexec'])
         self.assertEqual(os.path.dirname(entry['mountpoint']), root)                # a label with spaces and a slash stays inside the root
         self.assertNotIn(' ', os.path.basename(entry['mountpoint']))
@@ -256,6 +256,7 @@ class UsbApiTests(ServerCase):
                 return s
             time.sleep(0.02)
         self.fail('the import did not finish')
+        return None
 
     def test_no_drive_means_an_empty_state(self):
         code, s = self.jcall('/api/usb')
@@ -306,7 +307,7 @@ class UsbApiTests(ServerCase):
         self.assertEqual(s['state'], 'failed')
         self.assertIn('not a usable SoundFont', s['error'])
         self.assertNotIn(self.work.name, s['error'])                                  # no internal paths
-        self.assertEqual([n for n in os.listdir(self.import_dir)], [])
+        self.assertEqual(list(os.listdir(self.import_dir)), [])
 
     def test_refusals_and_a_second_import_while_one_runs(self):
         self.plug()
@@ -325,7 +326,7 @@ class UsbApiTests(ServerCase):
         self.addCleanup(setattr, web.bankimport, 'import_bank', real)
         self.addCleanup(gate.set)
         self.assertEqual(self.jcall('/api/usb', {'action': 'import', 'name': 'Grand.sf2'})[0], 200)
-        code, r = self.jcall('/api/usb', {'action': 'import', 'name': 'Grand.sf2'})
+        code, _r = self.jcall('/api/usb', {'action': 'import', 'name': 'Grand.sf2'})
         self.assertEqual(code, 409)
         gate.set()
         self.assertEqual(self.wait_import()['state'], 'done')

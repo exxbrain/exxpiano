@@ -55,6 +55,7 @@ class MidiApiTests(ServerCase):
                 return s
             time.sleep(0.02)
         self.fail('the import did not finish')
+        return None
 
     def player_says(self, **st):
         os.makedirs(self.run_dir, exist_ok=True)

@@ -24,6 +24,7 @@
 Settings that can be changed are whitelisted with ranges in exxpianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
 come from /etc/exxpiano.conf. Without WEB_TOKEN anybody on your network can change the settings (nothing else).
 """
+import base64
 import hmac
 import json
 import os
@@ -42,7 +43,6 @@ import exxpianoconf
 import midilib
 import midiplayer
 import profiles
-import base64
 import qrlib
 import sysmon
 import usblib
@@ -692,7 +692,7 @@ class App:
         try:
             since = int((query.get('since') or ['0'])[0])
         except ValueError:
-            raise ValueError('bad since')
+            raise ValueError('bad since') from None
         if since < 0:
             raise ValueError('bad since')
         return self.actions.monitor(since)
@@ -870,11 +870,11 @@ class App:
         return dict(deleted=True, freed=banklib.delete_installed(bank_dir, bank_id, keep_paths=keep))
 
     def switch_bank(self, bank_id):
-        bank_dir, current, mech, mech_bytes = self._bank_context()
+        bank_dir, current, _mech, mech_bytes = self._bank_context()
         path = banklib.resolve_any(bank_dir, self.import_dir, bank_id)       # ValueError -> 400
         if current and banklib._same(path, current):
             return dict(started=False, message='This bank is already in use')
-        info, error = banklib.inspect(path)
+        _info, error = banklib.inspect(path)
         if error:
             raise ValueError(error)
         limit = banklib.size_limit(self.actions.mem_total(), mech_bytes)
@@ -1025,6 +1025,7 @@ def make_handler(app):
             if url.path == '/api/ping':
                 return self._send(200, dict(ok=True, auth_required=bool(app.token)))
             self._send(404, dict(error='not found'))
+            return None
 
         def do_POST(self):
             if not self._authorised():
@@ -1061,6 +1062,7 @@ def make_handler(app):
             except OSError as exc:
                 return self._send(500, dict(error='cannot write the settings: %s' % exc))
             self._send(404, dict(error='not found'))
+            return None
 
     return Handler
 

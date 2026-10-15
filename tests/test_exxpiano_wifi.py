@@ -13,6 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PI = os.path.join(HERE, '..', 'pi')
 sys.path.insert(0, PI)
 import wifilib  # noqa: E402
+
 spec = importlib.util.spec_from_file_location('piano_wifi', os.path.join(PI, 'exxpiano-wifi.py'))
 pw = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pw)
@@ -527,7 +528,7 @@ class SystemTests(unittest.TestCase):
         self.assertFalse([c for c in calls if c[0] == 'dhclient'])
 
     def test_a_missing_dhclient_or_sysfs_does_not_break_anything(self):
-        s, calls, nic = self.wired({'dhclient': (127, 'no such file')})
+        s, _calls, nic = self.wired({'dhclient': (127, 'no such file')})
         nic('eth1', 1)
         s.ensure_wired()
         s.sys_net = os.path.join(self.tmp.name, 'nowhere')
@@ -569,7 +570,7 @@ class SystemTests(unittest.TestCase):
         self.assertIn(['ifup', 'wlan0'], calls)
 
     def test_saved_networks_survive_when_only_the_header_is_added(self):
-        s, calls = self.make({'ifup': (0, '')})
+        s, _calls = self.make({'ifup': (0, '')})
         self.write(os.path.join(self.net, 'interfaces'), 'source interfaces.d/*\n')
         self.write(self.wpa, 'network={\n\tssid="Home"\n\tpsk="secret123"\n}\n')
         self.write(self.dietpi, 'AUTO_SETUP_NET_WIFI_COUNTRY_CODE=GB\n')
@@ -711,13 +712,13 @@ class EnsureNameTests(unittest.TestCase):
             self.assertIn('exxpiano-012abc', out)
 
     def test_the_installation_id_names_the_device_even_without_an_adapter(self):
-        code, out, calls = self.run_cli('dietpi', mac='')
+        code, _out, calls = self.run_cli('dietpi', mac='')
         self.assertEqual(code, 0)
         self.assertIn(['hostnamectl', 'set-hostname', 'exxpiano-012abc'], calls)
 
     def test_a_chosen_name_is_kept(self):
         for chosen in ('exxpiano', 'kitchen-piano', 'exxpiano-81de'):
-            code, out, calls = self.run_cli(chosen)
+            _code, out, calls = self.run_cli(chosen)
             self.assertEqual(calls, [])
             self.assertIn('kept', out)
 

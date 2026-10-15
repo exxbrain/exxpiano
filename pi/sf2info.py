@@ -39,9 +39,9 @@ def read_info(path):
     """Return dict(name, comment, copyright, version, size, sample_bytes, presets=[dict(bank, program, name)])."""
     try:
         file_size = os.path.getsize(path)
-        f = open(path, 'rb')
+        f = open(path, 'rb')                                        # noqa: SIM115 - closed by the with below; open errors are reported apart
     except OSError as exc:
-        raise Sf2Error('cannot open: %s' % exc)
+        raise Sf2Error('cannot open: %s' % exc) from exc
     with f:
         head = f.read(12)
         if len(head) < 12 or head[:4] != b'RIFF' or head[8:12] != b'sfbk':

@@ -43,7 +43,9 @@ def parse_sfz(path):
     release = 1.0
     skip = False
     notes = {}
-    for raw in open(path, encoding='utf-8', errors='replace'):
+    with open(path, encoding='utf-8', errors='replace') as f:
+        lines = f.readlines()
+    for raw in lines:
         line = raw.strip()
         if not line or line.startswith('//'):
             continue
@@ -81,7 +83,7 @@ def layer_ranges(chosen, centers, gamma=1.0):
     chosen = sorted(chosen)
     cs = [centers[l] for l in chosen]
     mids = [(cs[i] + cs[i + 1]) / 2 for i in range(len(cs) - 1)]
-    bounds = [0] + [int(round(127 * (m / 127) ** (1 / gamma))) for m in mids] + [127]
+    bounds = [0] + [round(127 * (m / 127) ** (1 / gamma)) for m in mids] + [127]
     out = {}
     for i, l in enumerate(chosen):
         lo = 1 if i == 0 else bounds[i] + 1
@@ -200,7 +202,7 @@ def main():
 
     durs = {}
     peaks = {}
-    layer_gain = {l: 0.0 for l in chosen}
+    layer_gain = dict.fromkeys(chosen, 0.0)
     if args.peak_lo is not None and args.peak_hi is not None:
         ordered = sorted(chosen)
         for note in notes:
@@ -233,7 +235,7 @@ def main():
         """One zone per sub-range of the layer; all of them point to the same sample, only the attenuation differs (centibels)."""
         ranges = split_range(vel[layer][0], vel[layer][1], args.subzones)
         for i, vr in enumerate(ranges):
-            att = 0 if len(ranges) == 1 else int(round(sub_db * 10 * (len(ranges) - 1 - i) / (len(ranges) - 1)))
+            att = 0 if len(ranges) == 1 else round(sub_db * 10 * (len(ranges) - 1 - i) / (len(ranges) - 1))
             zones.append((key, vr, rel, tune, pan, sid, att))
 
     for note in sorted(notes, key=lambda n: notes[n][min(notes[n])]['root']):
@@ -280,7 +282,7 @@ def main():
 
     def tc(seconds):
         import math
-        return int(round(1200 * math.log2(seconds)))
+        return round(1200 * math.log2(seconds))
 
     ibag = b''
     igen = b''

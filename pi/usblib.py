@@ -121,7 +121,7 @@ def add(devnode, run, status_path=STATUS_FILE, mount_root=MOUNT_ROOT):
             raise UsbError('file system %s is not supported (FAT32, exFAT or ext4 are)' % (fs or 'unknown'))
         mountpoint = os.path.join(mount_root, safe_label(label) + '-' + os.path.basename(devnode))
         os.makedirs(mountpoint, exist_ok=True)
-        rc, out = run(['mount', '-t', fs, '-o', MOUNT_OPTIONS, devnode, mountpoint])
+        rc, _out = run(['mount', '-t', fs, '-o', MOUNT_OPTIONS, devnode, mountpoint])
         if rc != 0:
             raise UsbError('the drive could not be mounted')
         entry.update(mounted=True, mountpoint=mountpoint)

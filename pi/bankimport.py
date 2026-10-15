@@ -76,7 +76,7 @@ def import_file(src_path, display_name, import_dir, prefix, data_name, validate,
     try:
         st = os.lstat(src_path)
     except OSError:
-        raise ImportFailed('the file is no longer on the drive')
+        raise ImportFailed('the file is no longer on the drive') from None
     import stat as _stat
     if not _stat.S_ISREG(st.st_mode):
         raise ImportFailed('not a plain file')

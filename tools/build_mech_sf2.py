@@ -32,7 +32,9 @@ SFZ_DIR = os.path.dirname(SFZ)   # sample paths in the SFZ are relative to it
 
 def parse():
     inst = {'Hammer': [], 'ResL': [], 'ResS': [], 'ResV3': [], 'PedalDn': [], 'PedalUp': []}
-    for raw in open(SFZ, encoding='utf-8', errors='replace'):
+    with open(SFZ, encoding='utf-8', errors='replace') as f:
+        lines = f.readlines()
+    for raw in lines:
         line = raw.strip()
         if not line.startswith('<region>'):
             continue

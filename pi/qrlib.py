@@ -106,7 +106,7 @@ def _make_codewords(data, ver, ecc):
             if i < len(chunk):
                 out.append(chunk[i])
     for i in range(ecc_len):                                        # then the error correction words
-        for chunk, rem in blocks:
+        for _chunk, rem in blocks:
             out.append(rem[i])
     return out
 
@@ -152,14 +152,14 @@ class _Symbol:
             rem = (rem << 1) ^ ((rem >> 9) * 0x537)
         bits = (data << 10 | rem) ^ 0x5412
         bit = lambda i: (bits >> i) & 1
-        for i in range(0, 6):
+        for i in range(6):
             self._set(8, i, bit(i))
         self._set(8, 7, bit(6))
         self._set(8, 8, bit(7))
         self._set(7, 8, bit(8))
         for i in range(9, 15):
             self._set(14 - i, 8, bit(i))
-        for i in range(0, 8):
+        for i in range(8):
             self._set(self.size - 1 - i, 8, bit(i))
         for i in range(8, 15):
             self._set(8, self.size - 15 + i, bit(i))
@@ -181,9 +181,8 @@ class _Symbol:
     def _draw_codewords(self, codewords):
         bits = [(w >> i) & 1 for w in codewords for i in range(7, -1, -1)]
         k = 0
-        for right in range(self.size - 1, 0, -2):
-            if right <= 6:
-                right -= 1
+        for pair in range(self.size - 1, 0, -2):
+            right = pair - 1 if pair <= 6 else pair                 # the column pair left of the timing column moves one step left
             for vert in range(self.size):
                 for j in range(2):
                     x = right - j
@@ -203,7 +202,7 @@ class _Symbol:
 
     def _penalty(self):
         n, m, score = self.size, self.modules, 0
-        lines = [row for row in m] + [[m[y][x] for y in range(n)] for x in range(n)]
+        lines = list(m) + [[m[y][x] for y in range(n)] for x in range(n)]
         for line in lines:                                           # runs of the same colour, and finder-like patterns
             run = 1
             for i in range(1, n):

@@ -64,7 +64,7 @@ def read_dietpi_version(path):
         with open(path, encoding='ascii') as f:
             version = f.read().strip()
     except OSError as exc:
-        raise BuildError('the builder did not report the DietPi version: %s' % exc)
+        raise BuildError('the builder did not report the DietPi version: %s' % exc) from exc
     if not VERSION_RE.fullmatch(version):
         raise BuildError('the DietPi version is missing or not safe for an artifact name: %r' % version)
     return version
@@ -125,9 +125,8 @@ def resolve_inputs(args):
         inputs['dietpi'] = os.path.join(ROOT, 'build', 'cache', target_of(args)[1]['image'])
     else:
         raise BuildError('give the DietPi image: --dietpi %s (from dietpi.com), or --download to fetch it' % target_of(args)[1]['image'])
-    if not args.download or args.dietpi:
-        if not os.path.isfile(inputs['dietpi']):
-            raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
+    if (not args.download or args.dietpi) and not os.path.isfile(inputs['dietpi']):
+        raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
     inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-full.sf2'))
     inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
     lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')      # for boards with 512 MB; optional unless asked for by name

@@ -39,7 +39,7 @@ class Rig:
         self.port = 'FLUID Synth 1'
         self.events, self.released = [], []
         self.player = midiplayer.Player(self.lib, self.run_dir, lambda *e: self.events.append((round(self.now - self.t0, 2),) + e),
-                                        lambda pedal: self.released.append(pedal), lambda: self.port, clock=lambda: self.now, wall=lambda: 1.7e9)
+                                        self.released.append, lambda: self.port, clock=lambda: self.now, wall=lambda: 1.7e9)
         self.t0 = self.now
         self.nonce = 0
 
@@ -72,7 +72,7 @@ class PlayerTests(unittest.TestCase):
         times = [(round(t, 1), k, a) for t, k, a, _ in r.events]
         self.assertEqual([(k, a) for _, k, a in times], [('pedal', 127), ('on', 60), ('off', 60), ('on', 64), ('off', 64), ('pedal', 0)])
         self.assertEqual([t for t, _, _ in times], sorted(t for t, _, _ in times))
-        for (t, k, a), want in zip(times, (0.0, 0.0, 0.5, 0.5, 1.0, 1.0)):
+        for (t, _k, _a), want in zip(times, (0.0, 0.0, 0.5, 0.5, 1.0, 1.0)):
             self.assertAlmostEqual(t, want + (times[0][0]), delta=0.2)    # the player starts when it saw the request, then keeps the time of the file
         self.assertEqual(r.status()['state'], 'idle')
         self.assertEqual(r.status()['reason'], 'finished')

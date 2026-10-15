@@ -3,8 +3,8 @@
 A bank is identified by its plain file name inside the library folder. The web interface only ever hands us such a name, and `resolve` accepts
 it only if the folder itself lists it, so a path can never be smuggled in (no `..`, no absolute paths, no symlinks).
 """
-import os
 import json
+import os
 import re
 import shutil
 import stat

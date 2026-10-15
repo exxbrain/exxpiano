@@ -43,8 +43,7 @@ class AudioSelectTests(unittest.TestCase):
             e = dict(os.environ, ASOUND_DIR=asound, DRY_RUN='1', USB_WAIT='0',
                      PIANO_SF2='/p.sf2', MECH_SF2='/m.sf2', FLUIDSYNTH='/usr/bin/fluidsynth')
             e.update({k: str(v) for k, v in env.items()})
-            r = subprocess.run(['bash', RUN], env=e, capture_output=True, text=True)
-            return r
+            return subprocess.run(['bash', RUN], env=e, capture_output=True, text=True)
 
     def test_a_bank_that_does_not_fit_the_memory_is_replaced_by_a_smaller_one(self):
         sys.path.insert(0, os.path.join(ROOT, 'tests'))

@@ -56,9 +56,8 @@ class ConfTests(ConfBase):
         for bad in ({'nope': 1}, {'gain': 99}, {'gain': -1}, {'polyphony': 5}, {'hammer_exp': 'abc'},
                     {'alsa_device': 'hw:1; rm -rf /'}, {'alsa_device': 'plughw:U24 -x'}, {'gain': True},
                     {'gain': float('nan')}, {}, [], 'x'):
-            with self.subTest(bad):
-                with self.assertRaises(ValueError):
-                    pc.validate(bad)
+            with self.subTest(bad), self.assertRaises(ValueError):
+                pc.validate(bad)
         self.assertEqual(self.read(), SAMPLE)               # nothing was written
 
     def test_accepts_valid_devices(self):
@@ -66,7 +65,7 @@ class ConfTests(ConfBase):
             self.assertEqual(pc.validate({'alsa_device': dev})['alsa_device'], dev)
 
     def test_fx_change_rewrites_only_fx_args_and_keeps_the_rest(self):
-        merged, scopes = pc.apply_updates({'velocity_curve': 0.8, 'hammer_boost': 3}, self.path)
+        _merged, scopes = pc.apply_updates({'velocity_curve': 0.8, 'hammer_boost': 3}, self.path)
         text = self.read()
         self.assertEqual(scopes, {'fx'})
         self.assertIn('# a comment above a setting', text)

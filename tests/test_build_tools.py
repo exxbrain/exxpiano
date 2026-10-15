@@ -98,7 +98,7 @@ class BuilderPackageTests(unittest.TestCase):
 
 
     def test_subzones_share_the_samples_and_only_add_zones(self):
-        name, folder, sep, ext, codec, rate = self.CASES[0]
+        _name, folder, sep, ext, codec, rate = self.CASES[0]
 
         def zone_count(path):
             with open(path, 'rb') as f:
@@ -126,7 +126,7 @@ class BuilderPackageTests(unittest.TestCase):
         self.assertAlmostEqual(b.key_release(21), 2.6)
         self.assertAlmostEqual(b.key_release(108), 0.7)
         self.assertAlmostEqual(b.key_release(10), 2.6)                            # held flat outside the table
-        name, folder, sep, ext, codec, rate = self.CASES[0]
+        _name, folder, sep, ext, codec, rate = self.CASES[0]
         with tempfile.TemporaryDirectory() as tmp:
             self.make_set(tmp, folder, sep, ext, codec, rate)
             out = os.path.join(tmp, 'p.sf2')
@@ -138,8 +138,8 @@ class BuilderPackageTests(unittest.TestCase):
             n = struct.unpack('<I', data[i + 4:i + 8])[0]
             gens = [struct.unpack('<Hh', data[i + 8 + j:i + 12 + j]) for j in range(0, n, 4)]
             releases = [a for o, a in gens if o == 38]
-            self.assertIn(int(round(1200 * math.log2(b.key_release(21.5)))), releases)    # the zone of A0 (keys 21-22)
-            self.assertIn(int(round(1200 * math.log2(b.key_release(24)))), releases)      # the zone of C1 (keys 23-25)
+            self.assertIn(round(1200 * math.log2(b.key_release(21.5))), releases)    # the zone of A0 (keys 21-22)
+            self.assertIn(round(1200 * math.log2(b.key_release(24))), releases)      # the zone of C1 (keys 23-25)
 
 class ReleaseNotesTests(unittest.TestCase):
     def run_notes(self, version, changelog):

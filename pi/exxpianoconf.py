@@ -80,7 +80,7 @@ def _coerce(name, raw):
     try:
         value = float(raw) if spec['kind'] == 'float' else int(float(raw))
     except (TypeError, ValueError):
-        raise ValueError('%s: not a number: %r' % (name, raw))
+        raise ValueError('%s: not a number: %r' % (name, raw)) from None
     if isinstance(raw, bool) or value != value:     # NaN or a JSON boolean
         raise ValueError('%s: not a number: %r' % (name, raw))
     if not spec['lo'] <= value <= spec['hi']:
@@ -139,9 +139,7 @@ def get_settings(path=None):
 
 
 def _fx_line(settings):
-    parts = []
-    for name in FX_NAMES:
-        parts.append('%s %s' % (SETTINGS[name]['flag'], _fmt(settings[name])))
+    parts = ['%s %s' % (SETTINGS[name]['flag'], _fmt(settings[name])) for name in FX_NAMES]
     return 'FX_ARGS="%s"' % ' '.join(parts)
 
 

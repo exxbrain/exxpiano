@@ -15,8 +15,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PI = os.path.join(HERE, '..', 'pi')
 sys.path.insert(0, PI)
 sys.path.insert(0, HERE)
-from sf2fixture import make_sf2  # noqa: E402
 import profiles  # noqa: E402
+from sf2fixture import make_sf2  # noqa: E402
+
 spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'exxpiano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
@@ -313,7 +314,7 @@ class GainScaleTests(ServerCase):
         css = _re.search(r'input\[type=range\]\.gain \{[^}]*transparent (\d+)%', page)
         self.assertEqual(int(css.group(1)) / 100.0, round(share, 2))              # the orange part of the track starts at the safe position
         self.assertIn('0 is the loudest setting at which even the densest passages', page)
-        code, r = self.jcall('/api/settings', {'gain': round(safe * 10 ** (hi_db / 20.0), 4)})     # the top of the slider is accepted
+        code, _r = self.jcall('/api/settings', {'gain': round(safe * 10 ** (hi_db / 20.0), 4)})     # the top of the slider is accepted
         self.assertEqual(code, 200)
 
 
