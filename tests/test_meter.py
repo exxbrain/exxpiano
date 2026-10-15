@@ -89,9 +89,19 @@ class MeterTests(unittest.TestCase):
                 self.assertGreater(s['right']['clipped'], 0)
                 self.assertEqual(s['left']['clipped'], 0)
                 self.assertGreater(s['right']['hold'], s['left']['hold'])
-                self.assertEqual([n for n in os.listdir(d) if n.startswith('.levels-')], [])           # no half-written files left
             finally:
                 os.close(holder)
+            # The loop reads what is still in the pipe and publishes while it does; with the writer closed it reaches the end and waits for the next
+            # start of the synthesizer. Wait until it is quiet, then no half-written file may be left (and the folder can be removed).
+            last, quiet = None, 0
+            for _ in range(100):
+                state = (sorted(os.listdir(d)), os.stat(out).st_mtime_ns)
+                quiet = quiet + 1 if state == last else 0
+                if quiet >= 6:
+                    break
+                last = state
+                time.sleep(0.05)
+            self.assertEqual([n for n in os.listdir(d) if n.startswith('.levels-')], [])
 
 
 if __name__ == '__main__':
