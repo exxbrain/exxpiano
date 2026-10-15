@@ -10,6 +10,17 @@ English | [Русский](README.ru.md)
 
 **A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
 
+## Start in 4 steps (nothing to build)
+
+You need a Raspberry Pi 2, 3 or 4, an SD card, a **5.1 V / 2.5 A** power supply, a USB MIDI keyboard, and headphones or speakers.
+
+1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi234-…-sd.zip` for a Pi 2/3/4 (`exxpiano-rpi5-…-sd.zip` for a Pi 5: not yet tried on a real Pi 5, and it needs a USB sound card).
+2. **Write it to the SD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
+3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and may take several minutes.
+4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. With an Ethernet cable there is no setup network: open that address directly.
+
+Then play. Details: "Connecting to a new Wi-Fi", "Power supply" and "Audio output and latency" below. "Deployment in short", "Quick start" and "SD card image" are only for building the banks and the image yourself.
+
 ## What it can do
 
 - **Real piano sound:** SoundFont banks through FluidSynth, plus the piano mechanics (hammer and damper noise, string resonance, pedal noise) that the SF2 format cannot express by itself. The ready images carry the Salamander Grand Piano V3 (Yamaha C5); any other `.sf2` / `.sf3` bank can be added from a USB drive and chosen in the web interface, and every bank remembers its own touch and mechanics settings.
@@ -78,7 +89,7 @@ but this setup was not measured with one.
 | A Raspberry Pi 2, 3 or 4 supported by the DietPi RPi234 ARMv8 image | an SD card containing the product image |
 | **A 5.1 V / 2.5 A power supply and a short cable** | see "Power supply" - this is not a formality |
 | A USB MIDI keyboard | class-compliant, no drivers needed |
-| A Mac or Linux machine to build the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
+| Only to build it yourself: a Mac or Linux machine for the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
 
 ## Deployment in short
 
@@ -92,7 +103,7 @@ The shipped product is a ready device with exxpiano already installed. One compl
 See [the image-building guide](docs/BUILD-IMAGE.md) for the complete procedure and current verification status.
 Version tags named `v<VERSION>` build this image and publish it together with its manifest, README, and checksums as assets of a GitHub Release.
 
-## Quick start
+## Quick start (building it yourself)
 
 ### 1. Build the sound banks (on a Mac/Linux)
 
