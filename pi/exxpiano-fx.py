@@ -25,11 +25,11 @@ import time
 
 CH_HAMMER, CH_RES_L, CH_RES_S, CH_RES_V3, CH_PEDAL_DN, CH_PEDAL_UP = 1, 2, 3, 4, 5, 6
 PROGRAMS = {CH_HAMMER: 1, CH_RES_L: 2, CH_RES_S: 3, CH_RES_V3: 4, CH_PEDAL_DN: 5, CH_PEDAL_UP: 6}
-ATT_RANGE_DB = 60.0
+ATT_RANGE_DB = 60.0   # attenuation covered by velocity 1..127 in Salamander-mech.sf2
 # A sustain value of a MIDI file at or above this is "down". Recordings of real pianists (the demonstration pieces) half-pedal: the value dips
 # to 40-63 for a few tens of milliseconds and comes back. FluidSynth takes 64 as the limit and stopped every sounding note in such a dip;
 # on a piano dampers that barely touch the strings do not stop them. A keyboard's switch pedal sends only 0 and 127 and is not changed.
-FILE_PEDAL_DOWN = 40   # attenuation covered by velocity 1..127 in Salamander-mech.sf2
+FILE_PEDAL_DOWN = 40
 
 # Loudness of ONE string-resonance voice at velocity 127 (loudest 100 ms, RMS, dBFS at FluidSynth gain 1.0), measured on mech.sf2 for the keys
 # 20, 22 ... 88 (index (key-20)//2). A voice of velocity v is ATT_RANGE_DB*(1-v/127) dB quieter. The resonance is about 35 dB below the piano in
