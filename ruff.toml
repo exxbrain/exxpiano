@@ -31,3 +31,6 @@ ignore = [
     "PERF401",  # test data built line by line
     "SIM115",   # a fake file object that wraps open()
 ]
+
+[format]
+quote-style = "preserve"   # the code uses single quotes; strings that need double quotes keep them

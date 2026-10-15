@@ -1,4 +1,5 @@
 """Tests for pi/exxpiano-web.py: the HTTP API with the system actions replaced by fakes (no Pi, no root needed)."""
+
 import base64
 import importlib.util
 import json
@@ -43,16 +44,25 @@ class FakeActions:
         self.mem_free = 300 << 20
         self.level_answer = dict(t=1.0, rate=44100, left=dict(peak=-12.0, hold=-6.0, clipped=0), right=dict(peak=0.0, hold=0.0, clipped=7), clip_ago=1.5)
         self.volume_db, self.volume_set, self.volume_asked, self.no_volume, self.volume_fails = -12.0, [], [], False, False
-        self.ready = [True, True, True]     # answers of wait_synth_ready, one per switch attempt
+        self.ready = [True, True, True]  # answers of wait_synth_ready, one per switch attempt
         self.waits = 0
-        self.gate = None                     # an Event: wait_synth_ready blocks until it is set
+        self.gate = None  # an Event: wait_synth_ready blocks until it is set
         self.pid = 100
         self.monitor_calls = []
         self.host = 'exxpiano'
         self.renamed = []
         self.networks = [dict(ssid='Home', signal=-50, secure=True, freq=2437), dict(ssid='Cafe', signal=-70, secure=False, freq=2412)]
-        self.wifi_st = dict(mode='client', busy=None, link=dict(ssid='Home', ip='192.168.1.9', signal=-50), hostname='exxpiano', ap=None,
-                            scan=self.networks, scanned_at=5, last_result=None, updated=100)
+        self.wifi_st = dict(
+            mode='client',
+            busy=None,
+            link=dict(ssid='Home', ip='192.168.1.9', signal=-50),
+            hostname='exxpiano',
+            ap=None,
+            scan=self.networks,
+            scanned_at=5,
+            last_result=None,
+            updated=100,
+        )
         self.wifi_saved_list = [dict(ssid='Home', secure=True, hidden=False, priority=0)]
         self.wifi_requests = []
         self.scan_answer = [dict(ssid='Fresh', signal=-40, secure=True, freq=2412)]
@@ -149,7 +159,7 @@ class ServerCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.conf = os.path.join(self.tmp.name, 'exxpiano.conf')
-        self.profile_file = os.path.join(self.tmp.name, 'state', 'profiles.json')    # never the real /var/lib
+        self.profile_file = os.path.join(self.tmp.name, 'state', 'profiles.json')  # never the real /var/lib
         with open(self.conf, 'w') as f:
             f.write(conf + 'PROFILE_FILE=%s\n' % self.profile_file)
         self.actions = FakeActions()
@@ -178,6 +188,7 @@ class ServerCase(unittest.TestCase):
     def conf_text(self):
         with open(self.conf) as f:
             return f.read()
+
 
 class WebTests(ServerCase):
     def test_index_page_is_served(self):
@@ -223,7 +234,7 @@ class WebTests(ServerCase):
         code, r = self.jcall('/api/settings', {'gain': 1.5})
         self.assertEqual((code, r['applied']['gain']), (200, True))
         self.assertEqual(self.actions.gains, [1.5])
-        code, r = self.jcall('/api/settings', {'gain': 1.5})                      # unchanged -> nothing to do
+        code, r = self.jcall('/api/settings', {'gain': 1.5})  # unchanged -> nothing to do
         self.assertIsNone(r['applied']['gain'])
         self.assertEqual(self.actions.gains, [1.5])
 
@@ -232,7 +243,7 @@ class WebTests(ServerCase):
         self.actions.gain_ok = False
         code, r = self.jcall('/api/settings', {'gain': 2.0})
         self.assertEqual((code, r['applied']['gain']), (200, False))
-        self.assertIn('GAIN=2', self.conf_text())                                  # still stored for the next start
+        self.assertIn('GAIN=2', self.conf_text())  # still stored for the next start
 
     def test_audio_setting_asks_for_a_restart_but_does_not_do_it(self):
         self.start()
@@ -253,7 +264,7 @@ class WebTests(ServerCase):
         self.assertEqual((r['settings']['period_size'], r['settings']['periods']), (128, 4))
         self.assertIn('PERIOD_SIZE=128', self.conf_text())
         self.assertEqual(self.jcall('/api/state')[1]['settings']['period_size'], 128)
-        for bad in ({'period_size': 32}, {'period_size': 9000}, {'periods': 1}):      # outside what FluidSynth accepts
+        for bad in ({'period_size': 32}, {'period_size': 9000}, {'periods': 1}):  # outside what FluidSynth accepts
             self.assertEqual(self.jcall('/api/settings', bad)[0], 400)
         self.assertIn('PERIOD_SIZE=128', self.conf_text())
 
@@ -272,8 +283,8 @@ class WebTests(ServerCase):
                 code, _ = self.jcall(path, body)
                 self.assertEqual(code, 400)
         self.assertEqual(self.call('/api/settings', raw=b'{not json', ctype='application/json')[0], 400)
-        self.assertEqual(self.call('/api/settings', raw=b'{"gain": 1.2}', ctype='text/plain')[0], 400)   # no simple cross-site form
-        self.assertEqual(self.call('/api/settings', raw=b'x' * 5000)[0], 400)                             # too large
+        self.assertEqual(self.call('/api/settings', raw=b'{"gain": 1.2}', ctype='text/plain')[0], 400)  # no simple cross-site form
+        self.assertEqual(self.call('/api/settings', raw=b'x' * 5000)[0], 400)  # too large
         self.assertEqual(self.conf_text(), before)
         self.assertEqual(self.actions.gains, [])
 
@@ -301,20 +312,21 @@ class GainScaleTests(ServerCase):
 
     def test_the_scale_is_consistent_with_the_settings_and_the_clipping_zone_is_the_last_part(self):
         import re as _re
+
         self.start()
         page = self.call('/')[1].decode()
         safe, lo_db, hi_db = (float(x) for x in _re.search(r'GAIN_SAFE = ([\d.]+), GAIN_LO_DB = (-?\d+), GAIN_HI_DB = (-?\d+);', page).groups())
         spec = web.exxpianoconf.SETTINGS['gain']
-        self.assertEqual(safe, spec['default'])                                   # the default is the loudest setting that does not clip
-        self.assertGreaterEqual(safe * 10 ** (lo_db / 20.0), spec['lo'])         # the scale stays inside what the server accepts
+        self.assertEqual(safe, spec['default'])  # the default is the loudest setting that does not clip
+        self.assertGreaterEqual(safe * 10 ** (lo_db / 20.0), spec['lo'])  # the scale stays inside what the server accepts
         self.assertLessEqual(safe * 10 ** (hi_db / 20.0), spec['hi'])
-        share = (0 - lo_db) / float(hi_db - lo_db)                                # where 0 dB (the safe gain) lies on the slider
-        self.assertGreater(share, 0.85)                                           # clipping is possible only in the last part
+        share = (0 - lo_db) / float(hi_db - lo_db)  # where 0 dB (the safe gain) lies on the slider
+        self.assertGreater(share, 0.85)  # clipping is possible only in the last part
         self.assertLess(share, 0.9)
         css = _re.search(r'input\[type=range\]\.gain \{[^}]*transparent (\d+)%', page)
-        self.assertEqual(int(css.group(1)) / 100.0, round(share, 2))              # the orange part of the track starts at the safe position
+        self.assertEqual(int(css.group(1)) / 100.0, round(share, 2))  # the orange part of the track starts at the safe position
         self.assertIn('0 is the loudest setting at which even the densest passages', page)
-        code, _r = self.jcall('/api/settings', {'gain': round(safe * 10 ** (hi_db / 20.0), 4)})     # the top of the slider is accepted
+        code, _r = self.jcall('/api/settings', {'gain': round(safe * 10 ** (hi_db / 20.0), 4)})  # the top of the slider is accepted
         self.assertEqual(code, 200)
 
 
@@ -339,7 +351,7 @@ class LevelsTests(ServerCase):
         page = self.call('/')[1].decode()
         for needle in ('id="meter"', 'id="mLH"', 'async function pollLevels', '"/api/levels"', 'meter_clip: "CLIP"', 'meter_clip: "СРЕЗ"'):
             self.assertIn(needle, page)
-        self.assertIn('currentPage !== "home"', page[page.index('async function pollLevels'):page.index('async function pollLevels') + 300])
+        self.assertIn('currentPage !== "home"', page[page.index('async function pollLevels') : page.index('async function pollLevels') + 300])
 
 
 class OutputVolumeTests(ServerCase):
@@ -348,7 +360,7 @@ class OutputVolumeTests(ServerCase):
     def test_the_state_tells_the_volume_of_the_card_that_plays(self):
         self.start()
         v = self.jcall('/api/state')[1]['output_volume']
-        self.assertEqual((v['card'], v['control'], v['db'], v['lo'], v['hi']), ('U24', 'PCM', -12.0, -60.0, 4.0))     # the card the synthesizer logged
+        self.assertEqual((v['card'], v['control'], v['db'], v['lo'], v['hi']), ('U24', 'PCM', -12.0, -60.0, 4.0))  # the card the synthesizer logged
 
     def test_a_new_level_is_set_on_that_card_and_returned(self):
         self.start()
@@ -378,11 +390,13 @@ class OutputVolumeTests(ServerCase):
         self.start(CONF + 'WEB_TOKEN=s3cret\n')
         self.assertEqual(self.call('/api/output-volume', {'db': -10})[0], 401)
         self.assertEqual(self.actions.volume_set, [])
-        text = ("Simple mixer control 'PCM',0\n  Capabilities: pvolume pvolume-joined pswitch pswitch-joined\n  Playback channels: Mono\n"
-                "  Limits: Playback -10239 - 400\n  Mono: Playback -1200 [85%] [-12.00dB] [on]\n")
+        text = (
+            "Simple mixer control 'PCM',0\n  Capabilities: pvolume pvolume-joined pswitch pswitch-joined\n  Playback channels: Mono\n"
+            "  Limits: Playback -10239 - 400\n  Mono: Playback -1200 [85%] [-12.00dB] [on]\n"
+        )
         self.assertEqual(web.parse_amixer(text), dict(db=-12.0, lo=-60.0, hi=4.0))
         usb = "Simple mixer control 'PCM',0\n  Limits: Playback 0 - 100\n  Front Left: Playback 40 [40%] [-20.00dB]\n"
-        self.assertEqual(web.parse_amixer(usb), dict(db=-20.0, lo=-60.0, hi=0.0))      # the unit of the limits is not 0.01 dB: no claim about the top
+        self.assertEqual(web.parse_amixer(usb), dict(db=-20.0, lo=-60.0, hi=0.0))  # the unit of the limits is not 0.01 dB: no claim about the top
         self.assertIsNone(web.parse_amixer("Simple mixer control 'Mic',0\n  Capabilities: cvolume\n"))
 
 
@@ -397,8 +411,11 @@ class BankWebTests(ServerCase):
         self.old = make_sf2(os.path.join(self.bank_dir, 'old.sf2'), presets=[('Old piano', 0, 0)], name='Old piano')
         self.new = make_sf2(os.path.join(self.bank_dir, 'new.sf2'), presets=[('New piano', 0, 0), ('Pad', 0, 90)], name='New piano')
         self.gm = make_sf2(os.path.join(self.bank_dir, 'odd.sf2'), presets=[('Odd', 2, 5)], name='Odd bank')
-        self.conf_text_base = ('BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nALSA_DEVICE=auto\nGAIN=1.0\nREVERB=0\n'
-                               'FX_ARGS="--hammer-boost 0"\n' % (self.bank_dir, self.old, self.mech))
+        self.conf_text_base = 'BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nALSA_DEVICE=auto\nGAIN=1.0\nREVERB=0\nFX_ARGS="--hammer-boost 0"\n' % (
+            self.bank_dir,
+            self.old,
+            self.mech,
+        )
         self.start(self.conf_text_base)
 
     def finish_switch(self):
@@ -441,7 +458,7 @@ class BankWebTests(ServerCase):
         self.assertEqual(self.jcall('/api/state')[1]['banks']['preset'], dict(bank=2, program=5))
 
     def test_a_bank_that_does_not_come_up_is_rolled_back(self):
-        self.actions.ready = [False, True]          # the new bank fails, the old one comes back
+        self.actions.ready = [False, True]  # the new bank fails, the old one comes back
         self.jcall('/api/bank', {'id': 'new.sf2'})
         self.finish_switch()
         text = self.conf_text()
@@ -461,6 +478,7 @@ class BankWebTests(ServerCase):
     def test_a_crash_inside_the_switch_still_rolls_back(self):
         def boom(old_pid, timeout=150):
             raise RuntimeError('systemctl exploded')
+
         self.actions.wait_synth_ready = boom
         self.jcall('/api/bank', {'id': 'new.sf2'})
         self.finish_switch()
@@ -480,7 +498,7 @@ class BankWebTests(ServerCase):
         self.assertEqual(self.actions.restarts, 0)
 
     def test_a_bank_too_big_for_the_memory_is_refused(self):
-        self.actions.mem = 1 << 10                        # almost no memory: not even a small bank fits
+        self.actions.mem = 1 << 10  # almost no memory: not even a small bank fits
         code, r = self.jcall('/api/bank', {'id': 'new.sf2'})
         self.assertEqual(code, 400)
         self.assertIn('too large', r['error'])
@@ -492,14 +510,14 @@ class BankWebTests(ServerCase):
         m = self.jcall('/api/state')[1]['banks']['memory']
         mech = os.path.getsize(self.mech)
         self.assertEqual((m['total'], m['mech'], m['current']), (954 << 20, mech, os.path.getsize(self.old)))
-        self.assertEqual(m['limit'], (954 << 20) - 200 * (1 << 20) - mech)                # the reserve of a board with enough memory
+        self.assertEqual(m['limit'], (954 << 20) - 200 * (1 << 20) - mech)  # the reserve of a board with enough memory
         self.assertEqual(m['reserve'], 200 * (1 << 20))
-        self.assertEqual(m['used'], (954 - 300) << 20)                                    # what the Monitor shows as used
+        self.assertEqual(m['used'], (954 - 300) << 20)  # what the Monitor shows as used
         self.assertGreater(m['disk_free'], 0)
-        self.actions.mem = 400 << 20                                                       # a small board keeps a share
+        self.actions.mem = 400 << 20  # a small board keeps a share
         m = self.jcall('/api/state')[1]['banks']['memory']
         self.assertEqual(m['reserve'], int((400 << 20) * 0.28))
-        self.actions.mem = None                                                            # unknown memory: no claims
+        self.actions.mem = None  # unknown memory: no claims
         m = self.jcall('/api/state')[1]['banks']['memory']
         self.assertEqual((m['total'], m['limit'], m['reserve']), (None, None, None))
 
@@ -512,12 +530,12 @@ class BankWebTests(ServerCase):
         self.assertEqual(sorted(x['id'] for x in self.jcall('/api/state')[1]['banks']['banks']), ['new.sf2', 'old.sf2'])
         self.assertEqual([n for n in os.listdir(self.bank_dir) if n.startswith('.')], [])
         self.assertEqual(self.conf_text(), before)
-        self.assertEqual(self.actions.restarts, 0)                                   # nothing that plays is touched
-        self.assertEqual(self.jcall('/api/bank', {'action': 'delete', 'id': 'odd.sf2'})[0], 400)       # a second time: it is gone
+        self.assertEqual(self.actions.restarts, 0)  # nothing that plays is touched
+        self.assertEqual(self.jcall('/api/bank', {'action': 'delete', 'id': 'odd.sf2'})[0], 400)  # a second time: it is gone
 
     def test_the_current_bank_the_last_good_one_and_the_mechanics_bank_are_never_deleted(self):
         self.start(self.conf_text_base.replace('PIANO_SF2="%s"' % self.old, 'PIANO_SF2="%s"' % self.new) + 'PIANO_SF2_LAST_GOOD="%s"\n' % self.old)
-        for name in ('new.sf2', 'old.sf2', 'mech.sf2'):                              # current, last good, mechanics
+        for name in ('new.sf2', 'old.sf2', 'mech.sf2'):  # current, last good, mechanics
             with self.subTest(name):
                 code, r = self.jcall('/api/bank', {'action': 'delete', 'id': name})
                 self.assertEqual(code, 400, r)
@@ -592,10 +610,15 @@ class ActionsCacheTests(unittest.TestCase):
             self.calls.append(cmd[0])
 
             class R:
-                stdout = {'fluidsynth': 'FluidSynth runtime version 2.4.4\n', 'systemctl': 'active\n',
-                          'journalctl': 'exxpiano: audio output plughw:CARD=U24 (usb), period 64 x 3\n'}.get(cmd[0], '')
+                stdout = {
+                    'fluidsynth': 'FluidSynth runtime version 2.4.4\n',
+                    'systemctl': 'active\n',
+                    'journalctl': 'exxpiano: audio output plughw:CARD=U24 (usb), period 64 x 3\n',
+                }.get(cmd[0], '')
                 returncode = 0
+
             return R()
+
         web.subprocess.run = fake_run
         self.addCleanup(setattr, web.subprocess, 'run', self.real_run)
         self.actions = web.Actions(asound=tempfile.mkdtemp())
@@ -607,27 +630,31 @@ class ActionsCacheTests(unittest.TestCase):
             self.assertEqual(a.service_state('exxpiano'), 'active')
             self.assertEqual(a.service_state('exxpiano-fx'), 'active')
             self.assertEqual(a.audio_output()['period'], 64)
-        self.assertEqual(sorted(self.calls), ['fluidsynth', 'journalctl', 'systemctl', 'systemctl'])      # one per unit
+        self.assertEqual(sorted(self.calls), ['fluidsynth', 'journalctl', 'systemctl', 'systemctl'])  # one per unit
 
     def test_entries_expire(self):
         a = self.actions
         a.service_state('exxpiano')
         with a._cache_lock:
             key = ('service', 'exxpiano')
-            a._cache[key] = (a._cache[key][0] - 3, a._cache[key][1])        # older than its 2 s
+            a._cache[key] = (a._cache[key][0] - 3, a._cache[key][1])  # older than its 2 s
         a.service_state('exxpiano')
         self.assertEqual(self.calls, ['systemctl', 'systemctl'])
 
     def test_a_restart_forgets_the_service_state_and_the_output(self):
         a = self.actions
-        a.service_state('exxpiano'); a.audio_output(); a.fluidsynth_version()
+        a.service_state('exxpiano')
+        a.audio_output()
+        a.fluidsynth_version()
         popen = web.subprocess.Popen
         web.subprocess.Popen = lambda *x, **kw: None
         self.addCleanup(setattr, web.subprocess, 'Popen', popen)
         a.restart_synth()
         self.calls.clear()
-        a.service_state('exxpiano'); a.audio_output(); a.fluidsynth_version()
-        self.assertEqual(sorted(self.calls), ['journalctl', 'systemctl'])    # the version of the program does not change with a restart
+        a.service_state('exxpiano')
+        a.audio_output()
+        a.fluidsynth_version()
+        self.assertEqual(sorted(self.calls), ['journalctl', 'systemctl'])  # the version of the program does not change with a restart
 
     def test_readiness_never_uses_the_cached_state(self):
         a = self.actions
@@ -651,7 +678,7 @@ class WifiApiTests(ServerCase):
         self.assertEqual(code, 200)
         self.assertTrue(r['supported'])
         self.assertEqual((r['mode'], r['link']['ssid'], r['hostname']), ('client', 'Home', 'exxpiano'))
-        self.assertEqual(r['saved'], [dict(ssid='Home', secure=True, hidden=False)])           # no priority, no key
+        self.assertEqual(r['saved'], [dict(ssid='Home', secure=True, hidden=False)])  # no priority, no key
         self.assertEqual([n['ssid'] for n in r['networks']], ['Home', 'Cafe'])
 
     def test_without_the_supervisor_the_page_is_told_why(self):
@@ -688,10 +715,19 @@ class WifiApiTests(ServerCase):
 
     def test_bad_input_is_refused_and_nothing_is_sent(self):
         self.start()
-        for body in (dict(action='connect', ssid='', password='12345678'), dict(action='connect', ssid='x' * 40, password='12345678'),
-                     dict(action='connect', ssid='Net', password='short'), dict(action='connect', ssid=5, password='12345678'),
-                     dict(action='connect', ssid='Net', password='пароль-пароль'), dict(action='forget', ssid='Unknown'),
-                     dict(action='forget'), dict(action='explode'), dict(), [], 'x'):
+        for body in (
+            dict(action='connect', ssid='', password='12345678'),
+            dict(action='connect', ssid='x' * 40, password='12345678'),
+            dict(action='connect', ssid='Net', password='short'),
+            dict(action='connect', ssid=5, password='12345678'),
+            dict(action='connect', ssid='Net', password='пароль-пароль'),
+            dict(action='forget', ssid='Unknown'),
+            dict(action='forget'),
+            dict(action='explode'),
+            dict(),
+            [],
+            'x',
+        ):
             with self.subTest(body):
                 self.assertEqual(self.post(body)[0], 400)
         self.assertEqual(self.actions.wifi_requests, [])
@@ -713,7 +749,7 @@ class WifiApiTests(ServerCase):
 
     def test_the_only_way_in_is_not_forgotten_but_other_networks_are(self):
         self.start()
-        code, r = self.post(dict(action='forget', ssid='Home'))                          # connected, the only saved one, no cable
+        code, r = self.post(dict(action='forget', ssid='Home'))  # connected, the only saved one, no cable
         self.assertEqual(code, 400)
         self.assertIn('only way', r['error'])
         self.assertEqual(self.actions.wifi_requests, [])
@@ -783,7 +819,7 @@ class DeviceNameTests(ServerCase):
         for bad in ([], 'x', {}):
             self.assertEqual(self.jcall('/api/device', bad)[0], 400)
         self.assertEqual(self.actions.renamed, [])
-        self.assertEqual(self.jcall('/api/device', {'name': 'a' * 63})[0], 200)               # the longest allowed
+        self.assertEqual(self.jcall('/api/device', {'name': 'a' * 63})[0], 200)  # the longest allowed
 
     def test_the_token_protects_renaming(self):
         self.start(CONF + 'WEB_TOKEN=s3cret\n')
@@ -796,6 +832,7 @@ class DeviceNameTests(ServerCase):
 
         class R:
             returncode, stdout, stderr = 0, '', ''
+
         web.subprocess.run = lambda cmd, *a, **kw: (calls.append(cmd), R())[1]
         self.addCleanup(setattr, web.subprocess, 'run', real)
         web.Actions().set_hostname('piano-test')
@@ -818,7 +855,7 @@ class QrApiTests(ServerCase):
         self.assertEqual((r['ssid'], r['password']), ('exxpiano-Setup-012ABC', 'exxpianosetup'))
         self.assertEqual(r['text'], 'WIFI:T:WPA;S:exxpiano-Setup-012ABC;P:exxpianosetup;;')
         self.assertTrue(r['svg'].startswith('<svg') and 'viewBox' in r['svg'])
-        png = base64.b64decode(r['png'])                                                          # the page offers it as a download: a real PNG
+        png = base64.b64decode(r['png'])  # the page offers it as a download: a real PNG
         self.assertEqual(png[:8], b'\x89PNG\r\n\x1a\n')
         self.assertEqual(r['filename'], 'exxpiano-join-wifi-012ABC')
         for kind, name in (('setup', 'setup-page'), ('page', 'page')):
@@ -828,7 +865,7 @@ class QrApiTests(ServerCase):
         self.start(CONF + 'WIFI_AP_SSID=My-Piano\nWIFI_AP_PASSWORD="much better; secret"\n')
         self.assertEqual(self.qr('kind=join')[1]['text'], 'WIFI:T:WPA;S:My-Piano-012ABC;P:much better\\; secret;;')
         self.start(CONF + 'WIFI_AP_PASSWORD=short\n')
-        self.assertEqual(self.qr('kind=join')[1]['password'], 'exxpianosetup')                  # the same fallback the supervisor makes
+        self.assertEqual(self.qr('kind=join')[1]['password'], 'exxpianosetup')  # the same fallback the supervisor makes
 
     def test_setup_page_code_uses_the_web_port(self):
         self.start(CONF + 'WEB_PORT=9090\n')
@@ -840,7 +877,7 @@ class QrApiTests(ServerCase):
         self.start()
         self.assertEqual(self.qr('kind=page', 'exxpiano.local:8080')[1]['text'], 'http://exxpiano.local:8080/?d=012ABC#/wifi')
         self.assertEqual(self.qr('kind=page', '192.168.1.95:8080')[1]['text'], 'http://192.168.1.95:8080/?d=012ABC#/wifi')
-        r = self.qr('kind=page', 'evil.example/<script>')[1]                                  # an odd Host header is not copied into a code
+        r = self.qr('kind=page', 'evil.example/<script>')[1]  # an odd Host header is not copied into a code
         self.assertEqual(r['text'], 'http://192.168.1.9:8080/?d=012ABC#/wifi')
 
     def test_unknown_kinds_and_the_token(self):
@@ -860,31 +897,73 @@ class MonitorEndpointTests(ServerCase):
 
     def test_the_kernel_log_reports_the_program_killed_for_lack_of_memory(self):
         import json as j
+
         msg = '[  127.7] Out of memory: Killed process 743 (fluidsynth) total-vm:489696kB, anon-rss:370048kB, file-rss:188kB, shmem-rss:0kB, UID:0 pgtables:864kB oom_score_adj:0'
-        text = '\n'.join([j.dumps({'__REALTIME_TIMESTAMP': '5000000', 'MESSAGE': msg}), j.dumps({'__REALTIME_TIMESTAMP': '6000000', 'MESSAGE': 'usb 1-1: new device'}), 'junk'])
+        text = '\n'.join(
+            [
+                j.dumps({'__REALTIME_TIMESTAMP': '5000000', 'MESSAGE': msg}),
+                j.dumps({'__REALTIME_TIMESTAMP': '6000000', 'MESSAGE': 'usb 1-1: new device'}),
+                'junk',
+            ]
+        )
         self.assertEqual(web.parse_oom(text), [dict(t=5000, unit='kernel', level='error', text=web.parse_oom(text)[0]['text'])])
         self.assertIn('killed fluidsynth, which held 361 MB', web.parse_oom(text)[0]['text'])
 
     def test_journal_lines_become_errors(self):
         import json as j
-        lines = '\n'.join([
-            j.dumps({'__REALTIME_TIMESTAMP': '1700000000123456', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '3', 'MESSAGE': 'exxpiano: no sound card found'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '1700000001000000', '_SYSTEMD_UNIT': 'exxpiano-web.service', 'PRIORITY': '4', 'MESSAGE': [104, 105]}),
-            'not json', j.dumps({'PRIORITY': '3', 'MESSAGE': 'no time'}), j.dumps({'__REALTIME_TIMESTAMP': '1', 'MESSAGE': '  '})])
+
+        lines = '\n'.join(
+            [
+                j.dumps(
+                    {
+                        '__REALTIME_TIMESTAMP': '1700000000123456',
+                        '_SYSTEMD_UNIT': 'exxpiano.service',
+                        'PRIORITY': '3',
+                        'MESSAGE': 'exxpiano: no sound card found',
+                    }
+                ),
+                j.dumps({'__REALTIME_TIMESTAMP': '1700000001000000', '_SYSTEMD_UNIT': 'exxpiano-web.service', 'PRIORITY': '4', 'MESSAGE': [104, 105]}),
+                'not json',
+                j.dumps({'PRIORITY': '3', 'MESSAGE': 'no time'}),
+                j.dumps({'__REALTIME_TIMESTAMP': '1', 'MESSAGE': '  '}),
+            ]
+        )
         got = web.parse_journal_errors(lines)
-        self.assertEqual(got, [dict(t=1700000000123, unit='exxpiano', level='error', text='exxpiano: no sound card found'),
-                               dict(t=1700000001000, unit='exxpiano-web', level='warning', text='hi')])
+        self.assertEqual(
+            got,
+            [
+                dict(t=1700000000123, unit='exxpiano', level='error', text='exxpiano: no sound card found'),
+                dict(t=1700000001000, unit='exxpiano-web', level='warning', text='hi'),
+            ],
+        )
 
     def test_the_notes_of_our_scripts_are_info_and_other_info_lines_are_not_listed(self):
         import json as j
-        lines = '\n'.join([
-            j.dumps({'__REALTIME_TIMESTAMP': '1000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '6', 'MESSAGE': 'exxpiano: audio output plughw:CARD=Headphones (onboard), period 64 x 3'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '2000000', '_SYSTEMD_UNIT': 'exxpiano-wifi.service', 'PRIORITY': '6', 'MESSAGE': 'exxpiano-wifi: started'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '3000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '6', 'MESSAGE': 'FluidSynth runtime version 2.4.4'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '4000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '4', 'MESSAGE': 'fluidsynth: warning: No preset found'})])
+
+        lines = '\n'.join(
+            [
+                j.dumps(
+                    {
+                        '__REALTIME_TIMESTAMP': '1000000',
+                        '_SYSTEMD_UNIT': 'exxpiano.service',
+                        'PRIORITY': '6',
+                        'MESSAGE': 'exxpiano: audio output plughw:CARD=Headphones (onboard), period 64 x 3',
+                    }
+                ),
+                j.dumps({'__REALTIME_TIMESTAMP': '2000000', '_SYSTEMD_UNIT': 'exxpiano-wifi.service', 'PRIORITY': '6', 'MESSAGE': 'exxpiano-wifi: started'}),
+                j.dumps(
+                    {'__REALTIME_TIMESTAMP': '3000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '6', 'MESSAGE': 'FluidSynth runtime version 2.4.4'}
+                ),
+                j.dumps(
+                    {'__REALTIME_TIMESTAMP': '4000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '4', 'MESSAGE': 'fluidsynth: warning: No preset found'}
+                ),
+            ]
+        )
         got = web.parse_journal_errors(lines)
-        self.assertEqual([(g['level'], g['text'][:20]) for g in got],
-                         [('info', 'exxpiano: audio outp'), ('info', 'exxpiano-wifi: start'), ('warning', 'fluidsynth: warning:')])
+        self.assertEqual(
+            [(g['level'], g['text'][:20]) for g in got],
+            [('info', 'exxpiano: audio outp'), ('info', 'exxpiano-wifi: start'), ('warning', 'fluidsynth: warning:')],
+        )
 
     def test_the_page_calls_the_card_service_messages_not_errors(self):
         self.start()
@@ -918,13 +997,14 @@ class MonitorEndpointTests(ServerCase):
         self.assertEqual(len(self.actions.monitor_calls), 1)
 
     def test_the_real_actions_produce_a_sample_from_this_machine(self):
-        r = web.Actions().monitor(0)                          # whatever this machine has: nothing may raise
+        r = web.Actions().monitor(0)  # whatever this machine has: nothing may raise
         self.assertIn('cpu', r['now'])
         self.assertIsInstance(r['points'], list)
 
 
 class DeviceProfileTests(ServerCase):
     """The buffers belong to the audio interface: each one gets its own back when it is chosen again."""
+
     U24 = 'plughw:CARD=U24'
 
     def put(self, body):
@@ -936,7 +1016,7 @@ class DeviceProfileTests(ServerCase):
         self.start()
         self.put({'alsa_device': self.U24, 'usb_period_size': 128, 'usb_periods': 4})
         self.put({'alsa_device': 'auto', 'period_size': 64, 'periods': 2})
-        s = self.put({'alsa_device': self.U24})                                  # only the interface is named
+        s = self.put({'alsa_device': self.U24})  # only the interface is named
         self.assertEqual((s['usb_period_size'], s['usb_periods']), (128, 4))
         s = self.put({'alsa_device': 'auto'})
         self.assertEqual((s['period_size'], s['periods']), (64, 2))
@@ -963,7 +1043,7 @@ class DeviceProfileTests(ServerCase):
         remembered = self.jcall('/api/state')[1]['device_profiles']
         self.assertEqual(sorted(remembered), ['auto', self.U24])
         self.assertEqual(sorted(remembered[self.U24]), ['period_size', 'periods', 'usb_period_size', 'usb_periods'])
-        self.assertFalse(os.path.exists(self.app.profile_path))                # nothing leaked into the per-bank file
+        self.assertFalse(os.path.exists(self.app.profile_path))  # nothing leaked into the per-bank file
 
     def test_changes_that_are_not_about_the_interface_remember_nothing(self):
         self.start()
@@ -986,7 +1066,7 @@ class InstrumentProfileTests(ServerCase):
         self.mech = make_sf2(os.path.join(d, 'mech.sf2'), presets=[('Hammer', 0, 1)])
         self.a = make_sf2(os.path.join(d, 'a.sf2'), presets=[('A piano', 0, 0)], name='A')
         self.b = make_sf2(os.path.join(d, 'b.sf2'), presets=[('B piano', 0, 0), ('B pad', 0, 90)], name='B')
-        self.base = ('BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nGAIN=1.0\nFX_ARGS="--hammer-boost 0"\n' % (d, self.a, self.mech))
+        self.base = 'BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nGAIN=1.0\nFX_ARGS="--hammer-boost 0"\n' % (d, self.a, self.mech)
         self.start(self.base)
 
     def settings(self):
@@ -1011,19 +1091,19 @@ class InstrumentProfileTests(ServerCase):
         self.switch('b.sf2')
         s = self.settings()
         self.assertEqual((s['velocity_curve'], s['gain']), (1.5, 1.7))
-        self.assertEqual(profiles.get(self.profile_file, 'b.sf2')['velocity_curve'], 1.5)       # now it has a profile of its own
+        self.assertEqual(profiles.get(self.profile_file, 'b.sf2')['velocity_curve'], 1.5)  # now it has a profile of its own
 
     def test_each_bank_gets_its_own_settings_back(self):
-        self.jcall('/api/settings', {'velocity_curve': 1.5, 'gain': 1.2})                        # A
+        self.jcall('/api/settings', {'velocity_curve': 1.5, 'gain': 1.2})  # A
         self.switch('b.sf2')
-        self.jcall('/api/settings', {'velocity_curve': 0.7, 'gain': 2.0, 'hammer_boost': 6})     # B
+        self.jcall('/api/settings', {'velocity_curve': 0.7, 'gain': 2.0, 'hammer_boost': 6})  # B
         self.switch('a.sf2')
         s = self.settings()
         self.assertEqual((s['velocity_curve'], s['gain'], s['hammer_boost']), (1.5, 1.2, 0.0))
         self.switch('b.sf2')
         s = self.settings()
         self.assertEqual((s['velocity_curve'], s['gain'], s['hammer_boost']), (0.7, 2.0, 6.0))
-        self.assertIn('GAIN=2', self.conf_text())                                                # the synthesizer starts with it
+        self.assertIn('GAIN=2', self.conf_text())  # the synthesizer starts with it
 
     def test_the_preset_is_remembered_per_bank_too(self):
         self.switch('b.sf2')
@@ -1039,13 +1119,13 @@ class InstrumentProfileTests(ServerCase):
         self.switch('b.sf2')
         s = self.settings()
         self.assertEqual((s['piano_bank'], s['piano_prog']), (0, 0))
-        self.assertEqual(s['velocity_curve'], 0.9)                                                # the rest is still brought back
+        self.assertEqual(s['velocity_curve'], 0.9)  # the rest is still brought back
 
     def test_values_edited_by_hand_in_the_file_are_not_lost_when_switching_away(self):
         with open(self.conf) as f:
             text = f.read()
         with open(self.conf, 'w') as f:
-            f.write(text.replace('--hammer-boost 0', '--hammer-boost 0 --velocity-curve 1.9'))   # not through the page
+            f.write(text.replace('--hammer-boost 0', '--hammer-boost 0 --velocity-curve 1.9'))  # not through the page
         self.switch('b.sf2')
         self.assertEqual(profiles.get(self.profile_file, 'a.sf2')['velocity_curve'], 1.9)
 
@@ -1057,7 +1137,7 @@ class InstrumentProfileTests(ServerCase):
         s = self.settings()
         self.assertEqual((s['velocity_curve'], s['gain']), (1.5, 1.2))
         self.assertIn('PIANO_SF2="%s"' % self.a, self.conf_text())
-        self.assertEqual(profiles.get(self.profile_file, 'b.sf2')['velocity_curve'], 0.5)       # B's own profile is untouched
+        self.assertEqual(profiles.get(self.profile_file, 'b.sf2')['velocity_curve'], 0.5)  # B's own profile is untouched
 
     def test_per_bank_changes_are_refused_while_a_switch_runs_but_device_settings_are_not(self):
         self.actions.gate = threading.Event()
@@ -1078,7 +1158,7 @@ class InstrumentProfileTests(ServerCase):
 
     def test_the_profiles_survive_a_restart_of_the_web_service(self):
         self.jcall('/api/settings', {'velocity_curve': 1.3})
-        again = web.App(self.conf, self.actions)                 # a new process, same files
+        again = web.App(self.conf, self.actions)  # a new process, same files
         self.assertTrue(again.banks_state()['profile']['saved'])
         self.assertEqual(profiles.get(again.profile_path, 'a.sf2')['velocity_curve'], 1.3)
 
@@ -1088,7 +1168,7 @@ class GainPipeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fifo = os.path.join(tmp, 'cmd')
             os.mkfifo(fifo, 0o600)
-            keep = os.open(fifo, os.O_RDWR)                       # plays the role of the running FluidSynth
+            keep = os.open(fifo, os.O_RDWR)  # plays the role of the running FluidSynth
             old = os.environ.get('CMD_FIFO')
             os.environ['CMD_FIFO'] = fifo
             try:
@@ -1104,7 +1184,7 @@ class GainPipeTests(unittest.TestCase):
     def test_set_gain_reports_failure_when_the_synth_is_not_running(self):
         with tempfile.TemporaryDirectory() as tmp:
             fifo = os.path.join(tmp, 'cmd')
-            os.mkfifo(fifo, 0o600)                                # nobody reads it
+            os.mkfifo(fifo, 0o600)  # nobody reads it
             old = os.environ.get('CMD_FIFO')
             os.environ['CMD_FIFO'] = fifo
             try:
@@ -1130,8 +1210,7 @@ class GainPipeTests(unittest.TestCase):
 class CardsTests(unittest.TestCase):
     def test_cards_skips_hdmi_and_capture_only_cards(self):
         with tempfile.TemporaryDirectory() as a:
-            rows = [(0, 'Headphones', 'pcm0p', False), (1, 'vc4hdmi', 'pcm0p', False),
-                    (2, 'mk3', 'pcm0c', True), (3, 'U24', 'pcm0p', True)]
+            rows = [(0, 'Headphones', 'pcm0p', False), (1, 'vc4hdmi', 'pcm0p', False), (2, 'mk3', 'pcm0c', True), (3, 'U24', 'pcm0p', True)]
             text = ''
             for n, cid, pcm, usb in rows:
                 text += ' %d [%-15s]: x - Name %s\n' % (n, cid, cid)

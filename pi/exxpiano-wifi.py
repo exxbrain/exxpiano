@@ -10,6 +10,7 @@
 The supervisor is the only process that touches wlan0. The web page asks it for things through files in /run/exxpiano-wifi
 (see wifilib.py). Written for DietPi / Debian with ifupdown + wpa_supplicant + dhclient; with NetworkManager it stays out of the way.
 """
+
 import http.server
 import json
 import os
@@ -36,7 +37,7 @@ WIRED_RE = re.compile(r'^(eth\d+|en[a-z0-9]+)$')
 
 
 def log(*parts):
-    print('exxpiano-wifi:', *parts, file=sys.stderr, flush=True)       # never a password or a key: only names and states
+    print('exxpiano-wifi:', *parts, file=sys.stderr, flush=True)  # never a password or a key: only names and states
 
 
 def config_from_env(env=None):
@@ -47,6 +48,7 @@ def config_from_env(env=None):
             return max(lo, min(hi, int(env.get(key, default))))
         except ValueError:
             return default
+
     password = env.get('WIFI_AP_PASSWORD') or wifilib.AP_DEFAULT_PASSWORD
     try:
         wifilib.validate_passphrase(password)
@@ -54,11 +56,18 @@ def config_from_env(env=None):
         log('WIFI_AP_PASSWORD is not 8 to 63 ordinary characters: using the default')
         password = wifilib.AP_DEFAULT_PASSWORD
     channel = num('WIFI_AP_CHANNEL', 6, 1, 11)
-    return dict(ap_prefix=env.get('WIFI_AP_SSID') or 'exxpiano-Setup', ap_password=password, channel=channel if channel in wifilib.CHANNELS_2G else 6,
-                grace_new=num('WIFI_GRACE_NEW', 10, 5, 3600), grace_known=num('WIFI_GRACE_KNOWN', 150, 5, 3600),
-                retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600), retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
-                connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300), web_port=num('WEB_PORT', 8080, 1, 65535),
-                enabled=env.get('WIFI_SETUP', '1') != '0')
+    return dict(
+        ap_prefix=env.get('WIFI_AP_SSID') or 'exxpiano-Setup',
+        ap_password=password,
+        channel=channel if channel in wifilib.CHANNELS_2G else 6,
+        grace_new=num('WIFI_GRACE_NEW', 10, 5, 3600),
+        grace_known=num('WIFI_GRACE_KNOWN', 150, 5, 3600),
+        retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600),
+        retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
+        connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300),
+        web_port=num('WEB_PORT', 8080, 1, 65535),
+        enabled=env.get('WIFI_SETUP', '1') != '0',
+    )
 
 
 # ---------------------------------------------------------------- the real system
@@ -68,10 +77,10 @@ class System:
     def __init__(self, iface=IFACE, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, run=None, net_dir=NET_DIR, dietpi_txt=DIETPI_TXT, sys_net=SYS_NET):
         self.iface, self.run_dir, self.wpa_conf = iface, run_dir, wpa_conf
         self.net_dir, self.dietpi_txt, self.sys_net = net_dir, dietpi_txt, sys_net
-        self._wired = {}                                # wired interface -> True while a DHCP client was started for the cable that is plugged in
+        self._wired = {}  # wired interface -> True while a DHCP client was started for the cable that is plugged in
         self._run = run or self._real_run
         self.procs = []
-        self.scan_error = None                          # why the last scan found nothing, or None
+        self.scan_error = None  # why the last scan found nothing, or None
 
     @staticmethod
     def _real_run(cmd, timeout=15):
@@ -185,7 +194,7 @@ class System:
             except OSError:
                 plugged = False
             if not plugged:
-                self._wired.pop(name, None)                           # unplugged: the next cable is a new one
+                self._wired.pop(name, None)  # unplugged: the next cable is a new one
                 continue
             if self._wired.get(name):
                 continue
@@ -224,8 +233,10 @@ class System:
             folder = os.path.join(self.net_dir, 'interfaces.d')
             os.makedirs(folder, exist_ok=True)
             with open(os.path.join(folder, 'exxpiano-' + self.iface), 'w', encoding='utf-8') as f:
-                f.write('# written by exxpiano-wifi: the Wi-Fi interface joins the networks of %s\nallow-hotplug %s\niface %s inet dhcp\n\twpa-conf %s\n'
-                        % (self.wpa_conf, self.iface, self.iface, self.wpa_conf))
+                f.write(
+                    '# written by exxpiano-wifi: the Wi-Fi interface joins the networks of %s\nallow-hotplug %s\niface %s inet dhcp\n\twpa-conf %s\n'
+                    % (self.wpa_conf, self.iface, self.iface, self.wpa_conf)
+                )
             log('no stanza for %s in %s: written' % (self.iface, self.net_dir))
 
     def _ifargs(self):
@@ -246,7 +257,7 @@ class System:
     def client_up(self):
         try:
             self.ensure_client_config()
-        except OSError as exc:                                      # not root, a read-only disk: ifup will say what is missing
+        except OSError as exc:  # not root, a read-only disk: ifup will say what is missing
             log('could not prepare the Wi-Fi configuration:', exc)
         self.run(['ifdown', '--force'] + self._ifargs() + [self.iface], 20)
         rc, out = self.run(['ifup'] + self._ifargs() + [self.iface], 30)
@@ -269,7 +280,7 @@ class System:
         self.run(['ip', 'link', 'set', self.iface, 'up'], 5)
         hostapd = subprocess.Popen(['hostapd', hostapd_conf], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         self.procs.append(hostapd)
-        for _ in range(20):                                         # up to 10 s for the radio to switch to AP mode
+        for _ in range(20):  # up to 10 s for the radio to switch to AP mode
             time.sleep(0.5)
             if hostapd.poll() is not None:
                 raise RuntimeError('hostapd stopped: ' + (hostapd.stdout.read() or '')[-300:])
@@ -279,8 +290,9 @@ class System:
         else:
             raise RuntimeError('the radio did not switch to access point mode')
         self.run(['ip', 'addr', 'add', wifilib.AP_ADDRESS + '/24', 'dev', self.iface], 5)
-        dnsmasq = subprocess.Popen(['dnsmasq', '--conf-file=' + dnsmasq_conf, '--keep-in-foreground'], stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.PIPE, text=True)
+        dnsmasq = subprocess.Popen(
+            ['dnsmasq', '--conf-file=' + dnsmasq_conf, '--keep-in-foreground'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True
+        )
         self.procs.append(dnsmasq)
         time.sleep(0.4)
         if dnsmasq.poll() is not None:
@@ -299,7 +311,7 @@ class System:
         self.procs = []
         self.run(['ip', 'addr', 'flush', 'dev', self.iface], 5)
         self.run(['ip', 'link', 'set', self.iface, 'down'], 5)
-        for name in ('hostapd.conf', 'dnsmasq.conf'):                # they hold the access point password
+        for name in ('hostapd.conf', 'dnsmasq.conf'):  # they hold the access point password
             try:
                 os.unlink(os.path.join(self.run_dir, name))
             except OSError:
@@ -327,6 +339,7 @@ class Portal:
 
             def log_message(self, *args):
                 pass
+
         try:
             self.server = http.server.ThreadingHTTPServer((self.address, self.port), Handler)
             self.port = self.server.server_address[1]
@@ -345,8 +358,9 @@ class Portal:
 
 # ---------------------------------------------------------------- the state machine
 class Supervisor:
-    def __init__(self, system, cfg, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, clock=time.monotonic, wall=time.time, sleep=time.sleep,
-                 portal=None, install_id=None):
+    def __init__(
+        self, system, cfg, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, clock=time.monotonic, wall=time.time, sleep=time.sleep, portal=None, install_id=None
+    ):
         self.sys, self.cfg, self.run_dir, self.wpa_conf = system, cfg, run_dir, wpa_conf
         self.clock, self.wall, self.sleep = clock, wall, sleep
         self.portal = portal
@@ -379,9 +393,23 @@ class Supervisor:
 
     def publish(self, link=None):
         link = link if link is not None else (self.sys.link() if self.mode == 'client' else None)
-        wifilib.write_status(self.run_dir, dict(
-            pid=os.getpid(), mode=self.mode, busy=self.busy, link=link, cable=self.sys.has_cable_route(), hostname=self.sys.hostname(), ap=dict(ssid=self.ap_ssid) if self.mode == 'ap' else None,
-            scan=self.scan_result, scan_error=getattr(self.sys, 'scan_error', None), scanned_at=self.scanned_at, last_result=self.last_result, updated=int(self.wall())))
+        wifilib.write_status(
+            self.run_dir,
+            dict(
+                pid=os.getpid(),
+                mode=self.mode,
+                busy=self.busy,
+                link=link,
+                cable=self.sys.has_cable_route(),
+                hostname=self.sys.hostname(),
+                ap=dict(ssid=self.ap_ssid) if self.mode == 'ap' else None,
+                scan=self.scan_result,
+                scan_error=getattr(self.sys, 'scan_error', None),
+                scanned_at=self.scanned_at,
+                last_result=self.last_result,
+                updated=int(self.wall()),
+            ),
+        )
         self._last_status = self.clock()
 
     def _result(self, ok, kind, ssid=None, error=None):
@@ -398,13 +426,13 @@ class Supervisor:
         self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.installation_id)
         try:
             self.sys.ap_start(self.ap_ssid, self.cfg['ap_password'], self.cfg['channel'], wifilib.country(wpa))
-        except Exception as exc:                                    # noqa: BLE001 - any failure must end with the normal network back
+        except Exception as exc:  # noqa: BLE001 - any failure must end with the normal network back
             log('the access point did not start:', exc)
             self.sys.ap_stop()
             self.sys.client_up()
             self.mode, self.busy = 'client', None
             self.ap_failures += 1
-            self.next_ap_attempt = self.clock() + (60 if self.ap_failures <= 3 else 300)    # soon at first: it may be a passing problem
+            self.next_ap_attempt = self.clock() + (60 if self.ap_failures <= 3 else 300)  # soon at first: it may be a passing problem
             self._result(False, 'ap', error='the access point did not start: %s' % str(exc)[-120:])
             self.publish()
             return False
@@ -452,7 +480,7 @@ class Supervisor:
                     self.ap_until = self.clock() + seconds
             else:
                 log('unknown request ignored')
-        except Exception as exc:                                    # noqa: BLE001 - a bad request must never stop the supervisor
+        except Exception as exc:  # noqa: BLE001 - a bad request must never stop the supervisor
             log('request failed:', exc)
             self.busy = None
             self._result(False, action or 'request', error='internal error')
@@ -509,9 +537,9 @@ class Supervisor:
         self._write_wpa(wifilib.remove_network(self._read_wpa(), ssid))
         self._result(True, 'forget', ssid)
         if self.mode == 'client' and not self._known() and not self.sys.has_cable_route():
-            self.enter_ap()                                         # nothing is left to connect to: no waiting, the setup network starts at once
+            self.enter_ap()  # nothing is left to connect to: no waiting, the setup network starts at once
         elif link and link.get('ssid') == ssid:
-            self.sys.client_up()                                    # leave the network that was just forgotten
+            self.sys.client_up()  # leave the network that was just forgotten
             self.publish()
         else:
             self.sys.reload_wpa()
@@ -522,8 +550,8 @@ class Supervisor:
         wired = getattr(self.sys, 'ensure_wired', None)
         if wired:
             try:
-                wired()                                              # a cable in a USB network adapter gets its address
-            except Exception as exc:                                 # noqa: BLE001 - never at the cost of the Wi-Fi supervisor
+                wired()  # a cable in a USB network adapter gets its address
+            except Exception as exc:  # noqa: BLE001 - never at the cost of the Wi-Fi supervisor
                 log('wired interface check failed:', exc)
         req = wifilib.take_request(self.run_dir)
         if req:
@@ -540,10 +568,10 @@ class Supervisor:
                     self.enter_ap()
         else:
             if self.ap_until is not None:
-                if now >= self.ap_until:                            # a test: back to the normal network
+                if now >= self.ap_until:  # a test: back to the normal network
                     self.leave_ap()
                     self.wait_online(None, self.cfg['retry_wait'])
-            elif online:                                            # a cable was plugged in: no need for the access point
+            elif online:  # a cable was plugged in: no need for the access point
                 self.leave_ap()
             elif self._known():
                 if self.sys.stations() == 0:
@@ -603,8 +631,8 @@ def main(argv=None):
     system = System()
     if cfg['enabled'] and not system.managed_elsewhere():
         try:
-            system.ensure_client_config()                           # a fresh card has no Wi-Fi set up: do it before the first scan or connection
-        except Exception as exc:                                    # noqa: BLE001 - the supervisor must start anyway
+            system.ensure_client_config()  # a fresh card has no Wi-Fi set up: do it before the first scan or connection
+        except Exception as exc:  # noqa: BLE001 - the supervisor must start anyway
             log('could not prepare the Wi-Fi configuration:', exc)
     if not cfg['enabled']:
         log('disabled (WIFI_SETUP=0)')
@@ -622,7 +650,7 @@ def main(argv=None):
     while not stop.is_set():
         try:
             sup.step()
-        except Exception as exc:                                    # noqa: BLE001 - the loop must survive anything
+        except Exception as exc:  # noqa: BLE001 - the loop must survive anything
             log('step failed:', exc)
         stop.wait(TICK)
     sup.shutdown()

@@ -4,10 +4,11 @@ Enough for a Wi-Fi join code (`WIFI:T:WPA;S:name;P:password;;`) and a page addre
 over GF(256), the eight masks with the standard penalty rules, format and version information. Output: a list of rows of booleans
 (True = dark module), or SVG / PNG text and bytes.
 """
+
 import struct
 import zlib
 
-ECC_LEVELS = {'L': 1, 'M': 0}                     # the two bits written into the format information
+ECC_LEVELS = {'L': 1, 'M': 0}  # the two bits written into the format information
 ECC_PER_BLOCK = {'L': (-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18), 'M': (-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26)}
 NUM_BLOCKS = {'L': (-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4), 'M': (-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5)}
 MAX_VERSION = 10
@@ -75,19 +76,19 @@ def _rs_remainder(data, divisor):
 
 # ---- the bit stream
 def _make_codewords(data, ver, ecc):
-    bits = [0, 1, 0, 0]                                            # byte mode
+    bits = [0, 1, 0, 0]  # byte mode
     count_bits = 8 if ver < 10 else 16
     bits += [(len(data) >> i) & 1 for i in range(count_bits - 1, -1, -1)]
     for byte in data:
         bits += [(byte >> i) & 1 for i in range(7, -1, -1)]
     capacity = _data_codewords(ver, ecc) * 8
-    bits += [0] * min(4, capacity - len(bits))                      # terminator
+    bits += [0] * min(4, capacity - len(bits))  # terminator
     bits += [0] * (-len(bits) % 8)
     pad = 0
     while len(bits) < capacity:
         bits += [(PAD_BYTES[pad % 2] >> i) & 1 for i in range(7, -1, -1)]
         pad += 1
-    words = [int(''.join(map(str, bits[i:i + 8])), 2) for i in range(0, len(bits), 8)]
+    words = [int(''.join(map(str, bits[i : i + 8])), 2) for i in range(0, len(bits), 8)]
 
     blocks_n, ecc_len = NUM_BLOCKS[ecc][ver], ECC_PER_BLOCK[ecc][ver]
     raw_words = _raw_modules(ver) // 8
@@ -97,15 +98,15 @@ def _make_codewords(data, ver, ecc):
     blocks, k = [], 0
     for i in range(blocks_n):
         size = short_len - ecc_len + (0 if i < short_blocks else 1)
-        chunk = words[k:k + size]
+        chunk = words[k : k + size]
         k += size
         blocks.append((chunk, _rs_remainder(chunk, divisor)))
     out = []
-    for i in range(max(len(chunk) for chunk, _ in blocks)):         # data words, block by block (the short blocks have one less)
+    for i in range(max(len(chunk) for chunk, _ in blocks)):  # data words, block by block (the short blocks have one less)
         for chunk, _ in blocks:
             if i < len(chunk):
                 out.append(chunk[i])
-    for i in range(ecc_len):                                        # then the error correction words
+    for i in range(ecc_len):  # then the error correction words
         for _chunk, rem in blocks:
             out.append(rem[i])
     return out
@@ -125,10 +126,10 @@ class _Symbol:
         self.function[y][x] = True
 
     def _draw_function_patterns(self):
-        for i in range(self.size):                                  # timing
+        for i in range(self.size):  # timing
             self._set(6, i, i % 2 == 0)
             self._set(i, 6, i % 2 == 0)
-        for cx, cy in ((3, 3), (self.size - 4, 3), (3, self.size - 4)):   # finders with their separators
+        for cx, cy in ((3, 3), (self.size - 4, 3), (3, self.size - 4)):  # finders with their separators
             for dy in range(-4, 5):
                 for dx in range(-4, 5):
                     x, y = cx + dx, cy + dy
@@ -142,7 +143,7 @@ class _Symbol:
                 for dy in range(-2, 3):
                     for dx in range(-2, 3):
                         self._set(cx + dx, cy + dy, max(abs(dx), abs(dy)) != 1)
-        self._draw_format(0)                                        # reserves the areas
+        self._draw_format(0)  # reserves the areas
         self._draw_version()
 
     def _draw_format(self, mask):
@@ -163,7 +164,7 @@ class _Symbol:
             self._set(self.size - 1 - i, 8, bit(i))
         for i in range(8, 15):
             self._set(8, self.size - 15 + i, bit(i))
-        self._set(8, self.size - 8, True)                            # the always-dark module
+        self._set(8, self.size - 8, True)  # the always-dark module
 
     def _draw_version(self):
         if self.ver < 7:
@@ -182,7 +183,7 @@ class _Symbol:
         bits = [(w >> i) & 1 for w in codewords for i in range(7, -1, -1)]
         k = 0
         for pair in range(self.size - 1, 0, -2):
-            right = pair - 1 if pair <= 6 else pair                 # the column pair left of the timing column moves one step left
+            right = pair - 1 if pair <= 6 else pair  # the column pair left of the timing column moves one step left
             for vert in range(self.size):
                 for j in range(2):
                     x = right - j
@@ -195,15 +196,23 @@ class _Symbol:
     def _apply_mask(self, mask):
         for y in range(self.size):
             for x in range(self.size):
-                invert = ((x + y) % 2 == 0, y % 2 == 0, x % 3 == 0, (x + y) % 3 == 0, (x // 3 + y // 2) % 2 == 0,
-                          x * y % 2 + x * y % 3 == 0, (x * y % 2 + x * y % 3) % 2 == 0, ((x + y) % 2 + x * y % 3) % 2 == 0)[mask]
+                invert = (
+                    (x + y) % 2 == 0,
+                    y % 2 == 0,
+                    x % 3 == 0,
+                    (x + y) % 3 == 0,
+                    (x // 3 + y // 2) % 2 == 0,
+                    x * y % 2 + x * y % 3 == 0,
+                    (x * y % 2 + x * y % 3) % 2 == 0,
+                    ((x + y) % 2 + x * y % 3) % 2 == 0,
+                )[mask]
                 if invert and not self.function[y][x]:
                     self.modules[y][x] = not self.modules[y][x]
 
     def _penalty(self):
         n, m, score = self.size, self.modules, 0
         lines = list(m) + [[m[y][x] for y in range(n)] for x in range(n)]
-        for line in lines:                                           # runs of the same colour, and finder-like patterns
+        for line in lines:  # runs of the same colour, and finder-like patterns
             run = 1
             for i in range(1, n):
                 if line[i] == line[i - 1]:
@@ -215,12 +224,12 @@ class _Symbol:
             text = ''.join('1' if v else '0' for v in line)
             for pat in ('10111010000', '00001011101'):
                 score += 40 * sum(1 for i in range(n - 10) if text.startswith(pat, i))
-        for y in range(n - 1):                                       # 2x2 blocks
+        for y in range(n - 1):  # 2x2 blocks
             for x in range(n - 1):
                 if m[y][x] == m[y][x + 1] == m[y + 1][x] == m[y + 1][x + 1]:
                     score += 3
         dark = sum(v for row in m for v in row)
-        total = n * n                                                # balance of dark and light: 10 points per 5 % away from half
+        total = n * n  # balance of dark and light: 10 points per 5 % away from half
         score += 10 * ((abs(dark * 20 - total * 10) + total - 1) // total - 1)
         return score
 
@@ -239,7 +248,7 @@ def encode(text, ecc='M', mask=None, version=None):
         raise QrError('the text is too long for this encoder (at most %d bytes)' % (_data_codewords(MAX_VERSION, 'L') - 3))
     codewords = _make_codewords(data, ver, ecc)
     best = None
-    for m in ([mask] if mask is not None else range(8)):
+    for m in [mask] if mask is not None else range(8):
         trial = _Symbol(ver, ecc, codewords)
         trial._apply_mask(m)
         trial._draw_format(m)
@@ -254,8 +263,10 @@ def to_svg(matrix, border=4, dark='#000000', light='#ffffff'):
     n = len(matrix)
     size = n + 2 * border
     cells = ''.join('M%d,%dh1v1h-1z' % (x + border, y + border) for y, row in enumerate(matrix) for x, v in enumerate(row) if v)
-    return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" shape-rendering="crispEdges">'
-            '<rect width="100%%" height="100%%" fill="%s"/><path d="%s" fill="%s"/></svg>') % (size, size, light, cells, dark)
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" shape-rendering="crispEdges">'
+        '<rect width="100%%" height="100%%" fill="%s"/><path d="%s" fill="%s"/></svg>'
+    ) % (size, size, light, cells, dark)
 
 
 def to_png(matrix, scale=8, border=4):
@@ -266,19 +277,26 @@ def to_png(matrix, scale=8, border=4):
     for y in range(size):
         my = y // scale - border
         bits = [0 if (0 <= my < n and 0 <= x // scale - border < n and matrix[my][x // scale - border]) else 1 for x in range(size)]
-        bits += [1] * (-size % 8)                                    # the row is padded with white to whole bytes
-        packed = bytes(int(''.join(map(str, bits[i:i + 8])), 2) for i in range(0, len(bits), 8))
+        bits += [1] * (-size % 8)  # the row is padded with white to whole bytes
+        packed = bytes(int(''.join(map(str, bits[i : i + 8])), 2) for i in range(0, len(bits), 8))
         rows.append(b'\x00' + packed)
 
     def chunk(tag, body):
         return struct.pack('>I', len(body)) + tag + body + struct.pack('>I', zlib.crc32(tag + body) & 0xFFFFFFFF)
-    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', size, size, 1, 0, 0, 0, 0))
-            + chunk(b'IDAT', zlib.compress(b''.join(rows), 9)) + chunk(b'IEND', b''))
+
+    return (
+        b'\x89PNG\r\n\x1a\n'
+        + chunk(b'IHDR', struct.pack('>IIBBBBB', size, size, 1, 0, 0, 0, 0))
+        + chunk(b'IDAT', zlib.compress(b''.join(rows), 9))
+        + chunk(b'IEND', b'')
+    )
 
 
 def wifi_text(ssid, password=None, hidden=False):
     """The text phones read as "join this Wi-Fi": WIFI:T:WPA;S:name;P:password;;  (\\ ; , : and " are escaped)."""
+
     def esc(value):
         return ''.join('\\' + c if c in '\\;,:"' else c for c in value)
+
     kind = 'WPA' if password else 'nopass'
     return 'WIFI:T:%s;S:%s;%s%s;' % (kind, esc(ssid), 'P:%s;' % esc(password) if password else '', 'H:true;' if hidden else '')

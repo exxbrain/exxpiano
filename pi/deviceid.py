@@ -5,6 +5,7 @@
 
 The reusable image does not ask for this serial and never uses it to control synthesizer startup.
 """
+
 import os
 import re
 import sys
@@ -22,7 +23,7 @@ def normalize_serial(text):
 
 def read_serial(cpuinfo=None, devicetree='/sys/firmware/devicetree/base/serial-number'):
     """The serial of this board, or None."""
-    cpuinfo = cpuinfo or os.environ.get('EXXPIANO_CPUINFO', '/proc/cpuinfo')           # the variable is for tests
+    cpuinfo = cpuinfo or os.environ.get('EXXPIANO_CPUINFO', '/proc/cpuinfo')  # the variable is for tests
     try:
         with open(cpuinfo, encoding='utf-8', errors='replace') as f:
             for line in f:

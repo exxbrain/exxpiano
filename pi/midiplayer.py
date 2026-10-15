@@ -7,6 +7,7 @@ file (programs, banks, volume, drums) reaches the synthesizer, because midilib k
 
 `step()` does one small piece of work using the clock it is given, so tests drive it with a fake clock; `run()` is the loop of the real thing.
 """
+
 import bisect
 import json
 import os
@@ -16,10 +17,10 @@ import time
 import midilib
 
 RUN_DIR = '/run/exxpiano-midi'
-POLL = 0.25               # seconds between looks at the request file
-STATUS_PLAYING = 0.5      # seconds between status files while playing
-STATUS_IDLE = 2.0         # and while idle: the web interface counts a status older than 5 s as "the player is not running"
-LOOP_GAP = 0.8            # a pause before a repeated piece starts again
+POLL = 0.25  # seconds between looks at the request file
+STATUS_PLAYING = 0.5  # seconds between status files while playing
+STATUS_IDLE = 2.0  # and while idle: the web interface counts a status older than 5 s as "the player is not running"
+LOOP_GAP = 0.8  # a pause before a repeated piece starts again
 
 
 class Player:
@@ -99,7 +100,7 @@ class Player:
             self.midi_id = None
             self._publish(now)
             return
-        _, meta = midilib._entry(self.library_dir, midi_id)               # the name the library shows, not the title inside the file (often empty)
+        _, meta = midilib._entry(self.library_dir, midi_id)  # the name the library shows, not the title inside the file (often empty)
         title = (meta or {}).get('name') or parsed['title']
         self.midi_id, self.title, self.loop, self.length = midi_id, title, loop, parsed['length']
         self._events, self._i, self._t0, self._port, self._pedal_down = parsed['events'], 0, now, port, False
@@ -114,8 +115,8 @@ class Player:
         position = min(max(float(position), 0.0), self.length)
         self.release_all(self._pedal_down)
         self._pedal_down = False
-        self._i = bisect.bisect_left(self._events, (position,))          # the first event at or after the position
-        for _, kind, a, b in reversed(self._events[:self._i]):
+        self._i = bisect.bisect_left(self._events, (position,))  # the first event at or after the position
+        for _, kind, a, b in reversed(self._events[: self._i]):
             if kind == 'pedal':
                 if a >= 64:
                     self._pedal_down = True
@@ -160,8 +161,17 @@ class Player:
         return max(0.0, min(self.length, self.clock() - self._t0)) if self.playing else 0.0
 
     def _publish(self, now):
-        status = dict(state='playing' if self.playing else 'idle', id=self.midi_id, title=self.title, position=round(self.position(), 1),
-                      length=round(self.length, 1), loop=self.loop, reason=self.reason, nonce=self._nonce, updated=int(self.wall()))
+        status = dict(
+            state='playing' if self.playing else 'idle',
+            id=self.midi_id,
+            title=self.title,
+            position=round(self.position(), 1),
+            length=round(self.length, 1),
+            loop=self.loop,
+            reason=self.reason,
+            nonce=self._nonce,
+            updated=int(self.wall()),
+        )
         try:
             os.makedirs(self.run_dir, exist_ok=True)
             fd, tmp = tempfile.mkstemp(dir=self.run_dir, prefix='.status-')
@@ -170,5 +180,5 @@ class Player:
             os.chmod(tmp, 0o644)
             os.replace(tmp, self.status_path)
         except OSError:
-            pass                                               # the next try is half a second away
+            pass  # the next try is half a second away
         self._next_status = now + (STATUS_PLAYING if self.playing else STATUS_IDLE)

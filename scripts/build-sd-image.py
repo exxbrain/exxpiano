@@ -11,6 +11,7 @@ The first start is offline: DietPi applies local hardware settings without its o
 HONEST STATUS: the whole build is tested on a stand-in image (same layout) and the finished image is read back and its programs run; it has not been
 started on a Raspberry Pi: do that with the first card and look at /var/log/exxpiano-firstboot.log.
 """
+
 import argparse
 import datetime
 import hashlib
@@ -107,7 +108,7 @@ def download(url, dest, fetch=None):
     try:
         with fetch(url + '.sha256') as r:
             expected = r.read().decode().split()[0].lower()
-    except Exception:                                     # noqa: BLE001 - no checksum published or not reachable
+    except Exception:  # noqa: BLE001 - no checksum published or not reachable
         print('build-sd-image: no checksum file found next to the image: not verified')
     if expected and expected != h.hexdigest():
         os.unlink(part)
@@ -129,19 +130,23 @@ def resolve_inputs(args):
         raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
     inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-full.sf2'))
     inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
-    lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')      # for boards with 512 MB; optional unless asked for by name
-    if target_of(args)[0] == 'rpi234' and (args.piano_lite or os.path.isfile(lite)):       # the Pi 5 has 2 GB or more: only the full bank
+    lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')  # for boards with 512 MB; optional unless asked for by name
+    if target_of(args)[0] == 'rpi234' and (args.piano_lite or os.path.isfile(lite)):  # the Pi 5 has 2 GB or more: only the full bank
         inputs['piano_lite'] = os.path.abspath(lite)
     for key in [k for k in ('piano', 'mech', 'piano_lite') if k in inputs]:
         if not os.path.isfile(inputs[key]) or not os.access(inputs[key], os.R_OK):
-            raise BuildError('the required %s bank is missing or unreadable: %s (prepare defaults with scripts/make-soundfonts.sh or pass --%s FILE.sf2)'
-                             % (key, inputs[key], key))
+            raise BuildError(
+                'the required %s bank is missing or unreadable: %s (prepare defaults with scripts/make-soundfonts.sh or pass --%s FILE.sf2)'
+                % (key, inputs[key], key)
+            )
     return inputs
 
 
 def build_deb(version, out_dir):
     os.makedirs(out_dir, exist_ok=True)
-    subprocess.run([sys.executable, os.path.join(ROOT, 'scripts', 'build-deb.py'), '--version', version, '--out', out_dir], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(
+        [sys.executable, os.path.join(ROOT, 'scripts', 'build-deb.py'), '--version', version, '--out', out_dir], check=True, stdout=subprocess.DEVNULL
+    )
     return os.path.join(out_dir, 'exxpiano_%s_all.deb' % version)
 
 
@@ -152,19 +157,41 @@ def docker_ok():
         raise BuildError('Docker is not running: start Docker Desktop and try again')
     if subprocess.run(['docker', 'image', 'inspect', BUILDER_IMAGE], capture_output=True).returncode != 0:
         print('build-sd-image: making the builder image (once)')
-        subprocess.run(['docker', 'build', '-q', '-t', BUILDER_IMAGE, '-f', os.path.join(ROOT, 'scripts', 'sd-builder.Dockerfile'), os.path.join(ROOT, 'scripts')], check=True)
+        subprocess.run(
+            ['docker', 'build', '-q', '-t', BUILDER_IMAGE, '-f', os.path.join(ROOT, 'scripts', 'sd-builder.Dockerfile'), os.path.join(ROOT, 'scripts')],
+            check=True,
+        )
 
 
 def inner_args(plan, path_of):
     """The arguments of sd-image-inner.sh; `path_of(key)` gives the path of an input as the script sees it."""
-    a = ['--image', path_of('dietpi'), '--out', plan['out_img_in_builder'], '--dietpi-version-out', plan['dietpi_version_out_in_builder'],
-         '--deb', path_of('deb'), '--hostname', 'exxpiano',
-         '--country', plan['country'], '--timezone', plan['timezone'], '--locale', plan['locale'], '--keyboard', plan['keyboard'], '--workdir', '/tmp/piano-sd-work']
+    a = [
+        '--image',
+        path_of('dietpi'),
+        '--out',
+        plan['out_img_in_builder'],
+        '--dietpi-version-out',
+        plan['dietpi_version_out_in_builder'],
+        '--deb',
+        path_of('deb'),
+        '--hostname',
+        'exxpiano',
+        '--country',
+        plan['country'],
+        '--timezone',
+        plan['timezone'],
+        '--locale',
+        plan['locale'],
+        '--keyboard',
+        plan['keyboard'],
+        '--workdir',
+        '/tmp/piano-sd-work',
+    ]
     a += ['--piano', path_of('piano'), '--mech', path_of('mech')]
     if plan.get('has_lite'):
         a += ['--piano-lite', path_of('piano_lite')]
     a += ['--onboard-audio', '1' if plan['onboard_audio'] else '0']
-    return a                                    # the passwords go through the environment (SD_PASSWORD, SD_AP_PASSWORD), not through the arguments
+    return a  # the passwords go through the environment (SD_PASSWORD, SD_AP_PASSWORD), not through the arguments
 
 
 def docker_command(plan, inputs, script_args, smoke=False):
@@ -175,7 +202,26 @@ def docker_command(plan, inputs, script_args, smoke=False):
         slot = '/in/%d' % len(mounts)
         mounts += ['-v', '%s:%s:ro' % (folder, slot)]
         mapping[key] = '%s/%s' % (slot, os.path.basename(path))
-    cmd = ['docker', 'run', '--rm', '--privileged', '-e', 'SD_PASSWORD', '-e', 'SD_AP_PASSWORD', '-e', 'SD_ONBOARD_AUDIO', '-v', '%s:/repo:ro' % ROOT, '-v', '%s:/out' % plan['out_dir']] + mounts + [BUILDER_IMAGE]
+    cmd = (
+        [
+            'docker',
+            'run',
+            '--rm',
+            '--privileged',
+            '-e',
+            'SD_PASSWORD',
+            '-e',
+            'SD_AP_PASSWORD',
+            '-e',
+            'SD_ONBOARD_AUDIO',
+            '-v',
+            '%s:/repo:ro' % ROOT,
+            '-v',
+            '%s:/out' % plan['out_dir'],
+        ]
+        + mounts
+        + [BUILDER_IMAGE]
+    )
     if smoke:
         return cmd + ['bash', '/repo/scripts/sd-smoke-test.sh', plan['out_img_in_builder']]
     return cmd + ['bash', '/repo/scripts/sd-image-inner.sh'] + script_args(mapping)
@@ -204,25 +250,45 @@ Its hostname is exxpiano-<installation-id-in-lowercase>; open http://<hostname>.
 The exact installation ID, Wi-Fi name and QR code are shown by the device web page after the first start.
 
 {audio_note}If something is wrong: the log of the first start is /var/log/exxpiano-firstboot.log; DietPi's own logs are in /var/lib/dietpi/logs/.
-'''.format(version=plan['version'], when=plan['when'], zip_name=zip_name,
-           dietpi_version=plan['dietpi_version'], dietpi_sha256=plan['dietpi_sha256'], banks=plan['banks_text'],
-           ap_pw=plan['ap_password'] or wifilib.AP_DEFAULT_PASSWORD, label=plan['label'],
-           audio_note='' if plan['onboard_audio'] else 'This board has no 3.5 mm jack: connect a USB sound card or an audio interface, the piano plays through it.\n\n')
+'''.format(
+        version=plan['version'],
+        when=plan['when'],
+        zip_name=zip_name,
+        dietpi_version=plan['dietpi_version'],
+        dietpi_sha256=plan['dietpi_sha256'],
+        banks=plan['banks_text'],
+        ap_pw=plan['ap_password'] or wifilib.AP_DEFAULT_PASSWORD,
+        label=plan['label'],
+        audio_note=''
+        if plan['onboard_audio']
+        else 'This board has no 3.5 mm jack: connect a USB sound card or an audio interface, the piano plays through it.\n\n',
+    )
 
 
 def parse_args(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--target', choices=sorted(TARGETS), default=DEFAULT_TARGET,
-                    help='the boards the image is for: rpi234 (Raspberry Pi 2/3/4, the default) or rpi5 (Raspberry Pi 5: DietPi_RPi5-ARMv8-Trixie.img.xz, no 3.5 mm jack: needs a USB sound card)')
+    ap.add_argument(
+        '--target',
+        choices=sorted(TARGETS),
+        default=DEFAULT_TARGET,
+        help='the boards the image is for: rpi234 (Raspberry Pi 2/3/4, the default) or rpi5 (Raspberry Pi 5: DietPi_RPi5-ARMv8-Trixie.img.xz, no 3.5 mm jack: needs a USB sound card)',
+    )
     ap.add_argument('--dietpi', help='the DietPi image of the target (for rpi234 DietPi_RPi234-ARMv8-Trixie.img.xz; or an unpacked .img) from dietpi.com')
     ap.add_argument('--download', action='store_true', help='fetch the official DietPi image into build/cache (only when you ask for it)')
     ap.add_argument('--piano', help='the piano bank (.sf2); default build/piano-full.sf2')
-    ap.add_argument('--piano-lite', help='the smaller piano bank for boards with 512 MB (.sf2); default build/piano-lite.sf2 when it exists. The image picks it at the first start when the memory is under 800 MB')
+    ap.add_argument(
+        '--piano-lite',
+        help='the smaller piano bank for boards with 512 MB (.sf2); default build/piano-lite.sf2 when it exists. The image picks it at the first start when the memory is under 800 MB',
+    )
     ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/mech.sf2')
-    ap.add_argument('--password', default=os.environ.get('SD_PASSWORD', ''),
-                    help="DietPi's global password (root and dietpi users); default: SD_PASSWORD; without either the DietPi default stays: change it")
-    ap.add_argument('--ap-password', default=os.environ.get('SD_AP_PASSWORD', ''),
-                    help='the password of the setup network; default: SD_AP_PASSWORD, then exxpianosetup')
+    ap.add_argument(
+        '--password',
+        default=os.environ.get('SD_PASSWORD', ''),
+        help="DietPi's global password (root and dietpi users); default: SD_PASSWORD; without either the DietPi default stays: change it",
+    )
+    ap.add_argument(
+        '--ap-password', default=os.environ.get('SD_AP_PASSWORD', ''), help='the password of the setup network; default: SD_AP_PASSWORD, then exxpianosetup'
+    )
     ap.add_argument('--country', default='GB', help='Wi-Fi country code (RU, GB ...)')
     ap.add_argument('--timezone', default='UTC')
     ap.add_argument('--locale', default='en_GB.UTF-8')
@@ -244,10 +310,25 @@ def plan_image(args, inputs):
     version = read_version()
     banks = [os.path.basename(inputs[k]) for k in ('piano', 'piano_lite', 'mech') if k in inputs]
     target, info = target_of(args)
-    return dict(version=version, target=target, label=info['label'], onboard_audio=info['onboard_audio'], has_lite='piano_lite' in inputs, banks=banks, out_dir=os.path.abspath(args.out), password=args.password, ap_password=args.ap_password,
-                country=args.country, timezone=args.timezone, locale=args.locale, keyboard=args.keyboard,
-                banks_text=', '.join(banks), when=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
-                out_img_in_builder='/out/exxpiano.img', dietpi_version_out_in_builder='/out/dietpi-version.txt')
+    return dict(
+        version=version,
+        target=target,
+        label=info['label'],
+        onboard_audio=info['onboard_audio'],
+        has_lite='piano_lite' in inputs,
+        banks=banks,
+        out_dir=os.path.abspath(args.out),
+        password=args.password,
+        ap_password=args.ap_password,
+        country=args.country,
+        timezone=args.timezone,
+        locale=args.locale,
+        keyboard=args.keyboard,
+        banks_text=', '.join(banks),
+        when=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+        out_img_in_builder='/out/exxpiano.img',
+        dietpi_version_out_in_builder='/out/dietpi-version.txt',
+    )
 
 
 def build_one(args, inputs, plan):
@@ -292,13 +373,26 @@ def build_one(args, inputs, plan):
     with open(os.path.join(out_dir, readme_name), 'w', encoding='utf-8') as f:
         f.write(readme(plan, zip_name))
     manifest_name = 'manifest-%s.json' % plan['target']
-    write_json(os.path.join(out_dir, manifest_name), dict(
-        schema_version=2, product='exxpiano', target_family=plan['target'],
-        product_version=plan['version'], dietpi_version=plan['dietpi_version'],
-        dietpi_source=os.path.basename(inputs['dietpi']), dietpi_sha256=plan['dietpi_sha256'],
-        installation_identity='generated-at-first-boot', setup_ssid_pattern='exxpiano-Setup-<6-hex-installation-id>',
-        hostname_pattern='exxpiano-<6-hex-installation-id-lowercase>', banks=plan['banks'],
-        image=zip_name, image_sha256=zip_hash, raw_image_sha256=raw_image_hash, built_at=plan['when']))
+    write_json(
+        os.path.join(out_dir, manifest_name),
+        dict(
+            schema_version=2,
+            product='exxpiano',
+            target_family=plan['target'],
+            product_version=plan['version'],
+            dietpi_version=plan['dietpi_version'],
+            dietpi_source=os.path.basename(inputs['dietpi']),
+            dietpi_sha256=plan['dietpi_sha256'],
+            installation_identity='generated-at-first-boot',
+            setup_ssid_pattern='exxpiano-Setup-<6-hex-installation-id>',
+            hostname_pattern='exxpiano-<6-hex-installation-id-lowercase>',
+            banks=plan['banks'],
+            image=zip_name,
+            image_sha256=zip_hash,
+            raw_image_sha256=raw_image_hash,
+            built_at=plan['when'],
+        ),
+    )
     print('\nDone:')
     print('  card image : %s (%.0f MB)' % (zip_path, os.path.getsize(zip_path) / 1e6))
     print('  manifest   : %s' % os.path.join(out_dir, manifest_name))

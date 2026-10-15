@@ -4,6 +4,7 @@ The copy is a transaction: a temporary folder on the same filesystem, SHA-256 wh
 atomic rename into the library. Anything that goes wrong (the drive pulled out, the disk full, a damaged file) removes the temporary folder, so a
 half-copied bank never shows up in the library. The source path is always one the caller has found itself in a listing, never one from the browser.
 """
+
 import hashlib
 import json
 import os
@@ -17,7 +18,7 @@ import sf2info
 CHUNK = 1 << 20
 ID_PREFIX = 'i-'
 ID_RE = re.compile(r'^i-[0-9a-f]{16}$')
-MIN_FREE_MB = 64                                   # kept free on the card after the copy
+MIN_FREE_MB = 64  # kept free on the card after the copy
 TMP_PREFIX = '.tmp-import-'
 
 
@@ -56,18 +57,31 @@ def remove_entry(import_dir, entry_id):
 
 def import_bank(src_path, display_name, import_dir, mem_limit=None, progress=None, statvfs=os.statvfs, opener=open):
     """Copy a SoundFont into the library of imported banks. -> (id, already_there)."""
+
     def validate(path):
         try:
             info = sf2info.read_info(path)
         except sf2info.Sf2Error as exc:
             raise ImportFailed('not a usable SoundFont: %s' % exc) from exc
         return dict(name=info.get('name') or display_name)
-    return import_file(src_path, display_name, import_dir, prefix=ID_PREFIX, data_name='bank' + os.path.splitext(src_path)[1].lower(),
-                       validate=validate, mem_limit=mem_limit, progress=progress, statvfs=statvfs, opener=opener)
+
+    return import_file(
+        src_path,
+        display_name,
+        import_dir,
+        prefix=ID_PREFIX,
+        data_name='bank' + os.path.splitext(src_path)[1].lower(),
+        validate=validate,
+        mem_limit=mem_limit,
+        progress=progress,
+        statvfs=statvfs,
+        opener=opener,
+    )
 
 
-def import_file(src_path, display_name, import_dir, prefix, data_name, validate, mem_limit=None, max_bytes=None, progress=None,
-                statvfs=os.statvfs, opener=open):
+def import_file(
+    src_path, display_name, import_dir, prefix, data_name, validate, mem_limit=None, max_bytes=None, progress=None, statvfs=os.statvfs, opener=open
+):
     """The transaction: copy `src_path` into `<import_dir>/<prefix><16 hex of SHA-256>/<data_name>` plus meta.json. -> (id, already_there).
     `validate(path)` checks the copy and returns more fields of meta.json (ImportFailed when the content is not usable).
     `progress(done_bytes, total_bytes, phase)` is called while it works."""
@@ -78,6 +92,7 @@ def import_file(src_path, display_name, import_dir, prefix, data_name, validate,
     except OSError:
         raise ImportFailed('the file is no longer on the drive') from None
     import stat as _stat
+
     if not _stat.S_ISREG(st.st_mode):
         raise ImportFailed('not a plain file')
     total = st.st_size
@@ -123,9 +138,8 @@ def import_file(src_path, display_name, import_dir, prefix, data_name, validate,
         new_id = prefix + digest[:16]
         final = os.path.join(import_dir, new_id)
         if os.path.isdir(final):
-            return new_id, True                                   # the same file is already there: no second copy
-        meta = dict(extra, id=new_id, original_name=display_name, size=total, sha256=digest, file=os.path.basename(target),
-                    imported_at=int(time.time()))
+            return new_id, True  # the same file is already there: no second copy
+        meta = dict(extra, id=new_id, original_name=display_name, size=total, sha256=digest, file=os.path.basename(target), imported_at=int(time.time()))
         with open(os.path.join(tmp, 'meta.json'), 'w', encoding='utf-8') as f:
             json.dump(meta, f, ensure_ascii=False, indent=2, sort_keys=True)
             f.flush()

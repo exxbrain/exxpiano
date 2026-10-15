@@ -3,6 +3,7 @@
 
 Runs as root, once per event; it publishes /run/exxpiano-usb/status.json and does nothing else: no copying (that needs the user's request).
 """
+
 import os
 import subprocess
 import sys

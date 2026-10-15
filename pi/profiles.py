@@ -4,6 +4,7 @@ The running values stay in /etc/exxpiano.conf (the bridge and the synthesizer re
 keyed by the bank's file name, so choosing a bank again brings its settings back. The file is plain JSON, read defensively: whatever is
 not a known setting, or is out of range, is dropped instead of being trusted.
 """
+
 import json
 import os
 import tempfile

@@ -1,4 +1,5 @@
 """Tests for pi/sysmon.py with fake /proc and /sys trees (no Pi needed)."""
+
 import os
 import sys
 import tempfile
@@ -35,8 +36,9 @@ class MonitorCase(unittest.TestCase):
         self.sys = os.path.join(self.tmp.name, 'sys')
         self.clock = Clock()
         self.raw = 0
-        self.mon = sysmon.Monitor(self.proc, self.sys, throttled=lambda: self.raw, clock=self.clock, wall=lambda: 1000.0 + self.clock.t,
-                                  sleep=self.clock.sleep, hz=100)
+        self.mon = sysmon.Monitor(
+            self.proc, self.sys, throttled=lambda: self.raw, clock=self.clock, wall=lambda: 1000.0 + self.clock.t, sleep=self.clock.sleep, hz=100
+        )
 
     def cpu(self, total, cores):
         """cpu lines: (idle, busy) pairs; user = busy, idle = idle."""
@@ -61,7 +63,8 @@ class CpuTests(MonitorCase):
         def sleeping(s):
             calls.append(s)
             orig(s)
-            self.cpu((175, 125), [(175, 125)] * 4)       # in the pause: 75 idle, 25 busy -> 25 %
+            self.cpu((175, 125), [(175, 125)] * 4)  # in the pause: 75 idle, 25 busy -> 25 %
+
         self.mon.sleep = sleeping
         snap = self.mon.get()['now']
         self.assertEqual(calls, [0.25])
@@ -73,10 +76,10 @@ class CpuTests(MonitorCase):
         self.mon.sleep = lambda s: (self.clock.sleep(s), self.cpu((100, 100), [(100, 100)]))
         self.mon.get()
         self.clock.t += 1
-        self.cpu((100, 300), [(100, 300)])                 # nothing idle: 100 %
+        self.cpu((100, 300), [(100, 300)])  # nothing idle: 100 %
         self.assertEqual(self.mon.get()['now']['cpu'], 100.0)
         self.clock.t += 1
-        self.cpu((300, 300), [(300, 300)])                 # all idle
+        self.cpu((300, 300), [(300, 300)])  # all idle
         self.assertEqual(self.mon.get()['now']['cpu'], 0.0)
 
     def test_a_second_client_within_the_interval_shares_the_sample(self):
@@ -92,7 +95,7 @@ class CpuTests(MonitorCase):
         self.cpu((500, 500), [(500, 500)])
         self.mon.get()
         self.clock.t += 1
-        self.cpu((10, 10), [(10, 10)])                      # after a reset of the counters
+        self.cpu((10, 10), [(10, 10)])  # after a reset of the counters
         cpu = self.mon.get()['now']['cpu']
         self.assertTrue(0.0 <= cpu <= 100.0)
 
@@ -127,7 +130,7 @@ class ReadingsTests(MonitorCase):
 class ThrottleTests(unittest.TestCase):
     def test_bits_say_what_happens_now_and_what_happened_since_the_boot(self):
         self.assertEqual(sysmon.parse_throttled(0), dict(raw=0, now=[], past=[]))
-        t = sysmon.parse_throttled(0x50005)                # under-voltage and throttling, now and before
+        t = sysmon.parse_throttled(0x50005)  # under-voltage and throttling, now and before
         self.assertEqual(t['now'], ['undervoltage', 'throttled'])
         self.assertEqual(t['past'], ['undervoltage', 'throttled'])
         t = sysmon.parse_throttled(0x80008)
@@ -139,7 +142,7 @@ class ThrottleTests(unittest.TestCase):
     def test_the_kernel_file_is_the_fallback_and_nothing_gives_none(self):
         with tempfile.TemporaryDirectory() as d:
             old = os.environ['PATH']
-            os.environ['PATH'] = d                          # no vcgencmd here
+            os.environ['PATH'] = d  # no vcgencmd here
             try:
                 self.assertIsNone(sysmon.read_throttled(d))
                 put(d, 'devices/platform/soc/soc:firmware/get_throttled', '50000\n')
@@ -177,9 +180,10 @@ class ProcessTests(MonitorCase):
 
         def pause(s):
             self.clock.sleep(s)
-            self.process(10, 'fluidsynth', '/usr/bin/fluidsynth', 1025)        # 25 ticks in 0.25 s at 100 Hz: one full core
+            self.process(10, 'fluidsynth', '/usr/bin/fluidsynth', 1025)  # 25 ticks in 0.25 s at 100 Hz: one full core
             self.process(11, 'python3', '/opt/exxpiano/exxpiano-fx.py', 51)
             self.process(12, 'python3', '/opt/exxpiano/exxpiano-web.py', 5)
+
         self.mon.sleep = pause
         p = self.mon.get()['now']['procs']
         self.assertEqual(p['synth'], 100.0)
@@ -191,7 +195,7 @@ class ProcessTests(MonitorCase):
         p = self.mon.get()['now']['procs']
         self.assertEqual(p, dict(synth=None, bridge=None, web=None))
         self.process(20, 'fluidsynth', 'fluidsynth', 10)
-        self.clock.t += 30                                  # the process list is scanned again after the cache time
+        self.clock.t += 30  # the process list is scanned again after the cache time
         self.mon.get()
         self.process(20, 'fluidsynth', 'fluidsynth', 110)
         self.clock.t += 1
@@ -276,7 +280,7 @@ class AudioTests(MonitorCase):
 
     def test_closed_streams_and_capture_only_cards_are_not_listed(self):
         put(self.snd, 'card0/pcm0p/sub0/hw_params', 'closed\n')
-        put(self.snd, 'card2/pcm0c/sub0/hw_params', HW_U24)                  # the keyboard's capture side
+        put(self.snd, 'card2/pcm0c/sub0/hw_params', HW_U24)  # the keyboard's capture side
         self.assertEqual(self.mon.get()['now']['audio'], [])
 
     def test_only_the_card_in_use_is_listed_when_several_are_present(self):
@@ -286,7 +290,7 @@ class AudioTests(MonitorCase):
 
     def test_junk_and_a_missing_asound_give_a_partial_answer_or_nothing(self):
         self.assertEqual(self.mon.get()['now']['audio'], [])
-        self.clock.t += 1                                            # a new sample, not the cached one
+        self.clock.t += 1  # a new sample, not the cached one
         self.stream(1, 'rate: fast\nperiod_size: x\nbuffer_size:\n', 'nonsense')
         (a,) = self.mon.get()['now']['audio']
         self.assertEqual((a['rate'], a['period'], a['period_ms'], a['buffer_ms'], a['state']), (None, None, None, None, None))
@@ -309,7 +313,7 @@ class HistoryTests(MonitorCase):
             self.mon.get()
         self.assertEqual(len(self.mon.get(0)['points']), 4)
         self.assertEqual(len(self.mon.get(t0)['points']), 3)
-        self.assertEqual(self.mon.get(10 ** 15)['points'], [])
+        self.assertEqual(self.mon.get(10**15)['points'], [])
 
     def test_the_history_is_bounded(self):
         self.cpu((100, 100), [(100, 100)])

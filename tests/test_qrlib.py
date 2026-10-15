@@ -1,5 +1,6 @@
 """Tests for pi/qrlib.py. The two golden codes were decoded back to their text with an independent decoder (OpenCV, classic and Aruco detectors,
 six image scales) when they were written down; the encoder as a whole was checked the same way on 480 forced-mask and 300 random payloads."""
+
 import os
 import struct
 import sys
@@ -107,14 +108,14 @@ class StructureTests(unittest.TestCase):
             self.assertEqual([''.join('1' if m[oy + y][ox + x] else '0' for x in range(7)) for y in range(7)], finder)
         self.assertEqual([m[6][i] for i in range(8, n - 8)], [i % 2 == 0 for i in range(8, n - 8)])
         self.assertEqual([m[i][6] for i in range(8, n - 8)], [i % 2 == 0 for i in range(8, n - 8)])
-        self.assertTrue(m[n - 8][8])                                            # the module that is always dark
+        self.assertTrue(m[n - 8][8])  # the module that is always dark
 
     def test_the_format_information_is_written_twice_and_is_a_valid_bch_word(self):
         for ecc in 'LM':
             for mask in range(8):
                 m = qrlib.encode('format check', ecc, mask=mask)
                 n = len(m)
-                first = [m[i][8] for i in range(6)] + [m[7][8], m[8][8], m[8][7]] + [m[8][14 - i] for i in range(9, 15)]          # m[y][x]
+                first = [m[i][8] for i in range(6)] + [m[7][8], m[8][8], m[8][7]] + [m[8][14 - i] for i in range(9, 15)]  # m[y][x]
                 second = [m[8][n - 1 - i] for i in range(8)] + [m[n - 15 + i][8] for i in range(8, 15)]
                 self.assertEqual(first, second)
                 word = sum(int(b) << i for i, b in enumerate(first)) ^ 0x5412
@@ -123,15 +124,15 @@ class StructureTests(unittest.TestCase):
                 rem = data
                 for _ in range(10):
                     rem = (rem << 1) ^ ((rem >> 9) * 0x537)
-                self.assertEqual(word & 0x3FF, rem)                              # the 10 check bits agree
+                self.assertEqual(word & 0x3FF, rem)  # the 10 check bits agree
 
     def test_the_version_information_exists_from_version_7(self):
-        m = qrlib.encode('x' * 140, 'L')                                          # version 7: 45 modules
+        m = qrlib.encode('x' * 140, 'L')  # version 7: 45 modules
         n = len(m)
         self.assertEqual(n, 45)
         word = sum(int(m[i // 3][n - 11 + i % 3]) << i for i in range(18))
         self.assertEqual(word >> 12, 7)
-        self.assertEqual(sum(int(m[n - 11 + i % 3][i // 3]) << i for i in range(18)), word)   # and its mirror copy
+        self.assertEqual(sum(int(m[n - 11 + i % 3][i // 3]) << i for i in range(18)), word)  # and its mirror copy
 
     def test_a_larger_text_always_changes_the_picture_and_the_choice_is_deterministic(self):
         self.assertEqual(qrlib.encode('same'), qrlib.encode('same'))
@@ -155,8 +156,8 @@ class StructureTests(unittest.TestCase):
             total = len(words) // n_blocks
             data_len = [total - ecc_len + (0 if i < short else 1) for i in range(n_blocks)]
             # de-interleave and check every block: data + ecc has remainder zero when divided by the generator
-            data_words = words[:sum(data_len)]
-            ecc_words = words[sum(data_len):]
+            data_words = words[: sum(data_len)]
+            ecc_words = words[sum(data_len) :]
             divisor = qrlib._rs_divisor(ecc_len)
             pos = [0] * n_blocks
             blocks = [[] for _ in range(n_blocks)]
@@ -177,11 +178,12 @@ class OutputTests(unittest.TestCase):
     def test_svg(self):
         svg = qrlib.to_svg(qrlib.encode('A'))
         self.assertTrue(svg.startswith('<svg') and svg.endswith('</svg>'))
-        self.assertIn('viewBox="0 0 29 29"', svg)                                  # 21 modules and a border of 4 on each side
+        self.assertIn('viewBox="0 0 29 29"', svg)  # 21 modules and a border of 4 on each side
         self.assertIn('fill="#000000"', svg)
 
     def test_the_svg_draws_exactly_the_dark_modules(self):
         import re
+
         m = qrlib.encode('http://10.42.0.1:8080/#/wifi')
         svg = qrlib.to_svg(m, border=4)
         cells = {(int(x) - 4, int(y) - 4) for x, y in re.findall(r'M(\d+),(\d+)h1v1h-1z', svg)}
@@ -193,9 +195,9 @@ class OutputTests(unittest.TestCase):
         self.assertEqual(png[:8], b'\x89PNG\r\n\x1a\n')
         pos, chunks = 8, {}
         while pos < len(png):
-            length, tag = struct.unpack('>I4s', png[pos:pos + 8])
-            body = png[pos + 8:pos + 8 + length]
-            self.assertEqual(struct.unpack('>I', png[pos + 8 + length:pos + 12 + length])[0], zlib.crc32(tag + body) & 0xFFFFFFFF)
+            length, tag = struct.unpack('>I4s', png[pos : pos + 8])
+            body = png[pos + 8 : pos + 8 + length]
+            self.assertEqual(struct.unpack('>I', png[pos + 8 + length : pos + 12 + length])[0], zlib.crc32(tag + body) & 0xFFFFFFFF)
             chunks[tag] = body
             pos += 12 + length
         size = (len(m) + 8) * 5
@@ -203,11 +205,11 @@ class OutputTests(unittest.TestCase):
         raw = zlib.decompress(chunks[b'IDAT'])
         stride = 1 + (size + 7) // 8
         self.assertEqual(len(raw), stride * size)
-        self.assertEqual(raw[0], 0)                                                 # filter type none
-        self.assertTrue(all(b == 0xFF for b in raw[1:stride]))                      # the first row is the white border
-        row_with_finder = raw[stride * (4 * 5 + 2):stride * (4 * 5 + 3)][1:]
+        self.assertEqual(raw[0], 0)  # filter type none
+        self.assertTrue(all(b == 0xFF for b in raw[1:stride]))  # the first row is the white border
+        row_with_finder = raw[stride * (4 * 5 + 2) : stride * (4 * 5 + 3)][1:]
         self.assertEqual(row_with_finder[0], 0xFF)
-        self.assertNotEqual(row_with_finder[2], 0xFF)                               # the finder is dark after the 4 + border modules
+        self.assertNotEqual(row_with_finder[2], 0xFF)  # the finder is dark after the 4 + border modules
 
     def test_the_wifi_text_escapes_what_phones_treat_as_separators(self):
         self.assertEqual(qrlib.wifi_text('Home', 'secret123'), 'WIFI:T:WPA;S:Home;P:secret123;;')

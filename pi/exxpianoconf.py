@@ -8,6 +8,7 @@ Scopes tell what has to happen after a change:
   gain  - set live in FluidSynth (its TCP shell) and stored for the next start
   synth - needs a restart of exxpiano (the banks reload, ~45 s)
 """
+
 import os
 import re
 import shlex
@@ -81,7 +82,7 @@ def _coerce(name, raw):
         value = float(raw) if spec['kind'] == 'float' else int(float(raw))
     except (TypeError, ValueError):
         raise ValueError('%s: not a number: %r' % (name, raw)) from None
-    if isinstance(raw, bool) or value != value:     # NaN or a JSON boolean
+    if isinstance(raw, bool) or value != value:  # NaN or a JSON boolean
         raise ValueError('%s: not a number: %r' % (name, raw))
     if not spec['lo'] <= value <= spec['hi']:
         raise ValueError('%s: %s is outside %s..%s' % (name, value, spec['lo'], spec['hi']))
@@ -167,7 +168,7 @@ def apply_updates(updates, path=None, raw=None):
 
     with open(path, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    wanted = {}                                   # conf KEY -> full new line
+    wanted = {}  # conf KEY -> full new line
     for name in clean:
         spec = SETTINGS[name]
         if spec['key'] == 'FX_ARGS':

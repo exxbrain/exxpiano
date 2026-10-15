@@ -5,6 +5,7 @@
 
 Fails (exit 1) when CHANGELOG.md has no `## <VERSION>` section, so a release cannot go out without its changes described.
 """
+
 import os
 import re
 import sys

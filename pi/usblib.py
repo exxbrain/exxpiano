@@ -3,6 +3,7 @@
 A USB drive is untrusted. The mount is `ro,nosuid,nodev,noexec`; only plain files of the folder `piano-banks/` in the root of the drive are offered;
 the browser never sends a path, only the name of a file this module has just listed. Nothing is copied before the user asks for it.
 """
+
 import json
 import os
 import re
@@ -66,7 +67,7 @@ def list_candidates(mountpoint, folder_name=BANK_FOLDER, exts=BANK_EXT):
     for name in names:
         if name.startswith('.') or not NAME_RE.match(name) or not name.lower().endswith(exts):
             continue
-        if folder_name == BANK_FOLDER and name.lower() in ('mech.sf2', 'mech.sf3'):      # the mechanics bank is not replaced from a drive
+        if folder_name == BANK_FOLDER and name.lower() in ('mech.sf2', 'mech.sf3'):  # the mechanics bank is not replaced from a drive
             continue
         try:
             st = os.lstat(os.path.join(folder, name))
@@ -90,11 +91,17 @@ def drive_state(drive):
     """One drive of the status file made ready for the web interface: label, readiness, reason, candidates."""
     mount = drive.get('mountpoint')
     ready = bool(drive.get('mounted') and mount and os.path.isdir(mount))
-    return dict(id=drive.get('id'), label=drive.get('label') or 'USB', fs=drive.get('fs'), ready=ready,
-                reason=drive.get('reason') if not ready else None, has_folder=bool(ready and os.path.isdir(os.path.join(mount, BANK_FOLDER))),
-                files=list_candidates(mount) if ready else [],
-                midi_files=list_candidates(mount, MIDI_FOLDER, MIDI_EXT) if ready else [],
-                has_midi_folder=bool(ready and os.path.isdir(os.path.join(mount, MIDI_FOLDER))))
+    return dict(
+        id=drive.get('id'),
+        label=drive.get('label') or 'USB',
+        fs=drive.get('fs'),
+        ready=ready,
+        reason=drive.get('reason') if not ready else None,
+        has_folder=bool(ready and os.path.isdir(os.path.join(mount, BANK_FOLDER))),
+        files=list_candidates(mount) if ready else [],
+        midi_files=list_candidates(mount, MIDI_FOLDER, MIDI_EXT) if ready else [],
+        has_midi_folder=bool(ready and os.path.isdir(os.path.join(mount, MIDI_FOLDER))),
+    )
 
 
 # ---- the privileged side: mount and unmount (used by exxpiano-usb.py, run by udev/systemd as root)

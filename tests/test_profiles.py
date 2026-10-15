@@ -1,4 +1,5 @@
 """Tests for pi/profiles.py (settings remembered per instrument)."""
+
 import json
 import os
 import sys
@@ -15,7 +16,7 @@ class ProfilesTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.path = os.path.join(self.tmp.name, 'sub', 'profiles.json')      # the folder does not exist yet
+        self.path = os.path.join(self.tmp.name, 'sub', 'profiles.json')  # the folder does not exist yet
 
     def test_save_and_get_roundtrip_creates_the_folder(self):
         profiles.save(self.path, 'a.sf2', {'velocity_curve': 1.4, 'gain': 2.0, 'piano_bank': 0, 'piano_prog': 0})
@@ -42,8 +43,8 @@ class ProfilesTests(unittest.TestCase):
         names = exxpianoconf.PER_DEVICE_NAMES
         profiles.save(self.path, 'plughw:CARD=U24', {'usb_period_size': 128, 'gain': 2.0, 'periods': 4}, names)
         self.assertEqual(profiles.get(self.path, 'plughw:CARD=U24', names), {'usb_period_size': 128, 'periods': 4})
-        self.assertEqual(profiles.load(self.path), {})                  # read as bank settings nothing of it is valid
-        profiles.save(self.path, 'plughw:CARD=U24', {'usb_period_size': 9999}, names)    # out of range: dropped on reading
+        self.assertEqual(profiles.load(self.path), {})  # read as bank settings nothing of it is valid
+        profiles.save(self.path, 'plughw:CARD=U24', {'usb_period_size': 9999}, names)  # out of range: dropped on reading
         self.assertEqual(profiles.get(self.path, 'plughw:CARD=U24', names), None)
 
     def test_a_missing_file_gives_nothing(self):
@@ -52,8 +53,7 @@ class ProfilesTests(unittest.TestCase):
     def test_junk_in_the_file_is_dropped_not_trusted(self):
         os.makedirs(os.path.dirname(self.path))
         with open(self.path, 'w') as f:
-            json.dump({'a.sf2': {'gain': 99, 'velocity_curve': 1.2, 'evil': 1, 'hammer_exp': 'x'}, 'b.sf2': 'nope', 'c.sf2': {'gain': -1},
-                       5: {}}, f)
+            json.dump({'a.sf2': {'gain': 99, 'velocity_curve': 1.2, 'evil': 1, 'hammer_exp': 'x'}, 'b.sf2': 'nope', 'c.sf2': {'gain': -1}, 5: {}}, f)
         self.assertEqual(profiles.load(self.path), {'a.sf2': {'velocity_curve': 1.2}})
 
     def test_corrupt_oversized_and_wrong_shape_files_give_nothing(self):
