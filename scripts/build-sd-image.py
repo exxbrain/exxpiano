@@ -258,7 +258,7 @@ The exact installation ID, Wi-Fi name and QR code are shown by the device web pa
         dietpi_sha256=plan['dietpi_sha256'],
         banks=plan['banks_text'],
         # a password given with --ap-password stays out of the README: it is published next to the image
-        ap_pw='the one given with --ap-password at build time' if plan['ap_password'] else wifilib.AP_DEFAULT_PASSWORD,
+        ap_pw='the one given with --ap-password at build time' if plan['custom_ap_password'] else wifilib.AP_DEFAULT_PASSWORD,
         label=plan['label'],
         audio_note=''
         if plan['onboard_audio']
@@ -319,8 +319,7 @@ def plan_image(args, inputs):
         has_lite='piano_lite' in inputs,
         banks=banks,
         out_dir=os.path.abspath(args.out),
-        password=args.password,
-        ap_password=args.ap_password,
+        custom_ap_password=args.ap_password not in (None, ''),  # the passwords themselves stay out of the plan: it feeds the README
         country=args.country,
         timezone=args.timezone,
         locale=args.locale,

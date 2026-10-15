@@ -259,7 +259,7 @@ class BuildTests(Case):
         r = self.run_build()
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         with open(os.path.join(self.out, 'README-rpi234.txt'), encoding='utf-8') as f:
-            self.assertIn('(password: exxpianosetup)', f.read())
+            self.assertIn('(password: %s)' % bsi.wifilib.AP_DEFAULT_PASSWORD, f.read())
 
     def test_the_container_gets_read_only_inputs_a_writable_output_and_the_passwords_in_the_environment(self):
         lite = self.touch('banks/piano-lite.sf2', b'l' * 10)
