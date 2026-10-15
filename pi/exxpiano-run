@@ -22,7 +22,7 @@ USB_WAIT="${USB_WAIT:-8}"          # the most seconds to wait for a USB card to 
 USB_SETTLE="${USB_SETTLE:-12}"      # seconds after the boot that USB devices need to show up; later nothing is waited for without a reason
 USB_SYSFS="${USB_SYSFS:-/sys/bus/usb/devices}"
 UPTIME_FILE="${PROC_UPTIME:-/proc/uptime}"
-POLYPHONY="${POLYPHONY:-192}"
+POLYPHONY="${POLYPHONY:-256}"
 CPU_CORES="${CPU_CORES:-3}"        # synthesis threads of FluidSynth (synth.cpu-cores): the voices of a dense piece are shared between the cores
 CPU_COUNT="${CPU_COUNT:-$(nproc 2>/dev/null || echo 1)}"
 if [ "$CPU_CORES" -ge "$CPU_COUNT" ]; then          # one core always stays for the system, the bridge and the web interface

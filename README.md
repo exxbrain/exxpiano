@@ -248,7 +248,7 @@ Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart ex
 | Setting | What it does |
 |---|---|
 | `GAIN` | overall volume of the synthesizer (0.2 is FluidSynth's own default; **0.6** is the loudest value at which the densest piece tried does not clip; the slider of the web interface is a dB scale around it, and only its last part can distort) |
-| `POLYPHONY` | number of voices (default 192, up to 256); stereo uses two voices per note, and the mechanics add more |
+| `POLYPHONY` | number of voices (default 256, the most); stereo uses two voices per note, and the mechanics add more |
 | `METER` | 1 = the output goes through the level meter: the **Home** section shows the peak of the left and the right channel and counts the samples at full scale (clipping). It costs about 3% of one core; 0 plays to the card directly |
 | `CPU_CORES` | synthesis threads of FluidSynth (1-4, default 3; one core always stays free): the voices of a dense piece are shared between the cores of the board, so a higher `POLYPHONY` (192 or 256) becomes possible (also in the **Audio output** section) |
 | `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |

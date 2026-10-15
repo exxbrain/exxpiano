@@ -29,7 +29,7 @@ SETTINGS = {
     'pedal_boost': dict(kind='float', lo=-30.0, hi=30.0, default=4.5, scope='fx', key='FX_ARGS', flag='--pedal-boost'),
     'gain': dict(kind='float', lo=0.01, hi=2.0, default=0.6, scope='gain', key='GAIN'),
     'reverb': dict(kind='int', lo=0, hi=1, default=0, scope='synth', key='REVERB'),
-    'polyphony': dict(kind='int', lo=16, hi=256, default=192, scope='synth', key='POLYPHONY'),
+    'polyphony': dict(kind='int', lo=16, hi=256, default=256, scope='synth', key='POLYPHONY'),
     'cpu_cores': dict(kind='int', lo=1, hi=4, default=3, scope='synth', key='CPU_CORES'),
     'alsa_device': dict(kind='device', default='auto', scope='synth', key='ALSA_DEVICE'),
     'usb_period_size': dict(kind='int', lo=64, hi=8192, default=64, scope='synth', key='USB_PERIOD_SIZE'),

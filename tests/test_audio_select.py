@@ -168,9 +168,9 @@ class AudioSelectTests(unittest.TestCase):
                     self.assertIn('audio.alsa.device=plughw:CARD=Headphones', off.stdout)
                     self.assertNotIn('exxpiano_tap', off.stdout)
 
-    def test_the_defaults_are_192_voices_on_3_threads(self):
+    def test_the_defaults_are_256_voices_on_3_threads(self):
         r = self.run_script([HEADPHONES], CPU_COUNT=4)
-        self.assertIn('synth.polyphony=192', r.stdout)
+        self.assertIn('synth.polyphony=256', r.stdout)
         self.assertIn('synth.cpu-cores=3', r.stdout)
 
     def test_the_synthesis_threads_are_shared_between_cores_and_one_core_stays_free(self):
