@@ -431,7 +431,7 @@ and the audio quality of a built bank was checked by hand through FluidSynth.
 
 ## If something does not work
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). If it does not help, [open an issue](https://github.com/exxbrain/exxpiano/issues/new?template=problem.yml): the form asks for the version, the board, the keyboard and the sound output, which is what it takes to find the cause.
 
 ## Licenses
 

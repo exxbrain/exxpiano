@@ -426,7 +426,7 @@ python3 -m unittest discover -s tests -v
 
 ## Если что-то не работает
 
-См. [docs/TROUBLESHOOTING.ru.md](docs/TROUBLESHOOTING.ru.md).
+См. [docs/TROUBLESHOOTING.ru.md](docs/TROUBLESHOOTING.ru.md). Если не помогло, [создайте issue](https://github.com/exxbrain/exxpiano/issues/new?template=problem.yml) (можно по-русски): форма спросит версию, плату, клавиатуру и звуковой выход — это то, что нужно, чтобы найти причину.
 
 ## Лицензии
 
