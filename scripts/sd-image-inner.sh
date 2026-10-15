@@ -10,7 +10,7 @@
 set -euo pipefail
 
 IMAGE="" OUT="" DIETPI_VERSION_OUT="" DEB="" PIANO="" PIANO_LITE="" ONBOARD_AUDIO=1 MECH="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
-KEYBOARD="us" EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work" NETWORK_IN_CHROOT=1
+KEYBOARD="us" EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 die() { echo "sd-image: $*" >&2; exit 1; }

@@ -3,6 +3,7 @@
 Run from the repository root:   python3 -m unittest discover -s tests -v
 dpkg itself is the final judge: on the Pi run `dpkg-deb --info FILE.deb` and `dpkg-deb --contents FILE.deb`.
 """
+
 import gzip
 import hashlib
 import io
@@ -22,11 +23,11 @@ def parse_ar(path):
     assert data[:8] == b'!<arch>\n'
     pos, members = 8, []
     while pos < len(data):
-        hdr = data[pos:pos + 60]
+        hdr = data[pos : pos + 60]
         assert len(hdr) == 60 and hdr[58:60] == b'`\n', 'bad ar header at %d' % pos
         name = hdr[0:16].decode().strip().rstrip('/')
         size = int(hdr[48:58].decode())
-        members.append((name, data[pos + 60:pos + 60 + size], hdr))
+        members.append((name, data[pos + 60 : pos + 60 + size], hdr))
         pos += 60 + size + (size % 2)
     return members
 
@@ -53,10 +54,21 @@ class DebTests(unittest.TestCase):
             with open(p, 'wb') as f:
                 f.write(payload)
             cls.banks[name] = (p, payload)
-        subprocess.run([sys.executable, os.path.join(ROOT, 'scripts', 'build-deb.py'), '--version', '9.9.9',
-                        '--out', os.path.join(cls.out, 'dist'),
-                        '--banks', cls.banks['piano.sf2'][0], cls.banks['mech.sf2'][0]],
-                       check=True, capture_output=True)
+        subprocess.run(
+            [
+                sys.executable,
+                os.path.join(ROOT, 'scripts', 'build-deb.py'),
+                '--version',
+                '9.9.9',
+                '--out',
+                os.path.join(cls.out, 'dist'),
+                '--banks',
+                cls.banks['piano.sf2'][0],
+                cls.banks['mech.sf2'][0],
+            ],
+            check=True,
+            capture_output=True,
+        )
         cls.main = os.path.join(cls.out, 'dist', 'exxpiano_9.9.9_all.deb')
         cls.fonts = os.path.join(cls.out, 'dist', 'exxpiano-soundfonts_9.9.9_all.deb')
 
@@ -85,7 +97,7 @@ class DebTests(unittest.TestCase):
         self.assertEqual(control['Architecture'], 'all')
         for dep in ('fluidsynth', 'python3-mido', 'python3-rtmidi', 'alsa-utils', 'hostapd', 'dnsmasq-base', 'iw', 'wpasupplicant'):
             self.assertIn(dep, control['Depends'])
-        self.assertNotIn('dnsmasq,', control['Depends'] + ',')                   # the full package would start its own DNS server on port 53
+        self.assertNotIn('dnsmasq,', control['Depends'] + ',')  # the full package would start its own DNS server on port 53
         self.assertEqual(control['Recommends'], 'avahi-daemon')
         self.assertTrue(control['Description'].split('\n')[0])
         self.assertTrue(control['Installed-Size'].isdigit())
@@ -100,10 +112,15 @@ class DebTests(unittest.TestCase):
     def test_data_files_owner_and_modes(self):
         data = self.tar(self.members(self.main)[2][1])
         names = {m.name: m for m in data.getmembers()}
-        for path in ('./etc/exxpiano.conf', './opt/exxpiano/exxpiano-fx.py',
-                     './lib/systemd/system/exxpiano.service', './lib/systemd/system/exxpiano-fx.service',
-                     './usr/bin/exxpiano-install-banks', './usr/share/doc/exxpiano/copyright',
-                     './opt/exxpiano/soundfonts'):
+        for path in (
+            './etc/exxpiano.conf',
+            './opt/exxpiano/exxpiano-fx.py',
+            './lib/systemd/system/exxpiano.service',
+            './lib/systemd/system/exxpiano-fx.service',
+            './usr/bin/exxpiano-install-banks',
+            './usr/share/doc/exxpiano/copyright',
+            './opt/exxpiano/soundfonts',
+        ):
             self.assertIn(path, names)
         for m in names.values():
             self.assertEqual((m.uid, m.gid, m.uname, m.gname), (0, 0, 'root', 'root'), m.name)
@@ -124,7 +141,7 @@ class DebTests(unittest.TestCase):
         self.assertIn('EnvironmentFile=/etc/exxpiano.conf', synth)
         self.assertIn('ExecStart=/opt/exxpiano/exxpiano-run', synth)
         runner = data.extractfile('./opt/exxpiano/exxpiano-run').read().decode()
-        self.assertIn('mkfifo', runner)                     # FluidSynth keeps running on a root-only pipe, no network port
+        self.assertIn('mkfifo', runner)  # FluidSynth keeps running on a root-only pipe, no network port
         self.assertNotIn('shell.port', runner)
         self.assertEqual(data.getmember('./opt/exxpiano/exxpiano-run').mode, 0o755)
         names = [m.name for m in data.getmembers()]
@@ -132,12 +149,36 @@ class DebTests(unittest.TestCase):
         self.assertIn('./lib/udev/rules.d/90-exxpiano.rules', names)
         for meter_file in ('./opt/exxpiano/exxpiano-meter.py', './etc/alsa/conf.d/60-exxpiano-tap.conf'):
             self.assertIn(meter_file, names)
-        for demo in ('./opt/exxpiano/exxpiano-demo-midi.py', './usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid', './usr/share/exxpiano/midi/liszt-la-campanella-2013.mid', './usr/share/exxpiano/midi/NOTICE.md'):
+        for demo in (
+            './opt/exxpiano/exxpiano-demo-midi.py',
+            './usr/share/exxpiano/midi/liszt-un-sospiro-2011.mid',
+            './usr/share/exxpiano/midi/liszt-la-campanella-2013.mid',
+            './usr/share/exxpiano/midi/NOTICE.md',
+        ):
             self.assertIn(demo, names)
         self.assertEqual(data.getmember('./opt/exxpiano/exxpiano-demo-midi.py').mode, 0o755)
-        for web_file in ('./opt/exxpiano/exxpianoconf.py', './opt/exxpiano/exxpiano-web.py', './opt/exxpiano/sf2info.py',
-                         './opt/exxpiano/banklib.py', './opt/exxpiano/bankimport.py', './opt/exxpiano/usblib.py', './opt/exxpiano/midilib.py', './opt/exxpiano/midiplayer.py', './opt/exxpiano/exxpiano-usb.py', './lib/systemd/system/exxpiano-usb@.service', './opt/exxpiano/profiles.py', './opt/exxpiano/sysmon.py', './opt/exxpiano/wifilib.py', './opt/exxpiano/qrlib.py', './opt/exxpiano/deviceid.py', './opt/exxpiano/exxpiano-wifi.py', './lib/systemd/system/exxpiano-wifi.service', './var/lib/exxpiano',
-                         './opt/exxpiano/web/index.html', './lib/systemd/system/exxpiano-web.service'):
+        for web_file in (
+            './opt/exxpiano/exxpianoconf.py',
+            './opt/exxpiano/exxpiano-web.py',
+            './opt/exxpiano/sf2info.py',
+            './opt/exxpiano/banklib.py',
+            './opt/exxpiano/bankimport.py',
+            './opt/exxpiano/usblib.py',
+            './opt/exxpiano/midilib.py',
+            './opt/exxpiano/midiplayer.py',
+            './opt/exxpiano/exxpiano-usb.py',
+            './lib/systemd/system/exxpiano-usb@.service',
+            './opt/exxpiano/profiles.py',
+            './opt/exxpiano/sysmon.py',
+            './opt/exxpiano/wifilib.py',
+            './opt/exxpiano/qrlib.py',
+            './opt/exxpiano/deviceid.py',
+            './opt/exxpiano/exxpiano-wifi.py',
+            './lib/systemd/system/exxpiano-wifi.service',
+            './var/lib/exxpiano',
+            './opt/exxpiano/web/index.html',
+            './lib/systemd/system/exxpiano-web.service',
+        ):
             self.assertIn(web_file, names)
 
     def test_soundfonts_package(self):

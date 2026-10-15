@@ -9,7 +9,7 @@ exxpiano-run lets FluidSynth play through the ALSA device `exxpiano_tap` (see 60
 It must never be slower than the audio: while the pipe is not read, the synthesizer waits. That is why exxpiano-run starts it in a loop and
 holds the pipe open itself; a read here takes microseconds (the peaks come from max/min on the whole block, not from a loop over samples).
 """
-import array
+
 import json
 import math
 import os
@@ -20,10 +20,10 @@ import time
 RATE = 44100
 FULL_SCALE = 32768.0
 SILENCE_DB = -90.0
-PUBLISH = 0.1            # seconds between status files
-HOLD_FALL = 20.0         # dB per second: how fast the held peak falls
+PUBLISH = 0.1  # seconds between status files
+HOLD_FALL = 20.0  # dB per second: how fast the held peak falls
 READ = 16384
-NAP = 0.05               # seconds between reads: the synthesizer writes a few hundred times a second, the pipe holds 0.37 s; fewer, larger reads cost much less (about 3% of one core of a Pi 3 in all)
+NAP = 0.05  # seconds between reads: the synthesizer writes a few hundred times a second, the pipe holds 0.37 s; fewer, larger reads cost much less (about 3% of one core of a Pi 3 in all)
 
 
 def to_db(peak):
@@ -43,10 +43,10 @@ class Meter:
     0x80): a clipped sample is always among them, and a sample that is that close to the limit is as good as clipped."""
 
     def __init__(self):
-        self.peak = [0, 0]                  # since the last status
+        self.peak = [0, 0]  # since the last status
         self.hold = [SILENCE_DB, SILENCE_DB]
-        self.clipped = [0, 0]               # since the start
-        self.last_clip = None               # time of the last clipped sample
+        self.clipped = [0, 0]  # since the start
+        self.last_clip = None  # time of the last clipped sample
         self.last_status = None
         self.tail = b''
 
@@ -57,13 +57,13 @@ class Meter:
         if not usable:
             return
         block = data[:usable]
-        values = memoryview(block).cast('h')                           # the exact 16 bit values, without a copy
+        values = memoryview(block).cast('h')  # the exact 16 bit values, without a copy
         for c in (0, 1):
-            hi = block[2 * c + 1::4]                                   # the high byte of every sample of this channel
+            hi = block[2 * c + 1 :: 4]  # the high byte of every sample of this channel
             top = max(hi.translate(MAG))
             if top >= 2:
                 peak = min(32767, top * 256 + 128)
-            else:                                                      # quiet: the exact values of every 16th sample are enough for a level
+            else:  # quiet: the exact values of every 16th sample are enough for a level
                 thin = values[c::32]
                 peak = max(max(thin), -min(thin))
             self.peak[c] = max(self.peak[c], peak)
@@ -82,8 +82,9 @@ class Meter:
             self.hold[c] = max(level, self.hold[c] - HOLD_FALL * dt)
             out[name] = dict(peak=round(level, 1), hold=round(self.hold[c], 1), clipped=self.clipped[c])
             self.peak[c] = 0
-        return dict(t=round(wall, 2), rate=RATE, left=out['left'], right=out['right'],
-                    clip_ago=None if self.last_clip is None else round(now - self.last_clip, 1))
+        return dict(
+            t=round(wall, 2), rate=RATE, left=out['left'], right=out['right'], clip_ago=None if self.last_clip is None else round(now - self.last_clip, 1)
+        )
 
 
 def publish(path, status):
@@ -109,7 +110,7 @@ def run(pipe, status_path):
                 data = os.read(fd, READ)
             except OSError:
                 break
-            if not data:                       # every writer is gone: wait for the next start of the synthesizer
+            if not data:  # every writer is gone: wait for the next start of the synthesizer
                 break
             now = time.monotonic()
             meter.feed(data, now)

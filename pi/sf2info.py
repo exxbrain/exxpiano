@@ -6,13 +6,14 @@ against the real file size. Only the INFO chunk and the preset headers are read;
     python3 sf2info.py FILE.sf2           print the name and the presets (JSON); exit status 1 if the file is not a usable bank
     python3 sf2info.py --check FILE.sf2   silent check for scripts: exit status 0 when usable
 """
+
 import json
 import os
 import struct
 import sys
 
-MAX_INFO = 1 << 20          # the INFO chunk is a few hundred bytes in real banks
-MAX_PDTA = 16 << 20         # preset/instrument/sample headers: 322 samples in ours, thousands in big banks
+MAX_INFO = 1 << 20  # the INFO chunk is a few hundred bytes in real banks
+MAX_PDTA = 16 << 20  # preset/instrument/sample headers: 322 samples in ours, thousands in big banks
 PHDR_SIZE = 38
 
 
@@ -31,7 +32,7 @@ def _sub_chunks(data):
         tag, size = struct.unpack_from('<4sI', data, pos)
         if pos + 8 + size > len(data):
             raise Sf2Error('a sub-chunk %r runs past its list' % tag)
-        yield tag, data[pos + 8:pos + 8 + size]
+        yield tag, data[pos + 8 : pos + 8 + size]
         pos += 8 + size + (size & 1)
 
 
@@ -39,9 +40,9 @@ def read_info(path):
     """Return dict(name, comment, copyright, version, size, sample_bytes, presets=[dict(bank, program, name)])."""
     try:
         file_size = os.path.getsize(path)
-        f = open(path, 'rb')
+        f = open(path, 'rb')  # noqa: SIM115 - closed by the with below; open errors are reported apart
     except OSError as exc:
-        raise Sf2Error('cannot open: %s' % exc)
+        raise Sf2Error('cannot open: %s' % exc) from exc
     with f:
         head = f.read(12)
         if len(head) < 12 or head[:4] != b'RIFF' or head[8:12] != b'sfbk':
@@ -82,7 +83,7 @@ def read_info(path):
                     if sub_tag == b'phdr':
                         if len(payload) % PHDR_SIZE:
                             raise Sf2Error('the preset header list has a bad size')
-                        for i in range(0, len(payload) - PHDR_SIZE, PHDR_SIZE):      # the last entry is the terminal record
+                        for i in range(0, len(payload) - PHDR_SIZE, PHDR_SIZE):  # the last entry is the terminal record
                             name, preset, bank = struct.unpack_from('<20sHH', payload, i)
                             presets.append(dict(bank=bank, program=preset, name=_text(name)))
             pos += 8 + size + (size & 1)
@@ -90,8 +91,15 @@ def read_info(path):
             raise Sf2Error('no preset headers (pdta) found')
         if not presets:
             raise Sf2Error('the bank has no presets')
-        return dict(name=info.get('INAM', ''), comment=info.get('ICMT', ''), copyright=info.get('ICOP', ''),
-                    version=info.get('version', ''), size=file_size, sample_bytes=sample_bytes, presets=presets)
+        return dict(
+            name=info.get('INAM', ''),
+            comment=info.get('ICMT', ''),
+            copyright=info.get('ICOP', ''),
+            version=info.get('version', ''),
+            size=file_size,
+            sample_bytes=sample_bytes,
+            presets=presets,
+        )
 
 
 def main(argv):

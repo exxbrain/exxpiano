@@ -1,0 +1,36 @@
+# Checked by scripts/lint.sh and the "lint" job of .github/workflows/build.yml.
+line-length = 160
+target-version = "py39"    # the tools and scripts also run on the python3 of macOS (3.9); the Pi has 3.11 or newer
+
+[lint]
+# Errors (E9, F) and cleanliness: bugbear (B), simplifications (SIM, RET, PIE, C4, PERF), modern syntax (UP), sorted imports (I),
+# naming (N), pycodestyle (E, W), pylint warnings and errors (PLW, PLE) and ruff's own rules (RUF).
+select = ["E9", "F", "B", "SIM", "RET", "PIE", "C4", "PERF", "UP", "I", "N", "E", "W", "PLW", "PLE", "RUF"]
+# The house style of this code, kept on purpose:
+ignore = [
+    "C408",     # dict(a=1) for records and JSON
+    "UP031",    # %-formatting in log and shell-like strings
+    "E501",     # the limit is a guide; a long comment after the code is fine
+    "E702",     # short statements joined with ";" on one line
+    "E731",     # small named lambdas
+    "E741",     # l, O, I as short names in formulas
+    "PLW1510",  # subprocess.run without check=: the return code is looked at by the caller
+    "RUF001",   # the web interface and messages contain Russian text and typographic characters
+    "RUF005",   # list + [x]
+    "N802", "N806", "N815", "N818",  # names that follow the SF2, ALSA or MIDI specifications
+    "PERF203",  # try/except in a loop over devices and files is intended
+    "SIM105",   # try/except/pass reads plainer than contextlib.suppress here
+    "SIM108",   # an if/else block where the ternary would be a very long line
+    "PLW3301",  # max(max(a), -min(a)): unpacking a whole audio block into max() would be slower
+    "RUF100",   # a noqa comment also carries the reason why the broad except is wanted
+]
+
+[lint.per-file-ignores]
+"tests/*" = [
+    "RUF012",   # tables of test cases as class attributes
+    "PERF401",  # test data built line by line
+    "SIM115",   # a fake file object that wraps open()
+]
+
+[format]
+quote-style = "preserve"   # the code uses single quotes; strings that need double quotes keep them

@@ -16,9 +16,26 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing after the checkout pushes or calls GitHub with it
 
       - name: Install ffmpeg (the builder tests use it)
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Tests
         run: python3 -m unittest discover -s tests -v
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing after the checkout pushes or calls GitHub with it
+
+      - name: Install ruff and shellcheck
+        run: |
+          python3 -m pip install --user ruff==0.16.8
+          sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Code checks (scripts/lint.sh)
+        run: scripts/lint.sh

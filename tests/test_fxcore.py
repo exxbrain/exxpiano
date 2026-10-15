@@ -2,6 +2,7 @@
 
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+
 import importlib.util
 import os
 import random
@@ -50,14 +51,14 @@ class ResonanceFloorTests(unittest.TestCase):
         self.assertLess(len(res(floored)), len(res(every)))
         for c_, n, v in res(floored):
             self.assertGreaterEqual(fx.res_level(c_, n, v), -64.0)
-        self.assertTrue(any(c_ == fx.CH_RES_L and n == 24 for c_, n, _ in res(floored)))       # the long resonance of a bass note is loud enough
-        self.assertFalse(any(c_ == fx.CH_RES_V3 and n >= 60 for c_, n, _ in res(floored)))      # group V3 is below -64 dBFS from C4 up: never started
-        for e in floored:                                                                       # what is not resonance is untouched
+        self.assertTrue(any(c_ == fx.CH_RES_L and n == 24 for c_, n, _ in res(floored)))  # the long resonance of a bass note is loud enough
+        self.assertFalse(any(c_ == fx.CH_RES_V3 and n >= 60 for c_, n, _ in res(floored)))  # group V3 is below -64 dBFS from C4 up: never started
+        for e in floored:  # what is not resonance is untouched
             if e[0] not in (fx.CH_RES_L, fx.CH_RES_S, fx.CH_RES_V3):
                 self.assertIn(e, every)
 
     def test_the_level_table_matches_the_measured_loudness_of_a_voice(self):
-        self.assertAlmostEqual(fx.res_level(fx.CH_RES_L, 24, 127), -34.6, delta=0.2)           # the loudest voice of the bank at full velocity
+        self.assertAlmostEqual(fx.res_level(fx.CH_RES_L, 24, 127), -34.6, delta=0.2)  # the loudest voice of the bank at full velocity
         self.assertAlmostEqual(fx.res_level(fx.CH_RES_V3, 60, 127), -72.2, delta=0.2)
         self.assertAlmostEqual(fx.res_level(fx.CH_RES_L, 60, 64), fx.res_level(fx.CH_RES_L, 60, 127) - att_db(64), delta=0.01)
 
@@ -71,8 +72,8 @@ class ResonanceFloorTests(unittest.TestCase):
         power = lambda ev: sum(10 ** (fx.res_level(*e) / 10.0) for e in ev)
         loudest = sorted(res(free), key=lambda e: -fx.res_level(*e))[:8]
         gain = 10 * __import__('math').log10(power(res(limited)) / power(loudest))
-        self.assertGreater(gain, 0.0)                                                           # the dropped power is given back ...
-        self.assertLessEqual(gain, 6.0 + 0.6)                                                   # ... by at most the make-up cap (velocities are whole numbers)
+        self.assertGreater(gain, 0.0)  # the dropped power is given back ...
+        self.assertLessEqual(gain, 6.0 + 0.6)  # ... by at most the make-up cap (velocities are whole numbers)
         self.assertEqual([(c, n) for c, n, _ in sorted(res(limited), key=lambda e: e[1])], sorted((c, n) for c, n, _ in loudest))
 
     def test_a_burst_inside_the_limit_and_a_single_release_are_left_alone(self):
@@ -81,7 +82,7 @@ class ResonanceFloorTests(unittest.TestCase):
         limited, free = core(res_floor=-90.0, res_burst=1), core(res_floor=-90.0)
         for c in (limited, free):
             c.note_on(40, 100, 0.0)
-        self.assertEqual(limited.note_off(40, 0.5), free.note_off(40, 0.5))                  # a key released without the pedal is no burst
+        self.assertEqual(limited.note_off(40, 0.5), free.note_off(40, 0.5))  # a key released without the pedal is no burst
 
 
 class HammerTests(unittest.TestCase):
@@ -96,9 +97,9 @@ class HammerTests(unittest.TestCase):
         for vel in (30, 60, 90, 127):
             c = core(hammer_boost=0, hammer_exp=0.8)
             c.note_on(60, vel, 0.0)
-            (_, v), = ch(c.note_off(60, 0.5), fx.CH_HAMMER)
+            ((_, v),) = ch(c.note_off(60, 0.5), fx.CH_HAMMER)
             levels.append(att_db(v))
-        self.assertEqual(levels, sorted(levels, reverse=True))   # attenuation falls as touch grows
+        self.assertEqual(levels, sorted(levels, reverse=True))  # attenuation falls as touch grows
 
     def test_very_soft_touch_is_inaudible_with_steep_curve(self):
         c = core(hammer_boost=0, hammer_exp=2.0)
@@ -112,8 +113,9 @@ class HammerTests(unittest.TestCase):
         def level(hold):
             c = core(hammer_boost=10)
             c.note_on(60, 100, 0.0)
-            (_, v), = ch(c.note_off(60, hold), fx.CH_HAMMER)
+            ((_, v),) = ch(c.note_off(60, hold), fx.CH_HAMMER)
             return v
+
         self.assertGreater(level(0.1), level(10.0))
 
 
@@ -124,7 +126,7 @@ class ResonanceAndPedalTests(unittest.TestCase):
         ev = c.note_off(60, 1.0)
         self.assertTrue(ch(ev, fx.CH_RES_L))
         self.assertTrue(ch(ev, fx.CH_RES_V3))
-        self.assertFalse(ch(ev, fx.CH_RES_S))        # soft layer only for velocity < 45
+        self.assertFalse(ch(ev, fx.CH_RES_S))  # soft layer only for velocity < 45
 
     def test_soft_touch_uses_short_resonance_layer(self):
         c = core()
@@ -138,11 +140,11 @@ class ResonanceAndPedalTests(unittest.TestCase):
         self.assertEqual(len(ch(c.sustain(127, 0.0), fx.CH_PEDAL_DN)), 1)
         c.note_on(60, 100, 0.5)
         ev = c.note_off(60, 1.0)
-        self.assertTrue(ch(ev, fx.CH_HAMMER))        # key noise is immediate
-        self.assertFalse(ch(ev, fx.CH_RES_L))        # damper has not fallen yet
+        self.assertTrue(ch(ev, fx.CH_HAMMER))  # key noise is immediate
+        self.assertFalse(ch(ev, fx.CH_RES_L))  # damper has not fallen yet
         up = c.sustain(0, 2.0)
         self.assertEqual(len(ch(up, fx.CH_PEDAL_UP)), 1)
-        self.assertTrue(ch(up, fx.CH_RES_L))         # resonance when the pedal rises
+        self.assertTrue(ch(up, fx.CH_RES_L))  # resonance when the pedal rises
 
     def test_repeated_pedal_value_does_nothing(self):
         c = core()
@@ -205,7 +207,7 @@ class VelocityCurveTests(unittest.TestCase):
         c.configure(velocity_curve=0.5, hammer_boost=6, hammer_exp=1.0, randomness=0, res_boost=2, pedal_boost=3)
         self.assertEqual(c.velocity_curve, 0.5)
         self.assertEqual((c.boost['hammer'], c.boost['res'], c.boost['pedal']), (6, 2, 3))
-        c.configure()                                   # no arguments: nothing changes
+        c.configure()  # no arguments: nothing changes
         self.assertEqual(c.velocity_curve, 0.5)
 
 
@@ -234,8 +236,9 @@ class BridgeMappingTests(unittest.TestCase):
     def make_bridge(self, curve):
         import sys
         import types
+
         fake_mido = types.ModuleType('mido')
-        fake_mido.Message = lambda t, **kw: FakeMsg(t, **kw)
+        fake_mido.Message = FakeMsg
         sys.modules['mido'] = fake_mido
         sys.path.insert(0, os.path.join(HERE, '..', 'pi'))
         try:
@@ -252,8 +255,8 @@ class BridgeMappingTests(unittest.TestCase):
         b.on_msg(FakeMsg('note_on', channel=3, note=60, velocity=32))
         piano = [m for m in b.sent if m.channel == 0]
         self.assertEqual(len(piano), 1)
-        self.assertEqual(piano[0].velocity, 64)          # 127 * (32/127) ** 0.5 = 63.7
-        self.assertEqual(b.core.held[60][1], 64)         # the mechanics use the mapped value too
+        self.assertEqual(piano[0].velocity, 64)  # 127 * (32/127) ** 0.5 = 63.7
+        self.assertEqual(b.core.held[60][1], 64)  # the mechanics use the mapped value too
 
     def test_the_piano_preset_is_selected_when_the_synthesizer_appears(self):
         b = self.make_bridge(1.0)
@@ -265,23 +268,24 @@ class BridgeMappingTests(unittest.TestCase):
 
     def test_changing_the_preset_in_the_config_selects_it_live(self):
         import tempfile
+
         b = self.make_bridge(1.0)
         with tempfile.TemporaryDirectory() as tmp:
             conf = os.path.join(tmp, 'exxpiano.conf')
             with open(conf, 'w') as f:
                 f.write('FX_ARGS="--piano-bank 0 --piano-prog 0"\n')
             b.conf_path = conf
-            b.reload_settings()                                  # first read: only loads, plays nothing
+            b.reload_settings()  # first read: only loads, plays nothing
             self.assertEqual(b.sent, [])
             with open(conf, 'w') as f:
                 f.write('FX_ARGS="--piano-bank 1 --piano-prog 7"\n')
-            os.utime(conf, (1, 1))                               # a different mtime, however fast the test runs
+            os.utime(conf, (1, 1))  # a different mtime, however fast the test runs
             b.reload_settings()
         self.assertEqual([(m.type, getattr(m, 'program', None)) for m in b.sent][-1], ('program_change', 7))
 
     def test_other_messages_are_not_touched(self):
         b = self.make_bridge(0.5)
-        b.on_msg(FakeMsg('note_on', channel=0, note=60, velocity=0))     # a note-off written as velocity 0
+        b.on_msg(FakeMsg('note_on', channel=0, note=60, velocity=0))  # a note-off written as velocity 0
         b.on_msg(FakeMsg('control_change', channel=0, control=64, value=127))
         self.assertEqual(b.sent[0].velocity, 0)
         self.assertEqual(b.sent[1].value, 127)

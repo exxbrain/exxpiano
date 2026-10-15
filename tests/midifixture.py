@@ -1,4 +1,5 @@
 """Standard MIDI files for the tests: make_midi() writes a small one from a list of notes."""
+
 import struct
 
 

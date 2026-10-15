@@ -2,6 +2,12 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.21
+
+- **Low notes no longer stop abruptly when the pedal is lifted.** Every key of the piano banks had the same release, 0.7 s, so on a pedal lift the bass dropped out at once (heard at 0:37 of the La Campanella demonstration from bar 1:48). The release now follows the key: 2.6 s at A0, 1.5 s at C3, 0.95 s at C5, 0.7 s at the top, log-interpolated in between (`RELEASE_BY_KEY` in `tools/build_piano_sf2.py`); an SFZ release of 5 s or more is kept as before. It is in the banks built from this version on (`full` and `lite`); a bank built earlier or imported from a USB drive does not change. Measured offline on that moment: the level dip went from about 10 dB to about 5 dB. **Heard on a Raspberry Pi in the demonstration pieces.**
+- **A half-pedal in a MIDI file no longer stops the notes.** Recordings of real pianists (the demonstration pieces) let the sustain value dip to 40-63 for a few tens of milliseconds; FluidSynth takes 64 as the limit and stopped every sounding note in each dip (a D sharp at 0:31 of the same piece). The MIDI player now counts the pedal as up only below 40 (`FILE_PEDAL_DOWN` in `pi/exxpiano-fx.py`). A keyboard's pedal is not changed: a switch pedal sends only 0 and 127. Measured offline: that D sharp stays 4-6 dB louder through the dip. **Heard on a Raspberry Pi in the demonstration pieces.**
+- **256 voices by default instead of 192.** With 192 the end of La Campanella (the final fortissimo with the pedal) still ran out of voices and the synthesizer cut sounding notes: about ten clicks in a recording from a Raspberry Pi with 1.10.20. With 256 they are gone, at a load average of 0.3-0.7 during the piece. An existing `/etc/exxpiano.conf` keeps its value: set `POLYPHONY=256` there or in the **Audio output** section.
+
 ## 1.10.20
 
 - **Crackling in the loud, dense places is fixed at its cause.** Two things made it: (1) **clipping** in the synthesizer: the sum of many loud voices with the pedal went over full scale, mostly in the right channel (La Campanella at the old gain 1.15: 3596 clipped samples in the second half, the loudest sample 4.6 dB over full scale); (2) the synthesizer **cutting sounding notes** when it ran out of voices. The remedies below are measured on a Pi 3 B+ with the pieces that came with the device; **not yet heard by the maintainers on other music or on other boards**.

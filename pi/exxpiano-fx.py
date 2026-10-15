@@ -14,10 +14,11 @@ requests an attenuation in dB through the note velocity.
 Needs: python3-mido python3-rtmidi (apt).  Run:  exxpiano-fx.py [--hammer-boost DB] [--res-boost DB]
 [--pedal-boost DB]
 """
+
 import argparse
 import math
-import random
 import os
+import random
 import re
 import sys
 import threading
@@ -25,21 +26,133 @@ import time
 
 CH_HAMMER, CH_RES_L, CH_RES_S, CH_RES_V3, CH_PEDAL_DN, CH_PEDAL_UP = 1, 2, 3, 4, 5, 6
 PROGRAMS = {CH_HAMMER: 1, CH_RES_L: 2, CH_RES_S: 3, CH_RES_V3: 4, CH_PEDAL_DN: 5, CH_PEDAL_UP: 6}
-ATT_RANGE_DB = 60.0   # attenuation covered by velocity 1..127 in Salamander-mech.sf2
+ATT_RANGE_DB = 60.0  # attenuation covered by velocity 1..127 in Salamander-mech.sf2
+# A sustain value of a MIDI file at or above this is "down". Recordings of real pianists (the demonstration pieces) half-pedal: the value dips
+# to 40-63 for a few tens of milliseconds and comes back. FluidSynth takes 64 as the limit and stopped every sounding note in such a dip;
+# on a piano dampers that barely touch the strings do not stop them. A keyboard's switch pedal sends only 0 and 127 and is not changed.
+FILE_PEDAL_DOWN = 40  # the same as midiplayer.FILE_PEDAL_DOWN: the player must know the pedal is down to let it go when it stops
 
 # Loudness of ONE string-resonance voice at velocity 127 (loudest 100 ms, RMS, dBFS at FluidSynth gain 1.0), measured on mech.sf2 for the keys
 # 20, 22 ... 88 (index (key-20)//2). A voice of velocity v is ATT_RANGE_DB*(1-v/127) dB quieter. The resonance is about 35 dB below the piano in
 # energy, and most single voices (all of group V3, the soft ones of S) are at or below -60 dBFS: they only take voices of the synthesizer.
 RES_LEVEL = {
-    CH_RES_L: (-39.5, -40.5, -34.6, -44.8, -44.6, -39.0, -38.3, -39.1, -46.8, -43.8, -44.5, -37.7, -41.1, -41.0, -45.0, -41.8, -42.4, -42.8, -45.4, -46.0, -44.6, -51.0, -50.8, -48.2, -53.2, -53.2, -53.8, -51.5, -51.8, -54.7, -61.8, -62.4, -58.5, -55.8, -56.5),
-    CH_RES_S: (-46.5, -46.9, -46.3, -55.7, -56.6, -53.0, -51.9, -52.0, -55.9, -54.0, -54.0, -53.9, -51.6, -52.3, -53.1, -49.6, -49.5, -52.5, -54.9, -54.7, -56.0, -58.1, -58.8, -57.2, -61.2, -61.3, -61.6, -61.2, -61.1, -61.5, -62.6, -62.3, -63.1, -62.3, -62.6),
-    CH_RES_V3: (-56.4, -56.6, -58.8, -59.2, -59.1, -59.1, -59.1, -59.5, -59.1, -57.5, -57.7, -62.4, -60.6, -61.3, -61.3, -59.9, -60.6, -59.7, -63.8, -64.2, -72.2, -68.2, -68.5, -66.1, -67.6, -67.3, -69.1, -64.8, -65.3, -63.4, -67.2, -67.6, -69.0, -67.2, -67.1),
+    CH_RES_L: (
+        -39.5,
+        -40.5,
+        -34.6,
+        -44.8,
+        -44.6,
+        -39.0,
+        -38.3,
+        -39.1,
+        -46.8,
+        -43.8,
+        -44.5,
+        -37.7,
+        -41.1,
+        -41.0,
+        -45.0,
+        -41.8,
+        -42.4,
+        -42.8,
+        -45.4,
+        -46.0,
+        -44.6,
+        -51.0,
+        -50.8,
+        -48.2,
+        -53.2,
+        -53.2,
+        -53.8,
+        -51.5,
+        -51.8,
+        -54.7,
+        -61.8,
+        -62.4,
+        -58.5,
+        -55.8,
+        -56.5,
+    ),
+    CH_RES_S: (
+        -46.5,
+        -46.9,
+        -46.3,
+        -55.7,
+        -56.6,
+        -53.0,
+        -51.9,
+        -52.0,
+        -55.9,
+        -54.0,
+        -54.0,
+        -53.9,
+        -51.6,
+        -52.3,
+        -53.1,
+        -49.6,
+        -49.5,
+        -52.5,
+        -54.9,
+        -54.7,
+        -56.0,
+        -58.1,
+        -58.8,
+        -57.2,
+        -61.2,
+        -61.3,
+        -61.6,
+        -61.2,
+        -61.1,
+        -61.5,
+        -62.6,
+        -62.3,
+        -63.1,
+        -62.3,
+        -62.6,
+    ),
+    CH_RES_V3: (
+        -56.4,
+        -56.6,
+        -58.8,
+        -59.2,
+        -59.1,
+        -59.1,
+        -59.1,
+        -59.5,
+        -59.1,
+        -57.5,
+        -57.7,
+        -62.4,
+        -60.6,
+        -61.3,
+        -61.3,
+        -59.9,
+        -60.6,
+        -59.7,
+        -63.8,
+        -64.2,
+        -72.2,
+        -68.2,
+        -68.5,
+        -66.1,
+        -67.6,
+        -67.3,
+        -69.1,
+        -64.8,
+        -65.3,
+        -63.4,
+        -67.2,
+        -67.6,
+        -69.0,
+        -67.2,
+        -67.1,
+    ),
 }
 
 
 def res_level(ch, note, vel):
     """Expected loudness (dBFS, RMS) of the resonance voice (channel, key, velocity)."""
-    idx = min(34, max(0, int(round((note - 20) / 2.0))))
+    idx = min(34, max(0, round((note - 20) / 2.0)))
     return RES_LEVEL[ch][idx] - ATT_RANGE_DB * (1.0 - vel / 127.0)
 
 
@@ -57,24 +170,38 @@ def res_decay(key):
 class FXCore:
     """Pure logic: feed it note/pedal events, it returns FX note-ons as (channel, note, velocity)."""
 
-    def __init__(self, hammer_boost=10.0, res_boost=0.0, pedal_boost=0.0, rng=None, hammer_exp=2.0,
-                 randomness=1.0, velocity_curve=1.0, piano_bank=0, piano_prog=0, res_floor=None, res_burst=0, res_makeup=6.0):
-        self.res_floor = res_floor            # dBFS: a resonance voice quieter than this is not started (None = every voice is started)
-        self.res_burst = res_burst            # at most this many resonance voices when the pedal lifts (0 = no limit)
-        self.res_makeup = res_makeup          # dB: the most that the loudest voices of a limited burst get back for the ones that were dropped
+    def __init__(
+        self,
+        hammer_boost=10.0,
+        res_boost=0.0,
+        pedal_boost=0.0,
+        rng=None,
+        hammer_exp=2.0,
+        randomness=1.0,
+        velocity_curve=1.0,
+        piano_bank=0,
+        piano_prog=0,
+        res_floor=None,
+        res_burst=0,
+        res_makeup=6.0,
+    ):
+        self.res_floor = res_floor  # dBFS: a resonance voice quieter than this is not started (None = every voice is started)
+        self.res_burst = res_burst  # at most this many resonance voices when the pedal lifts (0 = no limit)
+        self.res_makeup = res_makeup  # dB: the most that the loudest voices of a limited burst get back for the ones that were dropped
         self.boost = {'hammer': hammer_boost, 'res': res_boost, 'pedal': pedal_boost}
         self.hammer_exp = hammer_exp
         self.randomness = randomness
         self.velocity_curve = velocity_curve
-        self.piano_bank = piano_bank          # the preset that plays the piano on channel 0
+        self.piano_bank = piano_bank  # the preset that plays the piano on channel 0
         self.piano_prog = piano_prog
         self.rng = rng or random.Random()
-        self.held = {}        # note -> (t_on, vel)
-        self.sustained = {}   # note -> (t_on, vel) released while the pedal was down
+        self.held = {}  # note -> (t_on, vel)
+        self.sustained = {}  # note -> (t_on, vel) released while the pedal was down
         self.pedal = False
 
-    def configure(self, hammer_boost=None, res_boost=None, pedal_boost=None, hammer_exp=None, randomness=None,
-                  velocity_curve=None, piano_bank=None, piano_prog=None):
+    def configure(
+        self, hammer_boost=None, res_boost=None, pedal_boost=None, hammer_exp=None, randomness=None, velocity_curve=None, piano_bank=None, piano_prog=None
+    ):
         """Change settings while running (None = keep)."""
         if hammer_boost is not None:
             self.boost['hammer'] = hammer_boost
@@ -99,13 +226,13 @@ class FXCore:
         g = self.velocity_curve
         if g == 1.0:
             return vel
-        return max(1, min(127, int(round(127.0 * (vel / 127.0) ** g))))
+        return max(1, min(127, round(127.0 * (vel / 127.0) ** g)))
 
     @staticmethod
     def _vel(att_db):
         if att_db < 0:
             att_db = 0.0
-        v = int(round(127 * (1.0 - att_db / ATT_RANGE_DB)))
+        v = round(127 * (1.0 - att_db / ATT_RANGE_DB))
         return v if v >= 1 else 0
 
     @staticmethod
@@ -128,8 +255,7 @@ class FXCore:
     def hammer(self, out, note, vel, hold):
         if 21 <= note <= 108:
             # amplitude ~ (vel/127)**hammer_exp: a soft touch is much quieter than a hard one
-            att = 37.0 - 20.0 * self.hammer_exp * math.log10(max(vel, 1) / 127.0) \
-                + 2.0 * hold - self.boost['hammer'] + self._jitter_db(3.0)
+            att = 37.0 - 20.0 * self.hammer_exp * math.log10(max(vel, 1) / 127.0) + 2.0 * hold - self.boost['hammer'] + self._jitter_db(3.0)
             key = note
             # every key has its own recorded sample, so a neighbour gives a different knock
             if self.randomness > 0 and self.rng.random() < 0.7 * min(self.randomness, 1.0):
@@ -150,7 +276,7 @@ class FXCore:
         if not self.res_burst or len(res) <= self.res_burst:
             return res
         ranked = sorted(res, key=lambda e: -res_level(*e))
-        kept = ranked[:self.res_burst]
+        kept = ranked[: self.res_burst]
         p_all = sum(10 ** (res_level(*e) / 10.0) for e in ranked)
         p_kept = sum(10 ** (res_level(*e) / 10.0) for e in kept)
         gain = min(self.res_makeup, 10.0 * math.log10(p_all / p_kept))
@@ -161,9 +287,9 @@ class FXCore:
             return
         b = self.boost['res']
         track_l = 94 if note <= 37 else 90
-        if vel >= 45:   # long layer, only for velocities from 45
+        if vel >= 45:  # long layer, only for velocities from 45
             self._emit_res(out, CH_RES_L, note, 4.0 + self._track(vel, track_l) + res_decay(note) * hold - b)
-        else:           # short layer for velocities up to 44
+        else:  # short layer for velocities up to 44
             track_s = 95 if note <= 46 else 90
             self._emit_res(out, CH_RES_S, note, self._track(vel, track_s) + 7.0 * hold - b)
         self._emit_res(out, CH_RES_V3, note, self._track(vel, 96) + 2.0 * hold - b)
@@ -171,8 +297,7 @@ class FXCore:
     def pedal_sound(self, out, down):
         key = self.rng.choice((60, 61))
         base = 20.0 if down else 19.0
-        self._emit(out, CH_PEDAL_DN if down else CH_PEDAL_UP, key,
-                   base - self.boost['pedal'] + self._jitter_db(2.0))
+        self._emit(out, CH_PEDAL_DN if down else CH_PEDAL_UP, key, base - self.boost['pedal'] + self._jitter_db(2.0))
 
     # ---- events ----
     def note_on(self, note, vel, now):
@@ -221,8 +346,9 @@ SKIP_RE = re.compile(r'Through|DINTHRU|MCU|HUI|ALV|FLUID|Timer|Announce|System|R
 
 class Bridge:
     def __init__(self, core):
-        import mido
         import exxpianoconf
+        import mido
+
         self.mido = mido
         self.exxpianoconf = exxpianoconf
         self.conf_path = exxpianoconf.CONF_PATH
@@ -248,7 +374,7 @@ class Bridge:
         """A note or the sustain pedal of a MIDI file, on the road of a keyboard's messages: the touch curve, the piano and the mechanics."""
         mido = self.mido
         if kind == 'pedal':
-            msg = mido.Message('control_change', channel=0, control=64, value=a)
+            msg = mido.Message('control_change', channel=0, control=64, value=127 if a >= FILE_PEDAL_DOWN else 0)
         else:
             msg = mido.Message('note_on' if kind == 'on' else 'note_off', channel=0, note=a, velocity=b)
         self.on_msg(msg)
@@ -281,12 +407,12 @@ class Bridge:
         if hasattr(msg, 'channel') and msg.channel != 0:
             msg = msg.copy(channel=0)
         if msg.type == 'note_on' and msg.velocity > 0:
-            mapped = self.core.map_velocity(msg.velocity)      # the touch curve: the piano and the mechanics both see it
+            mapped = self.core.map_velocity(msg.velocity)  # the touch curve: the piano and the mechanics both see it
             if mapped != msg.velocity:
                 msg = msg.copy(velocity=mapped)
         now = time.monotonic()
         with self.lock:
-            self.send(msg)    # the piano first: lowest latency
+            self.send(msg)  # the piano first: lowest latency
             fx = []
             if msg.type == 'note_on' and msg.velocity > 0:
                 fx = self.core.note_on(msg.note, msg.velocity, now)
@@ -354,16 +480,24 @@ class Bridge:
         s = self.exxpianoconf.get_settings(self.conf_path)
         with self.lock:
             preset_changed = (self.core.piano_bank, self.core.piano_prog) != (s['piano_bank'], s['piano_prog'])
-            self.core.configure(hammer_boost=s['hammer_boost'], res_boost=s['res_boost'],
-                                pedal_boost=s['pedal_boost'], hammer_exp=s['hammer_exp'],
-                                randomness=s['random'], velocity_curve=s['velocity_curve'],
-                                piano_bank=s['piano_bank'], piano_prog=s['piano_prog'])
+            self.core.configure(
+                hammer_boost=s['hammer_boost'],
+                res_boost=s['res_boost'],
+                pedal_boost=s['pedal_boost'],
+                hammer_exp=s['hammer_exp'],
+                randomness=s['random'],
+                velocity_curve=s['velocity_curve'],
+                piano_bank=s['piano_bank'],
+                piano_prog=s['piano_prog'],
+            )
             if preset_changed and not first:
                 self.select_piano()
         if not first:
-            print('settings reloaded: curve %.2f, hammer %+.1f dB, exp %.2f, random %.1f, res %+.1f, pedal %+.1f' % (
-                s['velocity_curve'], s['hammer_boost'], s['hammer_exp'], s['random'], s['res_boost'], s['pedal_boost']),
-                flush=True)
+            print(
+                'settings reloaded: curve %.2f, hammer %+.1f dB, exp %.2f, random %.1f, res %+.1f, pedal %+.1f'
+                % (s['velocity_curve'], s['hammer_boost'], s['hammer_exp'], s['random'], s['res_boost'], s['pedal_boost']),
+                flush=True,
+            )
 
     def run(self):
         tick = 0
@@ -379,19 +513,26 @@ def start_midi_player(bridge):
     """The player of the imported MIDI files (asked through /run/exxpiano-midi); a problem in it must never stop the keyboard."""
     try:
         import midiplayer
+
         conf = bridge.exxpianoconf.parse_conf(bridge.conf_path)
-        player = midiplayer.Player(conf.get('MIDI_DIR') or '/var/lib/exxpiano/midi', conf.get('MIDI_RUN_DIR') or midiplayer.RUN_DIR,
-                                   bridge.play_event, bridge.release_all, lambda: bridge.out_name)
+        player = midiplayer.Player(
+            conf.get('MIDI_DIR') or '/var/lib/exxpiano/midi',
+            conf.get('MIDI_RUN_DIR') or midiplayer.RUN_DIR,
+            bridge.play_event,
+            bridge.release_all,
+            lambda: bridge.out_name,
+        )
 
         def run():
             while True:
                 try:
                     player.run()
-                except Exception as exc:                              # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
                     print('midi player failed:', exc, file=sys.stderr, flush=True)
                     time.sleep(2)
+
         threading.Thread(target=run, daemon=True).start()
-    except Exception as exc:                                          # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         print('midi player not started:', exc, file=sys.stderr, flush=True)
 
 
@@ -400,24 +541,40 @@ def main():
     ap.add_argument('--hammer-boost', type=float, default=1.5, help='dB louder than the SFZ level (default 1.5)')
     ap.add_argument('--res-boost', type=float, default=0.0)
     ap.add_argument('--pedal-boost', type=float, default=4.5)
-    ap.add_argument('--hammer-exp', type=float, default=0.8,
-                    help='hammer noise amplitude ~ (velocity/127)**EXP; larger = stronger dependence (default 0.8)')
-    ap.add_argument('--random', type=float, default=1.6,
-                    help='variation of knock/pedal level and sample choice: 0 = none, 1 = normal, 2 = strong (default 1.6)')
+    ap.add_argument('--hammer-exp', type=float, default=0.8, help='hammer noise amplitude ~ (velocity/127)**EXP; larger = stronger dependence (default 0.8)')
+    ap.add_argument(
+        '--random', type=float, default=1.6, help='variation of knock/pedal level and sample choice: 0 = none, 1 = normal, 2 = strong (default 1.6)'
+    )
     ap.add_argument('--piano-bank', type=int, default=0, help='bank of the piano preset on channel 0 (default 0)')
     ap.add_argument('--piano-prog', type=int, default=0, help='program of the piano preset on channel 0 (default 0)')
-    ap.add_argument('--velocity-curve', type=float, default=1.0,
-                    help='touch curve: out = 127*(in/127)**CURVE; 1 = unchanged, <1 more sensitive, >1 harder')
-    ap.add_argument('--res-floor', type=float, default=-64.0,
-                    help='dBFS: string-resonance voices quieter than this are not started, they only use up voices of the synthesizer (default -64; -200 = start all)')
-    ap.add_argument('--res-burst', type=int, default=0,
-                    help='at most this many resonance voices when the pedal lifts, the loudest ones, with the others given back as level (default 0 = no limit)')
+    ap.add_argument('--velocity-curve', type=float, default=1.0, help='touch curve: out = 127*(in/127)**CURVE; 1 = unchanged, <1 more sensitive, >1 harder')
+    ap.add_argument(
+        '--res-floor',
+        type=float,
+        default=-64.0,
+        help='dBFS: string-resonance voices quieter than this are not started, they only use up voices of the synthesizer (default -64; -200 = start all)',
+    )
+    ap.add_argument(
+        '--res-burst',
+        type=int,
+        default=0,
+        help='at most this many resonance voices when the pedal lifts, the loudest ones, with the others given back as level (default 0 = no limit)',
+    )
     ap.add_argument('--res-makeup', type=float, default=6.0, help='dB: the most that a limited burst gives back as level (default 6)')
     args = ap.parse_args()
-    core = FXCore(args.hammer_boost, args.res_boost, args.pedal_boost, hammer_exp=args.hammer_exp,
-                  randomness=args.random, velocity_curve=args.velocity_curve,
-                  piano_bank=args.piano_bank, piano_prog=args.piano_prog,
-                  res_floor=args.res_floor, res_burst=args.res_burst, res_makeup=args.res_makeup)
+    core = FXCore(
+        args.hammer_boost,
+        args.res_boost,
+        args.pedal_boost,
+        hammer_exp=args.hammer_exp,
+        randomness=args.random,
+        velocity_curve=args.velocity_curve,
+        piano_bank=args.piano_bank,
+        piano_prog=args.piano_prog,
+        res_floor=args.res_floor,
+        res_burst=args.res_burst,
+        res_makeup=args.res_makeup,
+    )
     bridge = Bridge(core)
     start_midi_player(bridge)
     bridge.run()

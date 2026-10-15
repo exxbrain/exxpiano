@@ -10,6 +10,17 @@ English | [Русский](README.ru.md)
 
 **A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
 
+## Start in 4 steps (nothing to build)
+
+You need a Raspberry Pi 2, 3 or 4, a microSD card, a **5.1 V / 2.5 A** power supply, a USB MIDI keyboard, and headphones or speakers.
+
+1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi234-…-sd.zip` for a Pi 2/3/4 (`exxpiano-rpi5-…-sd.zip` for a Pi 5: not yet tried on a real Pi 5, and it needs a USB sound card).
+2. **Write it to the microSD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
+3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and may take several minutes.
+4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. With an Ethernet cable there is no setup network: open that address directly.
+
+Then play. Details: "Connecting to a new Wi-Fi", "Power supply" and "Audio output and latency" below. "Deployment in short", "Quick start" and "SD card image" are only for building the banks and the image yourself.
+
 ## What it can do
 
 - **Real piano sound:** SoundFont banks through FluidSynth, plus the piano mechanics (hammer and damper noise, string resonance, pedal noise) that the SF2 format cannot express by itself. The ready images carry the Salamander Grand Piano V3 (Yamaha C5); any other `.sf2` / `.sf3` bank can be added from a USB drive and chosen in the web interface, and every bank remembers its own touch and mechanics settings.
@@ -20,7 +31,7 @@ English | [Русский](README.ru.md)
 - **From a USB drive:** import sound banks and play MIDI files on the chosen piano, with the mechanics.
 - **Open and tested:** open source (scripts MIT, sounds CC-BY, the two demonstration recordings CC BY-NC-SA) with hundreds of automatic tests; what was not tried on a real board is marked as such.
 
-Not yet tried on real hardware: the Pi 5 image, the import from a USB drive, the MIDI player (see "Tested on" below).
+Not yet tried on real hardware: the Pi 5 image, the import from a USB drive (see "Tested on" below).
 
 ## What it looks like
 
@@ -33,6 +44,14 @@ Not yet tried on real hardware: the Pi 5 image, the import from a USB drive, the
 | ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
 
 *The pictures are made by `scripts/make-screenshots.py` from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the banks are made up; the pieces are the real recordings of `assets/midi/`), at the width of a phone.*
+
+## What it sounds like
+
+| *La Campanella* (from bar 1:48) | *Un Sospiro* |
+|---|---|
+| [![La Campanella](docs/media/la-campanella.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4) | [![Un Sospiro](docs/media/un-sospiro.jpg)](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4) |
+
+*The two pieces that come with the device, played by its MIDI player on a Raspberry Pi and recorded from the device, with the `lite` bank, the mechanics and 256 voices (the 1.10.21 changes, before their release). Nothing was added to the sound but one gain to bring both recordings to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 
 ## How it works
 
@@ -70,7 +89,7 @@ but this setup was not measured with one.
 | A Raspberry Pi 2, 3 or 4 supported by the DietPi RPi234 ARMv8 image | an SD card containing the product image |
 | **A 5.1 V / 2.5 A power supply and a short cable** | see "Power supply" - this is not a formality |
 | A USB MIDI keyboard | class-compliant, no drivers needed |
-| A Mac or Linux machine to build the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
+| Only to build it yourself: a Mac or Linux machine for the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
 
 ## Deployment in short
 
@@ -84,7 +103,7 @@ The shipped product is a ready device with exxpiano already installed. One compl
 See [the image-building guide](docs/BUILD-IMAGE.md) for the complete procedure and current verification status.
 Version tags named `v<VERSION>` build this image and publish it together with its manifest, README, and checksums as assets of a GitHub Release.
 
-## Quick start
+## Quick start (building it yourself)
 
 ### 1. Build the sound banks (on a Mac/Linux)
 
@@ -248,7 +267,7 @@ Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart ex
 | Setting | What it does |
 |---|---|
 | `GAIN` | overall volume of the synthesizer (0.2 is FluidSynth's own default; **0.6** is the loudest value at which the densest piece tried does not clip; the slider of the web interface is a dB scale around it, and only its last part can distort) |
-| `POLYPHONY` | number of voices (default 192, up to 256); stereo uses two voices per note, and the mechanics add more |
+| `POLYPHONY` | number of voices (default 256, the most); stereo uses two voices per note, and the mechanics add more |
 | `METER` | 1 = the output goes through the level meter: the **Home** section shows the peak of the left and the right channel and counts the samples at full scale (clipping). It costs about 3% of one core; 0 plays to the card directly |
 | `CPU_CORES` | synthesis threads of FluidSynth (1-4, default 3; one core always stays free): the voices of a dense piece are shared between the cores of the board, so a higher `POLYPHONY` (192 or 256) becomes possible (also in the **Audio output** section) |
 | `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
@@ -307,7 +326,7 @@ Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a 
 
 What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Changing the bank or restarting the synthesizer stops the piece; start it again after the new instrument has loaded. Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
 
-**What is tested and what is not.** The reader of the files, the library, the import, the player (with a fake clock), the road through the touch curve and the mechanics, and the API are covered by automatic tests, and the interface works in the demo. **Not tried on a real Raspberry Pi:** how exact the timing is (Python timers, together with the mechanics), the load on the processor with a dense file, very dense files against the polyphony (they may drop notes), and everything about the USB drive that the bank import also leaves open. The player lives in the mechanics bridge (`exxpiano-fx`): when it is not running, the card says so.
+**What is tested and what is not.** The reader of the files, the library, the import, the player (with a fake clock), the road through the touch curve and the mechanics, and the API are covered by automatic tests, and the interface works in the demo. **Tried on a real Raspberry Pi** with the two pieces that come with it (see "What it sounds like"): they play through to the end, the load average stayed at 0.3-0.7, and the final fortissimo of *La Campanella* needed 256 voices (with 192 the synthesizer cut sounding notes, which clicked). **Not measured:** how exact the timing is (Python timers, together with the mechanics), files denser than these two, and everything about the USB drive that the bank import also leaves open. The player lives in the mechanics bridge (`exxpiano-fx`): when it is not running, the card says so.
 
 ## Look at the web interface without a Raspberry Pi
 
@@ -410,9 +429,11 @@ different sample packages (44.1 kHz/16 bit and 48 kHz/24 bit, WAV and FLAC, diff
 `ffmpeg` and is skipped without it). No hardware is needed. The ALSA exchange is not covered by tests (checked on a real Pi),
 and the audio quality of a built bank was checked by hand through FluidSynth.
 
+`scripts/lint.sh` runs the code checks: `ruff` on the Python code (errors, and cleanliness: likely bugs, needless code, files left open, sorted imports, naming; the rules and the house-style exceptions are in `ruff.toml`), `shellcheck` on the shell scripts, and no file over 5 MB in git. CI runs the tests and these checks on every push and pull request (`.github/workflows/build.yml`).
+
 ## If something does not work
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). If it does not help, [open an issue](https://github.com/exxbrain/exxpiano/issues/new?template=problem.yml): the form asks for the version, the board, the keyboard and the sound output, which is what it takes to find the cause.
 
 ## Licenses
 
@@ -420,4 +441,4 @@ The repository's scripts are MIT ([LICENSE](LICENSE)). The [Salamander Grand Pia
 ([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
 attribution.
 
-The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.
+The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The demonstration videos (the pre-release [demo-videos](https://github.com/exxbrain/exxpiano/releases/tag/demo-videos)) are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.

@@ -8,6 +8,7 @@ Scopes tell what has to happen after a change:
   gain  - set live in FluidSynth (its TCP shell) and stored for the next start
   synth - needs a restart of exxpiano (the banks reload, ~45 s)
 """
+
 import os
 import re
 import shlex
@@ -29,7 +30,7 @@ SETTINGS = {
     'pedal_boost': dict(kind='float', lo=-30.0, hi=30.0, default=4.5, scope='fx', key='FX_ARGS', flag='--pedal-boost'),
     'gain': dict(kind='float', lo=0.01, hi=2.0, default=0.6, scope='gain', key='GAIN'),
     'reverb': dict(kind='int', lo=0, hi=1, default=0, scope='synth', key='REVERB'),
-    'polyphony': dict(kind='int', lo=16, hi=256, default=192, scope='synth', key='POLYPHONY'),
+    'polyphony': dict(kind='int', lo=16, hi=256, default=256, scope='synth', key='POLYPHONY'),
     'cpu_cores': dict(kind='int', lo=1, hi=4, default=3, scope='synth', key='CPU_CORES'),
     'alsa_device': dict(kind='device', default='auto', scope='synth', key='ALSA_DEVICE'),
     'usb_period_size': dict(kind='int', lo=64, hi=8192, default=64, scope='synth', key='USB_PERIOD_SIZE'),
@@ -80,8 +81,8 @@ def _coerce(name, raw):
     try:
         value = float(raw) if spec['kind'] == 'float' else int(float(raw))
     except (TypeError, ValueError):
-        raise ValueError('%s: not a number: %r' % (name, raw))
-    if isinstance(raw, bool) or value != value:     # NaN or a JSON boolean
+        raise ValueError('%s: not a number: %r' % (name, raw)) from None
+    if isinstance(raw, bool) or value != value:  # NaN or a JSON boolean
         raise ValueError('%s: not a number: %r' % (name, raw))
     if not spec['lo'] <= value <= spec['hi']:
         raise ValueError('%s: %s is outside %s..%s' % (name, value, spec['lo'], spec['hi']))
@@ -139,9 +140,7 @@ def get_settings(path=None):
 
 
 def _fx_line(settings):
-    parts = []
-    for name in FX_NAMES:
-        parts.append('%s %s' % (SETTINGS[name]['flag'], _fmt(settings[name])))
+    parts = ['%s %s' % (SETTINGS[name]['flag'], _fmt(settings[name])) for name in FX_NAMES]
     return 'FX_ARGS="%s"' % ' '.join(parts)
 
 
@@ -169,7 +168,7 @@ def apply_updates(updates, path=None, raw=None):
 
     with open(path, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    wanted = {}                                   # conf KEY -> full new line
+    wanted = {}  # conf KEY -> full new line
     for name in clean:
         spec = SETTINGS[name]
         if spec['key'] == 'FX_ARGS':

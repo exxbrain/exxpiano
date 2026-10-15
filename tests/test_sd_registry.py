@@ -1,4 +1,5 @@
 """Tests for scripts/sd-registry.py: the register of the devices that were made."""
+
 import contextlib
 import importlib.util
 import io
@@ -28,10 +29,10 @@ class RegistryTests(unittest.TestCase):
                 reg.normalize(bad)
 
     def test_the_first_and_the_next_number(self):
-        self.assertEqual(reg.next_number(self.path), '0001')                       # no file yet
+        self.assertEqual(reg.next_number(self.path), '0001')  # no file yet
         self.add('1')
         self.add('0005')
-        self.add('AB12')                                                          # a number with letters is not counted
+        self.add('AB12')  # a number with letters is not counted
         self.assertEqual(reg.next_number(self.path), '0006')
 
     def test_a_number_cannot_be_used_twice(self):
@@ -52,7 +53,7 @@ class RegistryTests(unittest.TestCase):
     def test_a_record_has_a_timestamp_and_survives_odd_text(self):
         row = reg.add(dict(number='3', hostname='h', version='1', note='sold to "Ivan", Moscow; 12 Oct\nsecond line'), self.path)
         self.assertRegex(row['built_at'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$')
-        self.assertEqual(reg.get('3', self.path)['note'], 'sold to "Ivan", Moscow; 12 Oct\nsecond line')   # quotes, commas, newlines
+        self.assertEqual(reg.get('3', self.path)['note'], 'sold to "Ivan", Moscow; 12 Oct\nsecond line')  # quotes, commas, newlines
 
     def test_notes_and_find(self):
         self.add('1')
@@ -69,12 +70,12 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(reg.find_serial('D2F2F1DE', self.path)['number'], '0001')
         self.assertIsNone(reg.find_serial('00000000aaaabbbb', self.path))
         reg.add(dict(number='1', serial='00000000d2f2f1de', version='2'), self.path, replace=True)
-        self.assertEqual(reg.find_serial('00000000d2f2f1de', self.path)['version'], '2')            # the old line (0001~) does not count
+        self.assertEqual(reg.find_serial('00000000d2f2f1de', self.path)['version'], '2')  # the old line (0001~) does not count
 
     def test_a_damaged_row_does_not_break_reading(self):
         os.makedirs(os.path.dirname(self.path))
         with open(self.path, 'w') as f:
-            f.write('number,hostname\n0001,exxpiano-0001\n')                         # old file with fewer columns
+            f.write('number,hostname\n0001,exxpiano-0001\n')  # old file with fewer columns
         self.assertEqual(reg.load(self.path)[0]['version'], '')
         self.assertEqual(reg.next_number(self.path), '0002')
 
@@ -84,6 +85,7 @@ class RegistryTests(unittest.TestCase):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 code = reg.main(['--registry', self.path] + list(args))
             return code, out.getvalue(), err.getvalue()
+
         self.assertEqual(run('next')[1].strip(), '0001')
         self.assertIn('nothing registered', run('list')[1])
         self.add('1', banks='a.sf2')

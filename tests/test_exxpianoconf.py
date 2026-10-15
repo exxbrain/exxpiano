@@ -1,4 +1,5 @@
 """Tests for pi/exxpianoconf.py (settings read/validate/store)."""
+
 import importlib.util
 import os
 import tempfile
@@ -45,7 +46,7 @@ class ConfTests(ConfBase):
         self.assertEqual(s['hammer_exp'], 0.8)
         self.assertEqual(s['gain'], 1.0)
         self.assertEqual(s['alsa_device'], 'auto')
-        self.assertEqual(s['velocity_curve'], 1.0)          # not in the file -> default
+        self.assertEqual(s['velocity_curve'], 1.0)  # not in the file -> default
         self.assertEqual(s['res_boost'], 0.0)
 
     def test_missing_file_gives_defaults(self):
@@ -53,20 +54,30 @@ class ConfTests(ConfBase):
         self.assertEqual(s['gain'], 0.6)
 
     def test_rejects_unknown_and_out_of_range(self):
-        for bad in ({'nope': 1}, {'gain': 99}, {'gain': -1}, {'polyphony': 5}, {'hammer_exp': 'abc'},
-                    {'alsa_device': 'hw:1; rm -rf /'}, {'alsa_device': 'plughw:U24 -x'}, {'gain': True},
-                    {'gain': float('nan')}, {}, [], 'x'):
-            with self.subTest(bad):
-                with self.assertRaises(ValueError):
-                    pc.validate(bad)
-        self.assertEqual(self.read(), SAMPLE)               # nothing was written
+        for bad in (
+            {'nope': 1},
+            {'gain': 99},
+            {'gain': -1},
+            {'polyphony': 5},
+            {'hammer_exp': 'abc'},
+            {'alsa_device': 'hw:1; rm -rf /'},
+            {'alsa_device': 'plughw:U24 -x'},
+            {'gain': True},
+            {'gain': float('nan')},
+            {},
+            [],
+            'x',
+        ):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                pc.validate(bad)
+        self.assertEqual(self.read(), SAMPLE)  # nothing was written
 
     def test_accepts_valid_devices(self):
         for dev in ('auto', 'plughw:U24', 'plughw:CARD=U24', 'plughw:Headphones'):
             self.assertEqual(pc.validate({'alsa_device': dev})['alsa_device'], dev)
 
     def test_fx_change_rewrites_only_fx_args_and_keeps_the_rest(self):
-        merged, scopes = pc.apply_updates({'velocity_curve': 0.8, 'hammer_boost': 3}, self.path)
+        _merged, scopes = pc.apply_updates({'velocity_curve': 0.8, 'hammer_boost': 3}, self.path)
         text = self.read()
         self.assertEqual(scopes, {'fx'})
         self.assertIn('# a comment above a setting', text)
@@ -76,16 +87,16 @@ class ConfTests(ConfBase):
         self.assertEqual(len(line), 1)
         self.assertIn('--velocity-curve 0.8', line[0])
         self.assertIn('--hammer-boost 3', line[0])
-        self.assertIn('--hammer-exp 0.8', line[0])           # untouched values survive
+        self.assertIn('--hammer-exp 0.8', line[0])  # untouched values survive
         self.assertEqual(pc.get_settings(self.path)['velocity_curve'], 0.8)
 
     def test_scopes(self):
         _, scopes = pc.apply_updates({'gain': 1.5}, self.path)
         self.assertEqual(scopes, {'gain'})
         _, scopes = pc.apply_updates({'reverb': 1, 'gain': 1.5}, self.path)
-        self.assertEqual(scopes, {'synth'})                  # gain unchanged this time
+        self.assertEqual(scopes, {'synth'})  # gain unchanged this time
         _, scopes = pc.apply_updates({'reverb': 1}, self.path)
-        self.assertEqual(scopes, set())                      # nothing changed -> nothing to do
+        self.assertEqual(scopes, set())  # nothing changed -> nothing to do
 
     def test_new_key_is_appended(self):
         pc.apply_updates({'periods': 4}, self.path)
@@ -118,16 +129,24 @@ class RawPathTests(ConfBase):
         s = pc.get_settings(self.path)
         self.assertEqual((s['piano_bank'], s['piano_prog']), (2, 5))
         self.assertIn('--piano-bank 2', text)
-        self.assertEqual(text.count('PIANO_SF2='), 1)               # replaced, not duplicated
+        self.assertEqual(text.count('PIANO_SF2='), 1)  # replaced, not duplicated
 
     def test_raw_only_write(self):
         pc.apply_updates(None, self.path, raw={'PIANO_SF2_LAST_GOOD': '/b/x.sf2'})
         self.assertIn('PIANO_SF2_LAST_GOOD="/b/x.sf2"', self.read())
 
     def test_unsafe_raw_values_are_refused_and_nothing_is_written(self):
-        for key, value in (('PIANO_SF2', 'relative/x.sf2'), ('PIANO_SF2', '/a/b"; rm -rf /; "'), ('PIANO_SF2', '/a/$HOME/x'),
-                           ('PIANO_SF2', '/a/b\nGAIN=9'), ('PIANO_SF2', '/a/`id`'), ('PIANO_SF2', 5), ('GAIN', '/a/b'),
-                           ('FX_ARGS', '/a/b'), ('PIANO_SF2', '/' + 'x' * 400)):
+        for key, value in (
+            ('PIANO_SF2', 'relative/x.sf2'),
+            ('PIANO_SF2', '/a/b"; rm -rf /; "'),
+            ('PIANO_SF2', '/a/$HOME/x'),
+            ('PIANO_SF2', '/a/b\nGAIN=9'),
+            ('PIANO_SF2', '/a/`id`'),
+            ('PIANO_SF2', 5),
+            ('GAIN', '/a/b'),
+            ('FX_ARGS', '/a/b'),
+            ('PIANO_SF2', '/' + 'x' * 400),
+        ):
             with self.subTest((key, value)), self.assertRaises(ValueError):
                 pc.apply_updates(None, self.path, raw={key: value})
         self.assertEqual(self.read(), SAMPLE)

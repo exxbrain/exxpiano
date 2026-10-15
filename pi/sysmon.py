@@ -3,6 +3,7 @@
 Standard library only. Everything is read from /proc and /sys (and `vcgencmd get_throttled` when it exists), so it works on a Pi and gives
 partial answers elsewhere: a value that cannot be read is None, never an error. The roots are parameters so the tests can use fake trees.
 """
+
 import os
 import re
 import subprocess
@@ -12,9 +13,9 @@ from collections import deque
 
 # Bits of `vcgencmd get_throttled`: the first four are the state right now, the next four say it happened since the boot.
 THROTTLE_BITS = {0: 'undervoltage', 1: 'freq_capped', 2: 'throttled', 3: 'soft_limit'}
-HISTORY = 150                   # points kept for the charts (one per second while the page is open)
-MIN_INTERVAL = 0.5              # a second client asking within this time gets the same sample
-PID_CACHE = 10.0                # seconds before the process list is scanned again
+HISTORY = 150  # points kept for the charts (one per second while the page is open)
+MIN_INTERVAL = 0.5  # a second client asking within this time gets the same sample
+PID_CACHE = 10.0  # seconds before the process list is scanned again
 
 
 def parse_throttled(raw):
@@ -78,11 +79,13 @@ def parse_usb_stream(text):
     pairs = _pairs(play)
     sync = re.search(r'Endpoint:.*\((ASYNC|SYNC|ADAPTIVE|NONE)\)', play)
     rates = pairs.get('Rates', '')
-    return dict(sync=sync.group(1) if sync else None,
-                rates=[int(r) for r in re.findall(r'\d+', rates)][:12],
-                bits=_int(pairs.get('Bits')),
-                momentary=_int(pairs.get('Momentary freq')),
-                status=pairs.get('Status'))
+    return dict(
+        sync=sync.group(1) if sync else None,
+        rates=[int(r) for r in re.findall(r'\d+', rates)][:12],
+        bits=_int(pairs.get('Bits')),
+        momentary=_int(pairs.get('Momentary freq')),
+        status=pairs.get('Status'),
+    )
 
 
 class Monitor:
@@ -97,10 +100,10 @@ class Monitor:
             self.hz = hz or 100
         self.lock = threading.Lock()
         self.history = deque(maxlen=HISTORY)
-        self.prev = None                    # (time, {cpu name: (idle, total)}, {label: ticks})
+        self.prev = None  # (time, {cpu name: (idle, total)}, {label: ticks})
         self.cached = None
         self.cached_at = 0.0
-        self.pids = ({}, 0.0)               # ({label: [pid]}, when scanned)
+        self.pids = ({}, 0.0)  # ({label: [pid]}, when scanned)
 
     # ---- raw readers
     def _cpu_times(self):
@@ -115,7 +118,7 @@ class Monitor:
             except ValueError:
                 continue
             if len(v) >= 5:
-                out[m.group(1)] = (v[3] + v[4], sum(v))              # idle + iowait, everything
+                out[m.group(1)] = (v[3] + v[4], sum(v))  # idle + iowait, everything
         return out
 
     def _scan_pids(self):
@@ -148,11 +151,11 @@ class Monitor:
             for pid in pids:
                 text = _read(os.path.join(self.proc, str(pid), 'stat'))
                 if not text or ')' not in text:
-                    self.pids = (self.pids[0], 0.0)              # it went away: look again next time
+                    self.pids = (self.pids[0], 0.0)  # it went away: look again next time
                     continue
                 try:
                     fields = text.rsplit(')', 1)[1].split()
-                    total += int(fields[11]) + int(fields[12])    # utime + stime
+                    total += int(fields[11]) + int(fields[12])  # utime + stime
                 except (IndexError, ValueError):
                     continue
             out[label] = total
@@ -193,15 +196,26 @@ class Monitor:
                     h, st = _pairs(hw), _pairs(_read(os.path.join(d, 'status')))
                     rate, period, buf = _int(h.get('rate')), _int(h.get('period_size')), _int(h.get('buffer_size'))
                     usb = parse_usb_stream(_read(os.path.join(base, 'stream%d' % int(pm.group(1)))))
-                    out.append(dict(
-                        card=card, id=(names.get(card) or (None, None))[0] or (_read(os.path.join(base, 'id')) or '').strip() or None,
-                        name=(names.get(card) or (None, None))[1], device=int(pm.group(1)),
-                        state=st.get('state'), format=h.get('format'), channels=_int(h.get('channels')), rate=rate,
-                        period=period, buffer=buf,
-                        period_ms=round(period * 1000.0 / rate, 2) if rate and period else None,
-                        buffer_ms=round(buf * 1000.0 / rate, 2) if rate and buf else None,
-                        delay=_int(st.get('delay')), avail=_int(st.get('avail')), avail_max=_int(st.get('avail_max')),
-                        usb=usb))
+                    out.append(
+                        dict(
+                            card=card,
+                            id=(names.get(card) or (None, None))[0] or (_read(os.path.join(base, 'id')) or '').strip() or None,
+                            name=(names.get(card) or (None, None))[1],
+                            device=int(pm.group(1)),
+                            state=st.get('state'),
+                            format=h.get('format'),
+                            channels=_int(h.get('channels')),
+                            rate=rate,
+                            period=period,
+                            buffer=buf,
+                            period_ms=round(period * 1000.0 / rate, 2) if rate and period else None,
+                            buffer_ms=round(buf * 1000.0 / rate, 2) if rate and buf else None,
+                            delay=_int(st.get('delay')),
+                            avail=_int(st.get('avail')),
+                            avail_max=_int(st.get('avail_max')),
+                            usb=usb,
+                        )
+                    )
         return out
 
     def _temperature(self):
@@ -218,6 +232,7 @@ class Monitor:
                 return round(int(text) / 1000)
             except (TypeError, ValueError):
                 return None
+
         return mhz('scaling_cur_freq'), mhz('cpuinfo_max_freq')
 
     def _memory(self):
@@ -241,7 +256,7 @@ class Monitor:
     def _sample(self):
         now = self.clock()
         cpu, ticks = self._cpu_times(), self._ticks(now)
-        if self.prev is None:                                        # the first call needs two readings to have a rate
+        if self.prev is None:  # the first call needs two readings to have a rate
             self.prev = (now, cpu, ticks)
             self.sleep(0.25)
             now = self.clock()
@@ -263,12 +278,24 @@ class Monitor:
             cores.append(pct('cpu%d' % i))
             i += 1
         # a service's share of ONE core (a multi-threaded one can pass 100)
-        procs = {label: round(max(0, ticks[label] - ticks0.get(label, ticks[label])) / self.hz / dt * 100, 1) if self.pids[0].get(label) else None
-                 for label in ticks}
+        procs = {
+            label: round(max(0, ticks[label] - ticks0.get(label, ticks[label])) / self.hz / dt * 100, 1) if self.pids[0].get(label) else None for label in ticks
+        }
         freq, freq_max = self._frequency()
         self.prev = (now, cpu, ticks)
-        snap = dict(t=int(self.wall() * 1000), cpu=pct('cpu'), cores=cores, procs=procs, temp=self._temperature(), freq=freq, freq_max=freq_max,
-                    mem=self._memory(), load=self._load(), throttle=parse_throttled(self.throttled()), audio=self.audio())
+        snap = dict(
+            t=int(self.wall() * 1000),
+            cpu=pct('cpu'),
+            cores=cores,
+            procs=procs,
+            temp=self._temperature(),
+            freq=freq,
+            freq_max=freq_max,
+            mem=self._memory(),
+            load=self._load(),
+            throttle=parse_throttled(self.throttled()),
+            audio=self.audio(),
+        )
         self.history.append(dict(t=snap['t'], cpu=snap['cpu'], temp=snap['temp'], freq=snap['freq']))
         return snap
 

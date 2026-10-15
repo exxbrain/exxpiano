@@ -1,0 +1,37 @@
+name: codeql
+
+# GitHub's code scanning: security problems in the Python code and in the workflows themselves.
+# The findings appear under Security -> Code scanning and as comments on pull requests.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"   # every Monday, so new queries also run on unchanged code
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, actions]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing after the checkout pushes or calls GitHub with it
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

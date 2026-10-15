@@ -9,6 +9,7 @@ Everything works as on the device (a USB drive with two banks is "plugged in": i
 "Cafe" is open), start the setup network, scan the QR codes. Nothing is written outside a temporary folder and nothing is sent anywhere.
 It runs the real code of exxpiano-web.py and the real page; only what touches the machine (systemctl, ALSA, /proc, Wi-Fi) is simulated.
 """
+
 import argparse
 import importlib.util
 import math
@@ -29,11 +30,9 @@ sys.path.insert(0, os.path.join(ROOT, 'tests'))
 spec = importlib.util.spec_from_file_location('piano_web', os.path.join(PI, 'exxpiano-web.py'))
 web = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(web)
-import midilib  # noqa: E402
 import midiplayer  # noqa: E402
 import usblib  # noqa: E402
 from sf2fixture import make_sf2  # noqa: E402
-
 
 spec = importlib.util.spec_from_file_location('exxpiano_demo_midi', os.path.join(PI, 'exxpiano-demo-midi.py'))
 demo_midi = importlib.util.module_from_spec(spec)
@@ -53,8 +52,12 @@ class DemoActions(web.Actions):
         self.busy, self.busy_until, self.ap_until = None, 0.0, 0.0
         self.link = None if args.mode == 'ap' else dict(ssid='Home', ip='192.168.1.95', signal=-52)
         self.saved = [dict(ssid='Home', secure=True, hidden=False, priority=1), dict(ssid='Dacha', secure=True, hidden=True, priority=0)]
-        self.scan = [dict(ssid='Home', signal=-48, secure=True, freq=2437), dict(ssid='Cafe', signal=-63, secure=False, freq=2412),
-                     dict(ssid='Neighbour', signal=-74, secure=True, freq=2462), dict(ssid='Studio 5G', signal=-80, secure=True, freq=5180)]
+        self.scan = [
+            dict(ssid='Home', signal=-48, secure=True, freq=2437),
+            dict(ssid='Cafe', signal=-63, secure=False, freq=2412),
+            dict(ssid='Neighbour', signal=-74, secure=True, freq=2462),
+            dict(ssid='Studio 5G', signal=-80, secure=True, freq=5180),
+        ]
         self.last_result = None
         self.cable = False
         self.history = []
@@ -76,7 +79,7 @@ class DemoActions(web.Actions):
         return 4242
 
     def wait_synth_ready(self, old_pid, timeout=150):
-        time.sleep(2)                                     # the real one waits for the banks to load
+        time.sleep(2)  # the real one waits for the banks to load
         return True
 
     def service_state(self, unit):
@@ -100,12 +103,17 @@ class DemoActions(web.Actions):
         """A simulated meter: a played piece that now and then goes over full scale on the right."""
         t = time.time() - self.t0
         swing = (math.sin(t * 2.3) + math.sin(t * 5.1)) / 4.0 + 0.5
-        louder = 20 * math.log10(max(self.gain_now, 1e-4) / 0.6)                 # the level follows the volume: above the safe value the loud places clip
+        louder = 20 * math.log10(max(self.gain_now, 1e-4) / 0.6)  # the level follows the volume: above the safe value the loud places clip
         left, right = -26 + 18 * swing + louder, -23 + 20 * swing + louder
         self.clip_right += 1 if right > -0.3 else 0
         self.hold = [max(left, self.hold[0] - 0.4), max(right, self.hold[1] - 0.4)]
-        return dict(t=time.time(), rate=44100, left=dict(peak=round(left, 1), hold=round(self.hold[0], 1), clipped=0),
-                    right=dict(peak=round(min(right, 0.0), 1), hold=round(min(self.hold[1], 0.0), 1), clipped=self.clip_right), clip_ago=None)
+        return dict(
+            t=time.time(),
+            rate=44100,
+            left=dict(peak=round(left, 1), hold=round(self.hold[0], 1), clipped=0),
+            right=dict(peak=round(min(right, 0.0), 1), hold=round(min(self.hold[1], 0.0), 1), clipped=self.clip_right),
+            clip_ago=None,
+        )
 
     def output_volume(self, card):
         return dict(control='PCM', db=self.volume_db, lo=-60.0, hi=4.0)
@@ -141,17 +149,46 @@ class DemoActions(web.Actions):
         self.history = (self.history + [point])[-150:]
         cores = [round(max(0, min(100, cpu + d)), 1) for d in (-8, 12, -3, 22)]
         throttle = dict(raw=0x50000, now=[], past=['undervoltage', 'throttled']) if self.args.throttled else dict(raw=0, now=[], past=[])
-        snap = dict(t=point['t'], cpu=point['cpu'], cores=cores, procs=dict(synth=round(cpu * 1.6, 1), bridge=round(self.rng.uniform(1, 5), 1), web=round(self.rng.uniform(0, 2), 1)),
-                    temp=temp, freq=point['freq'], freq_max=1200, mem=dict(total=931, used=int(500 + 30 * math.sin(k / 30))), load=[round(cpu / 40, 2), 0.7, 0.5], throttle=throttle,
-                    audio=[dict(card=1, id='U24', name='ZOOM U-24', device=0, state='RUNNING', format='S32_LE', channels=4, rate=44100, period=64, buffer=192, period_ms=1.45,
-                                buffer_ms=4.35, delay=int(120 + 30 * math.sin(k)), avail=72, avail_max=100,
-                                usb=dict(sync='ASYNC', rates=[44100, 48000, 88200, 96000], bits=24, momentary=44100, status='Running'))])
+        snap = dict(
+            t=point['t'],
+            cpu=point['cpu'],
+            cores=cores,
+            procs=dict(synth=round(cpu * 1.6, 1), bridge=round(self.rng.uniform(1, 5), 1), web=round(self.rng.uniform(0, 2), 1)),
+            temp=temp,
+            freq=point['freq'],
+            freq_max=1200,
+            mem=dict(total=931, used=int(500 + 30 * math.sin(k / 30))),
+            load=[round(cpu / 40, 2), 0.7, 0.5],
+            throttle=throttle,
+            audio=[
+                dict(
+                    card=1,
+                    id='U24',
+                    name='ZOOM U-24',
+                    device=0,
+                    state='RUNNING',
+                    format='S32_LE',
+                    channels=4,
+                    rate=44100,
+                    period=64,
+                    buffer=192,
+                    period_ms=1.45,
+                    buffer_ms=4.35,
+                    delay=int(120 + 30 * math.sin(k)),
+                    avail=72,
+                    avail_max=100,
+                    usb=dict(sync='ASYNC', rates=[44100, 48000, 88200, 96000], bits=24, momentary=44100, status='Running'),
+                )
+            ],
+        )
         return dict(now=snap, points=[p for p in self.history if p['t'] > since])
 
     def errors(self):
         now = int(time.time() * 1000)
-        return [dict(t=now - 90000, unit='exxpiano-wifi', level='warning', text="could not connect to 'Dacha', restoring the previous settings"),
-                dict(t=now - 20000, unit='exxpiano', level='error', text='no sound card found: connect a USB sound card or use the 3.5 mm jack')]
+        return [
+            dict(t=now - 90000, unit='exxpiano-wifi', level='warning', text="could not connect to 'Dacha', restoring the previous settings"),
+            dict(t=now - 20000, unit='exxpiano', level='error', text='no sound card found: connect a USB sound card or use the 3.5 mm jack'),
+        ]
 
     # ---- Wi-Fi: a small state machine that answers the requests of the page
     def _tick(self):
@@ -166,8 +203,18 @@ class DemoActions(web.Actions):
     def wifi_status(self):
         self._tick()
         ap = dict(ssid=web.wifilib.ap_ssid('exxpiano-Setup', self.args.installation_id))
-        return dict(mode=self.mode, busy=self.busy, link=self.link, cable=self.cable, hostname=self.host, ap=ap if self.mode == 'ap' else None,
-                    scan=self.scan, scanned_at=int(time.time()), last_result=self.last_result, updated=int(time.time()))
+        return dict(
+            mode=self.mode,
+            busy=self.busy,
+            link=self.link,
+            cable=self.cable,
+            hostname=self.host,
+            ap=ap if self.mode == 'ap' else None,
+            scan=self.scan,
+            scanned_at=int(time.time()),
+            last_result=self.last_result,
+            updated=int(time.time()),
+        )
 
     def wifi_saved(self):
         return list(self.saved)
@@ -196,7 +243,9 @@ class DemoActions(web.Actions):
         if 'fail' in (ssid or '').lower():
             self.last_result = dict(ok=False, kind='connect', ssid=ssid, error='wrong password, or the network is out of range', at=now)
             return
-        self.saved = [n for n in self.saved if n['ssid'] != ssid] + [dict(ssid=ssid, secure=bool(request.get('psk')), hidden=bool(request.get('hidden')), priority=9)]
+        self.saved = [n for n in self.saved if n['ssid'] != ssid] + [
+            dict(ssid=ssid, secure=bool(request.get('psk')), hidden=bool(request.get('hidden')), priority=9)
+        ]
         self.mode, self.link, self.ap_until = 'client', dict(ssid=ssid, ip='192.168.1.%d' % self.rng.randint(20, 200), signal=-55), 0
         self.last_result = dict(ok=True, kind='connect', ssid=ssid, error=None, at=now)
 
@@ -217,9 +266,14 @@ def main():
     banks = os.path.join(tmp, 'banks')
     os.makedirs(banks)
     make_sf2(os.path.join(banks, 'mech.sf2'), presets=[('Hammer', 0, 1)], name='Mechanics', sample_bytes=2000)
-    make_sf2(os.path.join(banks, 'Salamander Grand.sf2'), presets=[('Grand Piano', 0, 0), ('Bright', 0, 5), ('Felt', 3, 0)], name='Salamander Grand Piano', sample_bytes=900000)
+    make_sf2(
+        os.path.join(banks, 'Salamander Grand.sf2'),
+        presets=[('Grand Piano', 0, 0), ('Bright', 0, 5), ('Felt', 3, 0)],
+        name='Salamander Grand Piano',
+        sample_bytes=900000,
+    )
     make_sf2(os.path.join(banks, 'Upright.sf2'), presets=[('Upright', 0, 0)], name='Upright piano', sample_bytes=300000)
-    for name, megabytes in (('mech.sf2', 36), ('Salamander Grand.sf2', 695), ('Upright.sf2', 237)):          # sparse padding: the sizes of the real banks, no disk used
+    for name, megabytes in (('mech.sf2', 36), ('Salamander Grand.sf2', 695), ('Upright.sf2', 237)):  # sparse padding: the sizes of the real banks, no disk used
         os.truncate(os.path.join(banks, name), megabytes << 20)
     # a simulated USB drive with two banks in piano-banks/ (the import works for real: it copies into a temporary library)
     drive = os.path.join(tmp, 'usb-drive')
@@ -238,11 +292,24 @@ def main():
     usb_status = os.path.join(tmp, 'usb-status.json')
     usblib._write_json(usb_status, dict(drives=[dict(id='/dev/sda1', label='PIANO-BANKS', fs='vfat', mounted=True, mountpoint=drive, reason=None)]))
     conf = os.path.join(tmp, 'exxpiano.conf')
-    lines = ['PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'), 'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'), 'BANK_DIR=%s' % banks, 'ALSA_DEVICE=auto',
-             'GAIN=0.6', 'POLYPHONY=128', 'USB_PERIOD_SIZE=64', 'USB_PERIODS=3', 'REVERB=0', 'FX_ARGS="--velocity-curve 1 --hammer-boost 1.5 --hammer-exp 0.8 --random 1.6 --res-boost 0 --pedal-boost 4.5"',
-             'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'), 'WEB_PORT=%d' % args.port,
-             'IMPORT_DIR=%s' % os.path.join(tmp, 'library'), 'USB_STATUS=%s' % usb_status,
-             'MIDI_DIR=%s' % os.path.join(tmp, 'midi'), 'MIDI_RUN_DIR=%s' % os.path.join(tmp, 'midi-run')]
+    lines = [
+        'PIANO_SF2=%s' % os.path.join(banks, 'Salamander Grand.sf2'),
+        'MECH_SF2=%s' % os.path.join(banks, 'mech.sf2'),
+        'BANK_DIR=%s' % banks,
+        'ALSA_DEVICE=auto',
+        'GAIN=0.6',
+        'POLYPHONY=128',
+        'USB_PERIOD_SIZE=64',
+        'USB_PERIODS=3',
+        'REVERB=0',
+        'FX_ARGS="--velocity-curve 1 --hammer-boost 1.5 --hammer-exp 0.8 --random 1.6 --res-boost 0 --pedal-boost 4.5"',
+        'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'),
+        'WEB_PORT=%d' % args.port,
+        'IMPORT_DIR=%s' % os.path.join(tmp, 'library'),
+        'USB_STATUS=%s' % usb_status,
+        'MIDI_DIR=%s' % os.path.join(tmp, 'midi'),
+        'MIDI_RUN_DIR=%s' % os.path.join(tmp, 'midi-run'),
+    ]
     if args.token:
         lines.append('WEB_TOKEN=%s' % args.token)
     with open(conf, 'w') as f:

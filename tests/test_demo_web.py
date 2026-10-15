@@ -1,4 +1,5 @@
 """scripts/demo-web.py: the page on a computer without a Raspberry Pi. Starts the real script and asks its API."""
+
 import json
 import os
 import socket
@@ -26,7 +27,7 @@ class Demo:
             try:
                 self.get('/api/ping')
                 return
-            except Exception:                                  # noqa: BLE001 - not up yet
+            except Exception:  # noqa: BLE001 - not up yet
                 time.sleep(0.1)
         self.stop()
         raise RuntimeError('the demo did not start')
@@ -36,8 +37,9 @@ class Demo:
             return r.read()
 
     def json(self, path, body=None):
-        req = urllib.request.Request('http://127.0.0.1:%d%s' % (self.port, path), data=None if body is None else json.dumps(body).encode(),
-                                     headers={'Content-Type': 'application/json'})
+        req = urllib.request.Request(
+            'http://127.0.0.1:%d%s' % (self.port, path), data=None if body is None else json.dumps(body).encode(), headers={'Content-Type': 'application/json'}
+        )
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read())
 

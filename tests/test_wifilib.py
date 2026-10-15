@@ -1,4 +1,5 @@
 """Tests for pi/wifilib.py: wpa_supplicant.conf editing, key derivation, scan parsing, access point configuration."""
+
 import os
 import stat
 import sys
@@ -58,11 +59,11 @@ class WpaConfTests(unittest.TestCase):
         nets = wifilib.networks(text)
         self.assertEqual([n['ssid'] for n in nets], ['Home', 'Дом 2'])
         self.assertEqual([n['priority'] for n in nets], [0, 1])
-        self.assertIn('ssid=' + 'Дом 2'.encode().hex(), text)             # written as hex: no quoting problems
+        self.assertIn('ssid=' + 'Дом 2'.encode().hex(), text)  # written as hex: no quoting problems
         self.assertIn('psk=' + HEX, text)
         for kept in ('country=GB', 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev', 'update_config=1', '# Allow wpa_cli/wpa_gui'):
             self.assertIn(kept, text)
-        self.assertIn('psk=012abc', text)                         # the old network is untouched
+        self.assertIn('psk=012abc', text)  # the old network is untouched
         self.assertTrue(text.endswith('}\n'))
 
     def test_the_same_name_is_replaced_not_duplicated(self):
@@ -77,9 +78,9 @@ class WpaConfTests(unittest.TestCase):
     def test_open_and_hidden_networks(self):
         text = wifilib.add_network(WPA, 'Cafe')
         self.assertIn('key_mgmt=NONE', text)
-        self.assertFalse([n for n in wifilib.networks(text) if n['ssid'] == 'Cafe'][0]['secure'])
+        self.assertFalse(next(n for n in wifilib.networks(text) if n['ssid'] == 'Cafe')['secure'])
         text = wifilib.add_network(WPA, 'Secret', HEX, hidden=True)
-        self.assertTrue([n for n in wifilib.networks(text) if n['ssid'] == 'Secret'][0]['hidden'])
+        self.assertTrue(next(n for n in wifilib.networks(text) if n['ssid'] == 'Secret')['hidden'])
 
     def test_a_network_can_be_forgotten_and_forgetting_the_unknown_is_harmless(self):
         text = wifilib.add_network(WPA, 'Other', HEX)
@@ -95,7 +96,7 @@ class WpaConfTests(unittest.TestCase):
 
     def test_odd_files_do_not_break_the_parser(self):
         self.assertEqual(wifilib.networks(''), [])
-        broken = WPA.replace('}\n', '')                                       # unterminated block
+        broken = WPA.replace('}\n', '')  # unterminated block
         self.assertEqual(wifilib.add_network(broken, 'New', HEX).count('network={'), 2)
         weird = 'network={\n\tssid=4e6574\n\tkey_mgmt=NONE\n\tpriority=x\n}\nnetwork={\n\tkey_mgmt=NONE\n}\n'
         self.assertEqual(wifilib.networks(weird), [dict(ssid='Net', secure=False, hidden=False, priority=0)])
@@ -154,7 +155,7 @@ class ScanTests(unittest.TestCase):
         scan = wifilib.parse_scan(SCAN)
         self.assertEqual([e['ssid'] for e in scan], ['Home', 'Cafe Guest', 'Дом'])
         home = scan[0]
-        self.assertEqual((home['signal'], home['secure'], home['freq']), (-48, True, 2437))            # the stronger of the two
+        self.assertEqual((home['signal'], home['secure'], home['freq']), (-48, True, 2437))  # the stronger of the two
         self.assertEqual((scan[1]['signal'], scan[1]['secure']), (-60 if round(-60.5) == -60 else -61, False))
         self.assertTrue(scan[2]['secure'])
 
@@ -215,7 +216,7 @@ class HostnameTests(unittest.TestCase):
                 wifilib.apply_hostname(bad, lambda cmd: (0, ''))
         with self.assertRaises(OSError):
             wifilib.apply_hostname('ok', lambda cmd: (1, 'Access denied'), '/nonexistent/hosts')
-        self.assertEqual(wifilib.apply_hostname('ok', lambda cmd: (0, ''), '/nonexistent/hosts'), 'ok')    # a missing hosts file is not fatal
+        self.assertEqual(wifilib.apply_hostname('ok', lambda cmd: (0, ''), '/nonexistent/hosts'), 'ok')  # a missing hosts file is not fatal
 
 
 class AccessPointTests(unittest.TestCase):
@@ -230,8 +231,17 @@ class AccessPointTests(unittest.TestCase):
 
     def test_hostapd_configuration(self):
         text = wifilib.hostapd_conf('wlan0', 'exxpiano-Setup-81DE', 'exxpianosetup', 6, 'RU', '/run/exxpiano-wifi/hostapd')
-        for line in ('interface=wlan0', 'ssid=exxpiano-Setup-81DE', 'wpa=2', 'wpa_key_mgmt=WPA-PSK', 'rsn_pairwise=CCMP', 'wpa_passphrase=exxpianosetup',
-                     'channel=6', 'country_code=RU', 'ctrl_interface=/run/exxpiano-wifi/hostapd'):
+        for line in (
+            'interface=wlan0',
+            'ssid=exxpiano-Setup-81DE',
+            'wpa=2',
+            'wpa_key_mgmt=WPA-PSK',
+            'rsn_pairwise=CCMP',
+            'wpa_passphrase=exxpianosetup',
+            'channel=6',
+            'country_code=RU',
+            'ctrl_interface=/run/exxpiano-wifi/hostapd',
+        ):
             self.assertIn(line + '\n', text)
         self.assertNotIn('country_code', wifilib.hostapd_conf('wlan0', 'x', 'exxpianosetup', 1, 'xx'))
         for bad in (dict(passphrase='short'), dict(passphrase=None), dict(passphrase='exxpianosetup', channel=14), dict(ssid='')):
@@ -242,8 +252,19 @@ class AccessPointTests(unittest.TestCase):
 
     def test_dnsmasq_answers_every_name_with_the_pi_and_stays_on_its_interface(self):
         text = wifilib.dnsmasq_conf('wlan0', '/run/exxpiano-wifi')
-        for line in ('interface=wlan0', 'listen-address=10.42.0.1', 'bind-interfaces', 'address=/#/10.42.0.1', 'dhcp-range=10.42.0.10,10.42.0.60,255.255.255.0,2h',
-                     'dhcp-option=3,10.42.0.1', 'dhcp-option=6,10.42.0.1', 'no-resolv', 'user=nobody', 'group=nogroup', 'pid-file=/run/exxpiano-wifi/dnsmasq.pid'):
+        for line in (
+            'interface=wlan0',
+            'listen-address=10.42.0.1',
+            'bind-interfaces',
+            'address=/#/10.42.0.1',
+            'dhcp-range=10.42.0.10,10.42.0.60,255.255.255.0,2h',
+            'dhcp-option=3,10.42.0.1',
+            'dhcp-option=6,10.42.0.1',
+            'no-resolv',
+            'user=nobody',
+            'group=nogroup',
+            'pid-file=/run/exxpiano-wifi/dnsmasq.pid',
+        ):
             self.assertIn(line + '\n', text)
 
 

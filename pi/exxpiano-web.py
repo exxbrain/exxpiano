@@ -24,6 +24,8 @@
 Settings that can be changed are whitelisted with ranges in exxpianoconf.py. Optional WEB_TOKEN, WEB_PORT and WEB_BIND
 come from /etc/exxpiano.conf. Without WEB_TOKEN anybody on your network can change the settings (nothing else).
 """
+
+import base64
 import hmac
 import json
 import os
@@ -42,7 +44,6 @@ import exxpianoconf
 import midilib
 import midiplayer
 import profiles
-import base64
 import qrlib
 import sysmon
 import usblib
@@ -56,11 +57,11 @@ ERROR_LIMIT = 40
 OOM_RE = re.compile(r'Out of memory: Killed process \d+ \(([^)]*)\).*?anon-rss:(\d+)kB')
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
 
-MIXER_CONTROLS = ('PCM', 'Speaker', 'Headphone', 'Master')           # the playback volume controls of a sound card, in the order they are tried
+MIXER_CONTROLS = ('PCM', 'Speaker', 'Headphone', 'Master')  # the playback volume controls of a sound card, in the order they are tried
 MIXER_RE = re.compile(r'Playback\s+(-?\d+)\s+\[(\d+)%\]\s+\[(-?[\d.]+)dB\]')
 MIXER_LIMITS_RE = re.compile(r'Limits:\s*Playback\s+(-?\d+)\s*-\s*(-?\d+)')
 CARD_RE = re.compile(r'CARD=([A-Za-z0-9_.-]+)')
-VOLUME_FLOOR_DB = -60.0                                                # the slider does not go down to -102 dB: there is nothing to hear below this
+VOLUME_FLOOR_DB = -60.0  # the slider does not go down to -102 dB: there is nothing to hear below this
 
 
 def parse_amixer(text):
@@ -72,7 +73,7 @@ def parse_amixer(text):
     raw, db = int(m.group(1)), float(m.group(3))
     lim = MIXER_LIMITS_RE.search(text)
     hi = 0.0
-    if lim and abs(raw / 100.0 - db) < 0.06:                          # the raw unit is 0.01 dB (the Raspberry Pi's own jack)
+    if lim and abs(raw / 100.0 - db) < 0.06:  # the raw unit is 0.01 dB (the Raspberry Pi's own jack)
         hi = int(lim.group(2)) / 100.0
     return dict(db=db, lo=VOLUME_FLOOR_DB, hi=hi)
 
@@ -86,8 +87,8 @@ class Actions:
         self.wifi_run_dir = os.environ.get('EXXPIANO_WIFI_RUN', wifilib.RUN_DIR)
         self.wifi_iface = os.environ.get('WIFI_IFACE', 'wlan0')
         self.wpa_conf = os.environ.get('WIFI_WPA_CONF', '/etc/wpa_supplicant/wpa_supplicant.conf')
-        self.scan_error = None                 # why the last scan of the page failed
-        self._cache = {}                       # key -> (when, value): the page asks every few seconds, programs are started at most this often
+        self.scan_error = None  # why the last scan of the page failed
+        self._cache = {}  # key -> (when, value): the page asks every few seconds, programs are started at most this often
         self._cache_lock = threading.Lock()
 
     def _cached(self, key, ttl, produce):
@@ -96,7 +97,7 @@ class Actions:
             hit = self._cache.get(key)
             if hit and now - hit[0] < ttl:
                 return hit[1]
-        value = produce()                      # outside the lock: a slow program must not block the others
+        value = produce()  # outside the lock: a slow program must not block the others
         with self._cache_lock:
             self._cache[key] = (time.monotonic(), value)
         return value
@@ -139,8 +140,7 @@ class Actions:
 
     def synth_pid(self):
         try:
-            r = subprocess.run(['systemctl', 'show', '-p', 'MainPID', '--value', 'exxpiano'], capture_output=True, text=True,
-                               timeout=3)
+            r = subprocess.run(['systemctl', 'show', '-p', 'MainPID', '--value', 'exxpiano'], capture_output=True, text=True, timeout=3)
             return int(r.stdout.strip() or 0)
         except (OSError, subprocess.SubprocessError, ValueError):
             return 0
@@ -162,8 +162,8 @@ class Actions:
             if pid and pid != old_pid:
                 seen.add(pid)
             if len(seen) >= 3:
-                return False                                   # flapping: crashing and being restarted
-            if pid and pid != old_pid and self._service_state('exxpiano') == 'active' and self._seq_has_synth():     # never the cached answer
+                return False  # flapping: crashing and being restarted
+            if pid and pid != old_pid and self._service_state('exxpiano') == 'active' and self._seq_has_synth():  # never the cached answer
                 stable += 1
                 if stable >= 2:
                     return True
@@ -206,7 +206,7 @@ class Actions:
         except (OSError, subprocess.SubprocessError):
             return []
         found = parse_journal_errors(r.stdout)
-        try:                                              # the kernel's own log: it says when it killed a program for lack of memory
+        try:  # the kernel's own log: it says when it killed a program for lack of memory
             k = subprocess.run(['journalctl', '-k', '-b', '-n', '300', '--no-pager', '-o', 'json'], capture_output=True, text=True, timeout=5)
             found = sorted(found + parse_oom(k.stdout), key=lambda e: e['t'])[-ERROR_LIMIT:]
         except (OSError, subprocess.SubprocessError):
@@ -216,7 +216,7 @@ class Actions:
     # ---- Wi-Fi (the supervisor exxpiano-wifi does the changes; this only reads its status and sends requests)
     def wifi_status(self):
         st = wifilib.read_status(self.wifi_run_dir)
-        return st if st and time.time() - st.get('updated', 0) < 30 else None      # an old file: the supervisor is not running
+        return st if st and time.time() - st.get('updated', 0) < 30 else None  # an old file: the supervisor is not running
 
     def wifi_saved(self):
         try:
@@ -232,6 +232,7 @@ class Actions:
                 return r.returncode, r.stdout + r.stderr
             except (OSError, subprocess.SubprocessError) as exc:
                 return 127, str(exc)
+
         found, self.scan_error = wifilib.scan_networks(run, self.wifi_iface, tries=2, pause=1.0)
         return found
 
@@ -248,6 +249,7 @@ class Actions:
                 return r.returncode, r.stdout + r.stderr
             except (OSError, subprocess.SubprocessError) as exc:
                 return 127, str(exc)
+
         wifilib.apply_hostname(name, run)
         return socket.gethostname()
 
@@ -258,7 +260,7 @@ class Actions:
         return self._service_state('NetworkManager') == 'active'
 
     def restart_synth(self):
-        self._forget('service', 'output')                # the answers are about to change
+        self._forget('service', 'output')  # the answers are about to change
         subprocess.Popen(['systemctl', '--no-block', 'restart', 'exxpiano.service'])
 
     def output_volume(self, card):
@@ -279,7 +281,7 @@ class Actions:
             r = subprocess.run(['amixer', '-c', card, '--', 'sset', control, '%.1fdB' % db], capture_output=True, text=True, timeout=3)
             if r.returncode != 0:
                 return False
-            subprocess.run(['alsactl', 'store'], capture_output=True, timeout=5)          # the stored state is what alsa-restore puts back at boot
+            subprocess.run(['alsactl', 'store'], capture_output=True, timeout=5)  # the stored state is what alsa-restore puts back at boot
             return True
         except (OSError, subprocess.SubprocessError):
             return False
@@ -289,7 +291,7 @@ class Actions:
         True on success. (`set synth.gain` is the command that really changes it; plain `gain` does not.)"""
         fifo = os.environ.get('CMD_FIFO', '/run/exxpiano.cmd')
         try:
-            fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)      # fails with ENXIO when nobody reads (synth is down)
+            fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)  # fails with ENXIO when nobody reads (synth is down)
         except OSError:
             return False
         try:
@@ -313,7 +315,7 @@ class Actions:
             card = os.path.join(self.asound, 'card' + num)
             try:
                 if not any(n.startswith('pcm') and n.endswith('p') for n in os.listdir(card)):
-                    continue                                 # no playback (a keyboard's own USB audio, ...)
+                    continue  # no playback (a keyboard's own USB audio, ...)
             except OSError:
                 continue
             if 'hdmi' in cid.lower():
@@ -326,8 +328,7 @@ class Actions:
 
     def _audio_output(self):
         try:
-            r = subprocess.run(['journalctl', '-u', 'exxpiano', '-n', '300', '--no-pager', '-o', 'cat'],
-                               capture_output=True, text=True, timeout=5)
+            r = subprocess.run(['journalctl', '-u', 'exxpiano', '-n', '300', '--no-pager', '-o', 'cat'], capture_output=True, text=True, timeout=5)
         except (OSError, subprocess.SubprocessError):
             return None
         last = None
@@ -349,8 +350,15 @@ def parse_oom(text):
             continue
         m = OOM_RE.search(e['MESSAGE']) if isinstance(e.get('MESSAGE'), str) else None
         if m:
-            out.append(dict(t=t, unit='kernel', level='error',
-                            text='out of memory: the kernel killed %s, which held %d MB. Use a smaller piano bank (the Bank page) or a board with more memory' % (m.group(1), int(m.group(2)) // 1024)))
+            out.append(
+                dict(
+                    t=t,
+                    unit='kernel',
+                    level='error',
+                    text='out of memory: the kernel killed %s, which held %d MB. Use a smaller piano bank (the Bank page) or a board with more memory'
+                    % (m.group(1), int(m.group(2)) // 1024),
+                )
+            )
     return out
 
 
@@ -366,7 +374,7 @@ def parse_journal_errors(text):
         except (ValueError, KeyError, TypeError):
             continue
         msg = e.get('MESSAGE')
-        if isinstance(msg, list):                      # journald stores binary messages as byte lists
+        if isinstance(msg, list):  # journald stores binary messages as byte lists
             msg = bytes(b & 255 for b in msg).decode('utf-8', 'replace')
         if not isinstance(msg, str) or not msg.strip():
             continue
@@ -443,7 +451,7 @@ class Switcher:
             old_pid = actions.synth_pid()
             actions.restart_synth()
             ready = actions.wait_synth_ready(old_pid)
-        except Exception as exc:                                # whatever went wrong, the old bank must come back
+        except Exception as exc:  # whatever went wrong, the old bank must come back
             print('bank switch failed: %s' % exc, file=sys.stderr)
         if ready:
             app.remember(bank_id, mine)
@@ -456,7 +464,7 @@ class Switcher:
         if not old_path:
             self._set('failed', 'The new bank did not load and there is no previous bank to go back to')
             return
-        try:                                                    # the old bank AND its settings come back
+        try:  # the old bank AND its settings come back
             exxpianoconf.apply_updates(old, conf, raw={'PIANO_SF2': old_path})
             old_pid = actions.synth_pid()
             actions.restart_synth()
@@ -464,9 +472,11 @@ class Switcher:
         except Exception as exc:
             print('rollback failed: %s' % exc, file=sys.stderr)
             back = False
-        self._set('rolled_back' if back else 'failed',
-                  '%s did not load; %s' % (bank_id, 'the previous bank is playing again' if back
-                                           else 'the previous bank could not be restored either, check the device'))
+        self._set(
+            'rolled_back' if back else 'failed',
+            '%s did not load; %s'
+            % (bank_id, 'the previous bank is playing again' if back else 'the previous bank could not be restored either, check the device'),
+        )
 
 
 class ImportJob:
@@ -495,7 +505,9 @@ class ImportJob:
         def progress(done, total, phase):
             with self._lock:
                 if self._state['op'] == op:
-                    self._state.update(state=phase if phase in ('copying', 'verifying') else self._state['state'], done=max(self._state['done'], done), total=total)
+                    self._state.update(
+                        state=phase if phase in ('copying', 'verifying') else self._state['state'], done=max(self._state['done'], done), total=total
+                    )
 
         def run():
             try:
@@ -503,7 +515,7 @@ class ImportJob:
                 result = dict(state='done', bank_id=bank_id, already=already, error=None)
             except bankimport.ImportFailed as exc:
                 result = dict(state='failed', error=str(exc))
-            except Exception as exc:                          # noqa: BLE001 - the user gets a safe sentence, the journal gets the cause
+            except Exception as exc:  # noqa: BLE001 - the user gets a safe sentence, the journal gets the cause
                 print('bank import failed:', exc, file=sys.stderr)
                 result = dict(state='failed', error='the import failed')
             with self._lock:
@@ -533,21 +545,20 @@ class App:
         bankimport.stale_cleanup(self.import_dir)
 
     def spec(self):
-        return {n: {k: v for k, v in s.items() if k in ('kind', 'lo', 'hi', 'default', 'scope')}
-                for n, s in exxpianoconf.SETTINGS.items()}
+        return {n: {k: v for k, v in s.items() if k in ('kind', 'lo', 'hi', 'default', 'scope')} for n, s in exxpianoconf.SETTINGS.items()}
 
     def state(self):
         a = self.actions
         return dict(
             banks=self.banks_state(),
             version=a.version(),
-            hostname=a.hostname(), device=self.device_info(),
+            hostname=a.hostname(),
+            device=self.device_info(),
             fluidsynth=a.fluidsynth_version(),
             settings=exxpianoconf.get_settings(self.conf_path),
             device_profiles=profiles.load(self.devices_path, exxpianoconf.PER_DEVICE_NAMES),
             spec=self.spec(),
-            status=dict(synth=a.service_state('exxpiano'), bridge=a.service_state('exxpiano-fx'),
-                        output=a.audio_output(), cards=a.cards()),
+            status=dict(synth=a.service_state('exxpiano'), bridge=a.service_state('exxpiano-fx'), output=a.audio_output(), cards=a.cards()),
             output_volume=self.output_volume(),
         )
 
@@ -608,11 +619,30 @@ class App:
         st = a.wifi_status()
         saved = [dict(ssid=n['ssid'], secure=n['secure'], hidden=n['hidden']) for n in a.wifi_saved()]
         if st is None:
-            return dict(supported=False, reason='networkmanager' if a.network_manager_active() else 'not_running', saved=saved, networks=[],
-                        link=None, mode=None, busy=None)
-        return dict(supported=True, mode=st.get('mode'), busy=st.get('busy'), link=st.get('link'), hostname=st.get('hostname'), ap=st.get('ap'),
-                    saved=saved, networks=st.get('scan') or [], scan_error=st.get('scan_error'), scanned_at=st.get('scanned_at'), last_result=st.get('last_result'),
-                    now=st.get('updated'), cable=bool(st.get('cable')))
+            return dict(
+                supported=False,
+                reason='networkmanager' if a.network_manager_active() else 'not_running',
+                saved=saved,
+                networks=[],
+                link=None,
+                mode=None,
+                busy=None,
+            )
+        return dict(
+            supported=True,
+            mode=st.get('mode'),
+            busy=st.get('busy'),
+            link=st.get('link'),
+            hostname=st.get('hostname'),
+            ap=st.get('ap'),
+            saved=saved,
+            networks=st.get('scan') or [],
+            scan_error=st.get('scan_error'),
+            scanned_at=st.get('scanned_at'),
+            last_result=st.get('last_result'),
+            now=st.get('updated'),
+            cable=bool(st.get('cable')),
+        )
 
     def wifi_action(self, body):
         if not isinstance(body, dict):
@@ -623,14 +653,14 @@ class App:
             raise ValueError('Wi-Fi setup is not available here (%s)' % state['reason'])
         if action == 'scan':
             if state['mode'] == 'ap' or state['busy']:
-                return dict(networks=state['networks'], scanned_at=state['scanned_at'], cached=True)   # the radio is serving or busy
+                return dict(networks=state['networks'], scanned_at=state['scanned_at'], cached=True)  # the radio is serving or busy
             found = self.actions.wifi_scan()
             if found is None:
                 raise ValueError(getattr(self.actions, 'scan_error', None) or 'the scan failed, try again in a moment')
             return dict(networks=found, scanned_at=int(time.time()), cached=False)
         if state['busy']:
             raise WifiBusy()
-        if action == 'setup':                                    # the setup network for a while, then back by itself (a test and a way out)
+        if action == 'setup':  # the setup network for a while, then back by itself (a test and a way out)
             if state['mode'] == 'ap':
                 raise ValueError('the setup network is already running')
             return dict(accepted=True, id=self.actions.wifi_request(dict(action='ap', seconds=300)))
@@ -658,7 +688,7 @@ class App:
         asking browser reached it (for a phone on the same network)."""
         kind = (query.get('kind') or [''])[0]
         conf = exxpianoconf.parse_conf(self.conf_path)
-        install_id = self.device_info()['installation_id']           # the codes identify the installed copy they belong to
+        install_id = self.device_info()['installation_id']  # the codes identify the installed copy they belong to
         port = conf.get('WEB_PORT') or '8080'
         if kind == 'join':
             ssid, password = wifilib.setup_credentials(conf, install_id)
@@ -673,8 +703,14 @@ class App:
             raise ValueError('kind must be join, setup or page')
         matrix = qrlib.encode(text, 'M')
         # svg and png are what the page offers for download (the only place where a code can be taken: it belongs to this installation)
-        return dict(extra, kind=kind, text=text, svg=qrlib.to_svg(matrix), png=base64.b64encode(qrlib.to_png(matrix, scale=10, border=4)).decode('ascii'),
-                    filename='exxpiano-%s-%s' % ({'join': 'join-wifi', 'setup': 'setup-page', 'page': 'page'}[kind], install_id))
+        return dict(
+            extra,
+            kind=kind,
+            text=text,
+            svg=qrlib.to_svg(matrix),
+            png=base64.b64encode(qrlib.to_png(matrix, scale=10, border=4)).decode('ascii'),
+            filename='exxpiano-%s-%s' % ({'join': 'join-wifi', 'setup': 'setup-page', 'page': 'page'}[kind], install_id),
+        )
 
     def device_info(self):
         return dict(installation_id=self.actions.installation_id())
@@ -692,7 +728,7 @@ class App:
         try:
             since = int((query.get('since') or ['0'])[0])
         except ValueError:
-            raise ValueError('bad since')
+            raise ValueError('bad since') from None
         if since < 0:
             raise ValueError('bad since')
         return self.actions.monitor(since)
@@ -723,11 +759,17 @@ class App:
             external = dict(path=current, name=(info or {}).get('name') or os.path.basename(current))
         s = exxpianoconf.get_settings(self.conf_path)
         key = os.path.basename(current) if current else None
-        return dict(dir=bank_dir, current=current_id, external=external, banks=banks,
-                    memory=banklib.memory_info(bank_dir, self.actions.mem_total(), mech_bytes, current, mem_available=self.actions.mem_available()),
-                    profile=dict(key=key, saved=bool(key and profiles.get(self.profile_path, key))),
-                    presets=banklib.presets_of(current) if current else [],
-                    preset=dict(bank=s['piano_bank'], program=s['piano_prog']), switch=self.switcher.status)
+        return dict(
+            dir=bank_dir,
+            current=current_id,
+            external=external,
+            banks=banks,
+            memory=banklib.memory_info(bank_dir, self.actions.mem_total(), mech_bytes, current, mem_available=self.actions.mem_available()),
+            profile=dict(key=key, saved=bool(key and profiles.get(self.profile_path, key))),
+            presets=banklib.presets_of(current) if current else [],
+            preset=dict(bank=s['piano_bank'], program=s['piano_prog']),
+            switch=self.switcher.status,
+        )
 
     def _bank_path(self, bank_dir, bank_id):
         try:
@@ -809,7 +851,7 @@ class App:
         raise ValueError('unknown action')
 
     def _midi_id(self, midi_id):
-        midilib.resolve(self.midi_dir, midi_id)                        # ValueError -> 400
+        midilib.resolve(self.midi_dir, midi_id)  # ValueError -> 400
         return midi_id
 
     def _midi_request(self, req):
@@ -870,11 +912,11 @@ class App:
         return dict(deleted=True, freed=banklib.delete_installed(bank_dir, bank_id, keep_paths=keep))
 
     def switch_bank(self, bank_id):
-        bank_dir, current, mech, mech_bytes = self._bank_context()
-        path = banklib.resolve_any(bank_dir, self.import_dir, bank_id)       # ValueError -> 400
+        bank_dir, current, _mech, mech_bytes = self._bank_context()
+        path = banklib.resolve_any(bank_dir, self.import_dir, bank_id)  # ValueError -> 400
         if current and banklib._same(path, current):
             return dict(started=False, message='This bank is already in use')
-        info, error = banklib.inspect(path)
+        _info, error = banklib.inspect(path)
         if error:
             raise ValueError(error)
         limit = banklib.size_limit(self.actions.mem_total(), mech_bytes)
@@ -883,7 +925,7 @@ class App:
         preset = banklib.default_preset(banklib.presets_of(path))
         if preset is None:
             raise ValueError('the bank has no preset that can be used for the piano')
-        self.switcher.start(path, bank_id, preset)                        # Busy -> 409
+        self.switcher.start(path, bank_id, preset)  # Busy -> 409
         return dict(started=True)
 
     def _check_preset(self, body):
@@ -910,7 +952,7 @@ class App:
         try:
             new = exxpianoconf.validate({'alsa_device': body['alsa_device']})['alsa_device']
         except ValueError:
-            return body                                    # apply_updates reports it
+            return body  # apply_updates reports it
         if new == cur['alsa_device']:
             return body
         self.remember_device(cur['alsa_device'], {n: cur[n] for n in exxpianoconf.PER_DEVICE_NAMES})
@@ -921,16 +963,16 @@ class App:
     def update(self, body):
         per_bank = isinstance(body, dict) and any(k in exxpianoconf.PER_BANK_NAMES for k in body)
         if per_bank and self.switcher.busy():
-            raise Busy()                                   # the switch is writing these very values
+            raise Busy()  # the switch is writing these very values
         if isinstance(body, dict):
             self._check_preset(body)
         body = self._with_device_profile(body)
-        settings, scopes = exxpianoconf.apply_updates(body, self.conf_path)     # ValueError -> 400
+        settings, scopes = exxpianoconf.apply_updates(body, self.conf_path)  # ValueError -> 400
         if per_bank:
             self.remember(self.current_key(), {n: settings[n] for n in exxpianoconf.PER_BANK_NAMES})
         if isinstance(body, dict) and ('alsa_device' in body or any(k in exxpianoconf.PER_DEVICE_NAMES for k in body)):
             self.remember_device(settings['alsa_device'], {n: settings[n] for n in exxpianoconf.PER_DEVICE_NAMES})
-        done = dict(fx='fx' in scopes, gain=None)         # gain: True live, False failed, None unchanged
+        done = dict(fx='fx' in scopes, gain=None)  # gain: True live, False failed, None unchanged
         if 'gain' in scopes:
             done['gain'] = bool(self.actions.set_gain(settings['gain']))
         return dict(settings=settings, applied=done, restart_required='synth' in scopes)
@@ -945,7 +987,12 @@ def make_handler(app):
 
         def log_request(self, code='-', size='-'):
             # the page polls the state and the monitor all the time: successful polls would only fill the journal with noise
-            if self.command == 'GET' and str(code) == '200' and urlsplit(self.path).path in ('/api/state', '/api/monitor', '/api/errors', '/api/levels', '/api/usb', '/api/midi', '/api/wifi', '/api/qr', '/api/ping'):
+            if (
+                self.command == 'GET'
+                and str(code) == '200'
+                and urlsplit(self.path).path
+                in ('/api/state', '/api/monitor', '/api/errors', '/api/levels', '/api/usb', '/api/midi', '/api/wifi', '/api/qr', '/api/ping')
+            ):
                 return
             super().log_request(code, size)
 
@@ -976,7 +1023,7 @@ def make_handler(app):
             return json.loads(self.rfile.read(length).decode('utf-8'))
 
         def do_GET(self):
-            if urlsplit(self.path).path in ('/', '/index.html'):                 # a query (?d=81DE from a QR code) still means the page
+            if urlsplit(self.path).path in ('/', '/index.html'):  # a query (?d=81DE from a QR code) still means the page
                 try:
                     with open(os.path.join(WEB_DIR, 'index.html'), 'rb') as f:
                         return self._send(200, f.read(), 'text/html')
@@ -1025,6 +1072,7 @@ def make_handler(app):
             if url.path == '/api/ping':
                 return self._send(200, dict(ok=True, auth_required=bool(app.token)))
             self._send(404, dict(error='not found'))
+            return None
 
         def do_POST(self):
             if not self._authorised():
@@ -1061,6 +1109,7 @@ def make_handler(app):
             except OSError as exc:
                 return self._send(500, dict(error='cannot write the settings: %s' % exc))
             self._send(404, dict(error='not found'))
+            return None
 
     return Handler
 

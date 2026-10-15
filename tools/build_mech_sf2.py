@@ -17,6 +17,7 @@ Usage: build_mech_sf2.py SRC_DIR OUT.sf2 [SFZ_NAME]
 Works with any package of the set (44.1 kHz/16 bit, 48 kHz/24 bit, WAV or FLAC): sample files are found through the
 paths in the SFZ and converted to 44.1 kHz / 16 bit.
 """
+
 import array
 import os
 import re
@@ -27,12 +28,14 @@ import sys
 SRC = sys.argv[1]
 OUT = sys.argv[2]
 SFZ = os.path.join(SRC, sys.argv[3] if len(sys.argv) > 3 else 'SalamanderGrandPianoV3Retuned.sfz')
-SFZ_DIR = os.path.dirname(SFZ)   # sample paths in the SFZ are relative to it
+SFZ_DIR = os.path.dirname(SFZ)  # sample paths in the SFZ are relative to it
 
 
 def parse():
     inst = {'Hammer': [], 'ResL': [], 'ResS': [], 'ResV3': [], 'PedalDn': [], 'PedalUp': []}
-    for raw in open(SFZ, encoding='utf-8', errors='replace'):
+    with open(SFZ, encoding='utf-8', errors='replace') as f:
+        lines = f.readlines()
+    for raw in lines:
         line = raw.strip()
         if not line.startswith('<region>'):
             continue
@@ -44,8 +47,9 @@ def parse():
             inst['Hammer'].append(dict(file=relpath, lo=k, hi=k, root=k, tune=0))
         elif f.startswith('harm'):
             name = {'harmL': 'ResL', 'harmS': 'ResS', 'harmV3': 'ResV3'}[re.match(r'^(harm(?:V3|L|S))', f).group(1)]
-            inst[name].append(dict(file=relpath, lo=int(kv['lokey']), hi=int(kv['hikey']),
-                                   root=int(kv.get('pitch_keycenter', 60)), tune=int(kv.get('tune', 0))))
+            inst[name].append(
+                dict(file=relpath, lo=int(kv['lokey']), hi=int(kv['hikey']), root=int(kv.get('pitch_keycenter', 60)), tune=int(kv.get('tune', 0)))
+            )
         elif f.startswith('pedal'):
             name = 'PedalDn' if f.startswith('pedalD') else 'PedalUp'
             key = 60 if os.path.splitext(f)[0].endswith('1') else 61
@@ -54,7 +58,7 @@ def parse():
 
 
 def pad(s, n):
-    b = s.encode('ascii', 'replace')[:n - 1]
+    b = s.encode('ascii', 'replace')[: n - 1]
     return b + b'\0' * (n - len(b))
 
 
@@ -72,7 +76,7 @@ def decode(path):
     cmd = ['ffmpeg', '-v', 'error', '-i', path, '-ac', '2', '-ar', '44100', '-f', 's16le', '-']
     raw = subprocess.run(cmd, check=True, capture_output=True).stdout
     a = array.array('h')
-    a.frombytes(raw[:len(raw) // 4 * 4])
+    a.frombytes(raw[: len(raw) // 4 * 4])
     return a[0::2].tobytes(), a[1::2].tobytes()
 
 
@@ -120,18 +124,24 @@ def main():
     for name in order:
         inst_hdr += pad(name, 20) + struct.pack('<H', n_ibag)
         # global zone: modulators
-        ibag += struct.pack('<HH', n_gen, n_mod); n_ibag += 1
+        ibag += struct.pack('<HH', n_gen, n_mod)
+        n_ibag += 1
         for src, dest, amt in ((0x0502, 48, 0), (0x0102, 8, 0), (0x0102, 48, 600)):
-            imod += struct.pack('<HHhHH', src, dest, amt, 0, 0); n_mod += 1
+            imod += struct.pack('<HHhHH', src, dest, amt, 0, 0)
+            n_mod += 1
         for lo, hi, tune, pan, sid in zones[name]:
-            ibag += struct.pack('<HH', n_gen, n_mod); n_ibag += 1
+            ibag += struct.pack('<HH', n_gen, n_mod)
+            n_ibag += 1
             igen += g_range(43, lo, hi)
             igen += g_range(44, 0, 127)
             n_gen += 2
-            igen += g_val(17, pan); n_gen += 1
+            igen += g_val(17, pan)
+            n_gen += 1
             if tune:
-                igen += g_val(52, tune); n_gen += 1
-            igen += struct.pack('<HH', 53, sid); n_gen += 1
+                igen += g_val(52, tune)
+                n_gen += 1
+            igen += struct.pack('<HH', 53, sid)
+            n_gen += 1
     inst_hdr += pad('EOI', 20) + struct.pack('<H', n_ibag)
     ibag += struct.pack('<HH', n_gen, n_mod)
     igen += struct.pack('<HH', 0, 0)
@@ -154,13 +164,25 @@ def main():
         sh += pad(nm, 20) + struct.pack('<IIIIIBbHH', st, en, ls, le, rate, root, corr, link, ctype)
     sh += pad('EOS', 20) + struct.pack('<IIIIIBbHH', 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-    info = chunk(b'ifil', struct.pack('<HH', 2, 1)) + chunk(b'isng', b'EMU8000\0') + \
-        chunk(b'INAM', b'Salamander Mechanics\0') + \
-        chunk(b'ICMT', b'Release/resonance/pedal samples from Salamander Grand Piano V3 by Alexander Holm (CC-BY)\0')
+    info = (
+        chunk(b'ifil', struct.pack('<HH', 2, 1))
+        + chunk(b'isng', b'EMU8000\0')
+        + chunk(b'INAM', b'Salamander Mechanics\0')
+        + chunk(b'ICMT', b'Release/resonance/pedal samples from Salamander Grand Piano V3 by Alexander Holm (CC-BY)\0')
+    )
     sdta = lst(b'sdta', chunk(b'smpl', bytes(pcm)))
-    pdta = lst(b'pdta', chunk(b'phdr', phdr) + chunk(b'pbag', pbag) + chunk(b'pmod', pmod) + chunk(b'pgen', pgen) +
-               chunk(b'inst', inst_hdr) + chunk(b'ibag', ibag) + chunk(b'imod', imod) + chunk(b'igen', igen) +
-               chunk(b'shdr', sh))
+    pdta = lst(
+        b'pdta',
+        chunk(b'phdr', phdr)
+        + chunk(b'pbag', pbag)
+        + chunk(b'pmod', pmod)
+        + chunk(b'pgen', pgen)
+        + chunk(b'inst', inst_hdr)
+        + chunk(b'ibag', ibag)
+        + chunk(b'imod', imod)
+        + chunk(b'igen', igen)
+        + chunk(b'shdr', sh),
+    )
     body = b'sfbk' + lst(b'INFO', info) + sdta + pdta
     with open(OUT, 'wb') as f:
         f.write(b'RIFF' + struct.pack('<I', len(body)) + body)

@@ -7,6 +7,7 @@ Always builds  exxpiano_<version>_all.deb   (program, services, config, dependen
 With --banks also builds exxpiano-soundfonts_<version>_all.deb (the two .sf2 files, hundreds of MB).
 Install on the Pi:  sudo apt install ./exxpiano_1.0.0_all.deb
 """
+
 import argparse
 import gzip
 import hashlib
@@ -41,20 +42,24 @@ def md5_of(path):
 
 def parents(arcname):
     parts = arcname.split('/')[:-1]
-    return ['/'.join(parts[:i + 1]) for i in range(len(parts))]
+    return ['/'.join(parts[: i + 1]) for i in range(len(parts))]
 
 
 def write_tar_gz(path, files, mtime, extra_dirs=()):
     """files: list of (arcname, source) where source is a path (str) or bytes; mode comes from the tuple."""
     dirs = sorted({d for arc, _, _ in files for d in parents(arc)} | set(extra_dirs))
-    with open(path, 'wb') as raw, \
-            gzip.GzipFile(filename='', mode='wb', fileobj=raw, compresslevel=6, mtime=mtime) as gz, \
-            tarfile.open(fileobj=gz, mode='w', format=tarfile.GNU_FORMAT) as tf:
+    with (
+        open(path, 'wb') as raw,
+        gzip.GzipFile(filename='', mode='wb', fileobj=raw, compresslevel=6, mtime=mtime) as gz,
+        tarfile.open(fileobj=gz, mode='w', format=tarfile.GNU_FORMAT) as tf,
+    ):
+
         def owner(ti):
             ti.uid = ti.gid = 0
             ti.uname = ti.gname = 'root'
             ti.mtime = mtime
             return ti
+
         root = owner(tarfile.TarInfo('./'))
         root.type, root.mode = tarfile.DIRTYPE, 0o755
         tf.addfile(root)
@@ -67,6 +72,7 @@ def write_tar_gz(path, files, mtime, extra_dirs=()):
             ti.mode = mode
             if isinstance(source, bytes):
                 import io
+
                 ti.size = len(source)
                 tf.addfile(ti, io.BytesIO(source))
             else:
@@ -111,11 +117,9 @@ def build_package(out_dir, name, version, depends, description, files, extra_dir
         md5lines.append('%s  %s\n' % (digest, arc))
         installed += size
     control = (
-        'Package: %s\nVersion: %s\nArchitecture: all\nMaintainer: %s\nInstalled-Size: %d\n'
-        'Depends: %s\n%sSection: sound\nPriority: optional\nDescription: %s\n'
+        'Package: %s\nVersion: %s\nArchitecture: all\nMaintainer: %s\nInstalled-Size: %d\nDepends: %s\n%sSection: sound\nPriority: optional\nDescription: %s\n'
     ) % (name, version, MAINTAINER, (installed + 1023) // 1024, depends, 'Recommends: %s\n' % recommends if recommends else '', description)
-    ctl_files = [('control', control.encode('utf-8'), 0o644),
-                 ('md5sums', ''.join(md5lines).encode('ascii'), 0o644)]
+    ctl_files = [('control', control.encode('utf-8'), 0o644), ('md5sums', ''.join(md5lines).encode('ascii'), 0o644)]
     if conffiles:
         ctl_files.append(('conffiles', ''.join(c + '\n' for c in conffiles).encode('ascii'), 0o644))
     for script, data in scripts.items():
@@ -125,13 +129,15 @@ def build_package(out_dir, name, version, depends, description, files, extra_dir
     ctl_tar = os.path.join(tmp, name + '-control.tar.gz')
     write_tar_gz(data_tar, files, mtime, extra_dirs)
     # control archive has no directories except './'
-    with open(ctl_tar, 'wb') as raw, \
-            gzip.GzipFile(filename='', mode='wb', fileobj=raw, compresslevel=9, mtime=mtime) as gz, \
-            tarfile.open(fileobj=gz, mode='w', format=tarfile.GNU_FORMAT) as tf:
+    with (
+        open(ctl_tar, 'wb') as raw,
+        gzip.GzipFile(filename='', mode='wb', fileobj=raw, compresslevel=9, mtime=mtime) as gz,
+        tarfile.open(fileobj=gz, mode='w', format=tarfile.GNU_FORMAT) as tf,
+    ):
         import io
+
         root = tarfile.TarInfo('./')
-        root.type, root.mode, root.uid, root.gid, root.uname, root.gname, root.mtime = \
-            tarfile.DIRTYPE, 0o755, 0, 0, 'root', 'root', mtime
+        root.type, root.mode, root.uid, root.gid, root.uname, root.gname, root.mtime = tarfile.DIRTYPE, 0o755, 0, 0, 'root', 'root', mtime
         tf.addfile(root)
         for arc, data, mode in ctl_files:
             ti = tarfile.TarInfo('./' + arc)
@@ -152,9 +158,13 @@ def main():
     mtime = int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))
     os.makedirs(args.out, exist_ok=True)
     import tempfile
+
     copyright_text = (
         'exxpiano: scripts MIT (Denis Zakharov). Sounds: Salamander Grand Piano V3 by Alexander Holm, CC-BY.\n\n'
-        + read(src('NOTICE.md')).decode('utf-8') + '\n' + read(src('LICENSE')).decode('utf-8')).encode('utf-8')
+        + read(src('NOTICE.md')).decode('utf-8')
+        + '\n'
+        + read(src('LICENSE')).decode('utf-8')
+    ).encode('utf-8')
 
     main_files = [
         ('opt/exxpiano/exxpiano-fx.py', src('pi', 'exxpiano-fx.py'), 0o755),
@@ -202,26 +212,55 @@ def main():
         ' port 8080 with Wi-Fi setup (the Pi starts its own network when it has none).\n'
         ' .\n'
         ' Sound banks are not included. Install exxpiano-soundfonts or run\n'
-        ' exxpiano-install-banks.\n')
+        ' exxpiano-install-banks.\n'
+    )
 
     with tempfile.TemporaryDirectory() as tmp:
-        built = [build_package(args.out, 'exxpiano', args.version, DEPENDS, description, main_files,
-                               ['opt/exxpiano/soundfonts', 'var/lib/exxpiano'], scripts, ['/etc/exxpiano.conf'], mtime, tmp, RECOMMENDS)]
+        built = [
+            build_package(
+                args.out,
+                'exxpiano',
+                args.version,
+                DEPENDS,
+                description,
+                main_files,
+                ['opt/exxpiano/soundfonts', 'var/lib/exxpiano'],
+                scripts,
+                ['/etc/exxpiano.conf'],
+                mtime,
+                tmp,
+                RECOMMENDS,
+            )
+        ]
         if args.banks:
             piano, mech = args.banks
             for p in (piano, mech):
                 if not os.path.isfile(p):
                     sys.exit('No such file: ' + p)
-            bank_files = [('opt/exxpiano/soundfonts/piano.sf2', os.path.abspath(piano), 0o644),
-                          ('opt/exxpiano/soundfonts/mech.sf2', os.path.abspath(mech), 0o644)]
+            bank_files = [
+                ('opt/exxpiano/soundfonts/piano.sf2', os.path.abspath(piano), 0o644),
+                ('opt/exxpiano/soundfonts/mech.sf2', os.path.abspath(mech), 0o644),
+            ]
             bank_desc = (
                 'Salamander piano sound banks for exxpiano\n'
                 ' piano.sf2 (piano) and mech.sf2 (mechanics), built from Salamander Grand Piano V3\n'
-                ' by Alexander Holm (CC-BY).\n')
-            built.append(build_package(
-                args.out, 'exxpiano-soundfonts', args.version, 'exxpiano (>= %s)' % args.version,
-                bank_desc, bank_files, [],
-                {'postinst': read(src('packaging', 'debian', 'soundfonts-postinst'))}, [], mtime, tmp))
+                ' by Alexander Holm (CC-BY).\n'
+            )
+            built.append(
+                build_package(
+                    args.out,
+                    'exxpiano-soundfonts',
+                    args.version,
+                    'exxpiano (>= %s)' % args.version,
+                    bank_desc,
+                    bank_files,
+                    [],
+                    {'postinst': read(src('packaging', 'debian', 'soundfonts-postinst'))},
+                    [],
+                    mtime,
+                    tmp,
+                )
+            )
     for path in built:
         print('%s  (%.1f MB)' % (path, os.path.getsize(path) / 1e6))
 

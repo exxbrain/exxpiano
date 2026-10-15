@@ -3,6 +3,7 @@
 No hardware: the drive is a folder, the mount commands go through a fake runner. What a real Pi does with a real drive is a separate checklist.
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+
 import os
 import sys
 import tempfile
@@ -57,7 +58,7 @@ class ImporterTests(unittest.TestCase):
         self.assertEqual((listed[0]['source'], listed[0]['original_name'], listed[0]['ok']), ('imported', 'Grand.sf2', True))
         self.assertEqual(seen[-1][2], 'done')
         done = [d for d, _, _ in seen]
-        self.assertEqual(done, sorted(done))                                     # the progress never goes back
+        self.assertEqual(done, sorted(done))  # the progress never goes back
 
     def test_the_same_bank_is_not_copied_twice(self):
         first, _ = bankimport.import_bank(self.src, 'Grand.sf2', self.lib)
@@ -67,7 +68,7 @@ class ImporterTests(unittest.TestCase):
         self.assertEqual(self.leftovers(), [])
 
     def test_not_enough_space_refuses_before_anything_is_written(self):
-        full = lambda path: SimpleNamespace(f_bavail=10, f_frsize=4096)         # noqa: E731 - 40 KB free
+        full = lambda path: SimpleNamespace(f_bavail=10, f_frsize=4096)  # noqa: E731 - 40 KB free
         with self.assertRaisesRegex(bankimport.ImportFailed, 'not enough space'):
             bankimport.import_bank(self.src, 'Grand.sf2', self.lib, statvfs=full)
         self.assertEqual(banklib.list_imports(self.lib), [])
@@ -90,6 +91,7 @@ class ImporterTests(unittest.TestCase):
 
             def __exit__(self, *a):
                 self.f.close()
+
         with self.assertRaisesRegex(bankimport.ImportFailed, 'interrupted'):
             bankimport.import_bank(self.src, 'Grand.sf2', self.lib, opener=Failing)
         self.assertEqual(banklib.list_imports(self.lib), [])
@@ -110,8 +112,8 @@ class ImporterTests(unittest.TestCase):
 
     def test_an_incomplete_or_forged_entry_is_not_in_the_catalog(self):
         bank_id, _ = bankimport.import_bank(self.src, 'Grand.sf2', self.lib)
-        os.makedirs(os.path.join(self.lib, 'i-0123456789abcdef'))                 # a folder without meta.json
-        with open(os.path.join(self.lib, bank_id, 'bank.sf2'), 'ab') as f:         # the size no longer agrees with meta.json
+        os.makedirs(os.path.join(self.lib, 'i-0123456789abcdef'))  # a folder without meta.json
+        with open(os.path.join(self.lib, bank_id, 'bank.sf2'), 'ab') as f:  # the size no longer agrees with meta.json
             f.write(b'x')
         self.assertEqual(banklib.list_imports(self.lib), [])
         for bad in ('../x', 'i-zz', 'bank.sf2', None, 5, 'i-0123456789abcdef'):
@@ -124,9 +126,9 @@ class ImporterTests(unittest.TestCase):
         b, _ = bankimport.import_bank(other, 'Upright.sf2', self.lib)
         path_a = banklib.resolve_any(self.tmp.name, self.lib, a)
         with self.assertRaisesRegex(ValueError, 'in use'):
-            banklib.delete_import(self.lib, a, keep_paths=[path_a])               # the current bank
+            banklib.delete_import(self.lib, a, keep_paths=[path_a])  # the current bank
         with self.assertRaisesRegex(ValueError, 'in use'):
-            banklib.delete_import(self.lib, a, keep_paths=[None, path_a])         # the last good bank
+            banklib.delete_import(self.lib, a, keep_paths=[None, path_a])  # the last good bank
         with self.assertRaisesRegex(ValueError, 'no such imported bank'):
             banklib.delete_import(self.lib, 'i-0000000000000000')
         banklib.delete_import(self.lib, b, keep_paths=[path_a])
@@ -149,14 +151,16 @@ class DriveTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
 
     def test_only_plain_sound_font_files_of_piano_banks_are_offered(self):
-        mount = drive_with(self.tmp.name, {'Grand.sf2': b'x' * 10, 'Soft.SF3': b'y' * 10, '.hidden.sf2': b'z', 'notes.txt': b'n', 'mech.sf2': b'm',
-                                           'strings.sfz': b's', 'empty.sf2': b''})
+        mount = drive_with(
+            self.tmp.name,
+            {'Grand.sf2': b'x' * 10, 'Soft.SF3': b'y' * 10, '.hidden.sf2': b'z', 'notes.txt': b'n', 'mech.sf2': b'm', 'strings.sfz': b's', 'empty.sf2': b''},
+        )
         folder = os.path.join(mount, 'piano-banks')
-        os.makedirs(os.path.join(folder, 'inner.sf2'))                              # a folder named like a bank
-        os.symlink('/etc/passwd', os.path.join(folder, 'link.sf2'))                  # a link
+        os.makedirs(os.path.join(folder, 'inner.sf2'))  # a folder named like a bank
+        os.symlink('/etc/passwd', os.path.join(folder, 'link.sf2'))  # a link
         os.makedirs(os.path.join(folder, 'sub'))
         with open(os.path.join(folder, 'sub', 'deep.sf2'), 'wb') as f:
-            f.write(b'q')                                                           # one level deeper is not looked at
+            f.write(b'q')  # one level deeper is not looked at
         self.assertEqual([c['name'] for c in usblib.list_candidates(mount)], ['Grand.sf2', 'Soft.SF3'])
 
     def test_no_folder_or_a_linked_folder_gives_nothing(self):
@@ -185,6 +189,7 @@ class DriveTests(unittest.TestCase):
             if cmd[0] == 'mount':
                 return mount_rc, ''
             return 0, ''
+
         return run, calls
 
     def test_a_supported_drive_is_mounted_read_only_and_published_then_forgotten(self):
@@ -192,24 +197,24 @@ class DriveTests(unittest.TestCase):
         run, calls = self.runner('TYPE=exfat\nLABEL=My piano / banks\n')
         entry = usblib.add('/dev/sda1', run, status, root)
         self.assertTrue(entry['mounted'])
-        mount = [c for c in calls if c[0] == 'mount'][0]
+        mount = next(c for c in calls if c[0] == 'mount')
         self.assertEqual(mount[:5], ['mount', '-t', 'exfat', '-o', 'ro,nosuid,nodev,noexec'])
-        self.assertEqual(os.path.dirname(entry['mountpoint']), root)                # a label with spaces and a slash stays inside the root
+        self.assertEqual(os.path.dirname(entry['mountpoint']), root)  # a label with spaces and a slash stays inside the root
         self.assertNotIn(' ', os.path.basename(entry['mountpoint']))
         self.assertEqual([d['id'] for d in usblib.read_status(status)['drives']], ['/dev/sda1'])
-        usblib.add('/dev/sda1', run, status, root)                                  # the same event twice: still one drive
+        usblib.add('/dev/sda1', run, status, root)  # the same event twice: still one drive
         self.assertEqual(len(usblib.read_status(status)['drives']), 1)
         self.assertTrue(usblib.remove('/dev/sda1', run, status))
         self.assertEqual(usblib.read_status(status)['drives'], [])
         self.assertIn(['umount', '-l', entry['mountpoint']], calls)
-        self.assertFalse(usblib.remove('/dev/sda1', run, status))                   # already gone
+        self.assertFalse(usblib.remove('/dev/sda1', run, status))  # already gone
 
     def test_unsupported_file_system_unknown_device_and_failed_mount_are_explained(self):
         status, root = os.path.join(self.tmp.name, 'status.json'), os.path.join(self.tmp.name, 'mnt')
         run, calls = self.runner('TYPE=ntfs\nLABEL=Disk\n')
         entry = usblib.add('/dev/sdb1', run, status, root)
         self.assertEqual((entry['mounted'], 'not supported' in entry['reason']), (False, True))
-        self.assertFalse([c for c in calls if c[0] == 'mount'])                     # nothing was mounted
+        self.assertFalse([c for c in calls if c[0] == 'mount'])  # nothing was mounted
         run, _ = self.runner(None)
         self.assertIn('no recognised', usblib.add('/dev/sdc1', run, status, root)['reason'])
         run, _ = self.runner('TYPE=vfat\nLABEL=X\n', mount_rc=32)
@@ -225,7 +230,7 @@ class DriveTests(unittest.TestCase):
             f.write('{not json')
         self.assertEqual(usblib.read_status(path), dict(drives=[]))
         gone = dict(id='/dev/sda1', label='X', fs='vfat', mounted=True, mountpoint=os.path.join(self.tmp.name, 'vanished'))
-        self.assertFalse(usblib.drive_state(gone)['ready'])                         # a stale entry whose folder is gone is not offered
+        self.assertFalse(usblib.drive_state(gone)['ready'])  # a stale entry whose folder is gone is not offered
 
 
 class UsbApiTests(ServerCase):
@@ -240,13 +245,15 @@ class UsbApiTests(ServerCase):
         self.import_dir = os.path.join(w, 'library')
         self.status = os.path.join(w, 'usb-status.json')
         self.mount = drive_with(w, {'Grand.sf2': None, 'Upright.sf3': b'broken bank'})
-        self.start('BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nALSA_DEVICE=auto\nGAIN=1.0\nREVERB=0\nFX_ARGS="--hammer-boost 0"\n'
-                   'IMPORT_DIR=%s\nUSB_STATUS=%s\n' % (self.bank_dir, self.old, self.mech, self.import_dir, self.status))
+        self.start(
+            'BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nALSA_DEVICE=auto\nGAIN=1.0\nREVERB=0\nFX_ARGS="--hammer-boost 0"\n'
+            'IMPORT_DIR=%s\nUSB_STATUS=%s\n' % (self.bank_dir, self.old, self.mech, self.import_dir, self.status)
+        )
 
     def plug(self):
         usblib.add('/dev/sda1', lambda cmd: (0, 'TYPE=vfat\nLABEL=PIANO\n') if cmd[0] == 'blkid' else (0, ''), self.status, os.path.join(self.work.name, 'm'))
         entries = usblib.read_status(self.status)['drives']
-        entries[0]['mountpoint'] = self.mount                                         # the "mounted" drive is this folder
+        entries[0]['mountpoint'] = self.mount  # the "mounted" drive is this folder
         usblib._write_json(self.status, dict(drives=entries))
 
     def wait_import(self):
@@ -256,6 +263,7 @@ class UsbApiTests(ServerCase):
                 return s
             time.sleep(0.02)
         self.fail('the import did not finish')
+        return None
 
     def test_no_drive_means_an_empty_state(self):
         code, s = self.jcall('/api/usb')
@@ -274,27 +282,27 @@ class UsbApiTests(ServerCase):
         s = self.wait_import()
         self.assertEqual(s['state'], 'done', s)
         bank_id = s['bank_id']
-        usblib.remove('/dev/sda1', lambda cmd: (0, ''), self.status)                  # the drive is pulled out
+        usblib.remove('/dev/sda1', lambda cmd: (0, ''), self.status)  # the drive is pulled out
         banks = {b['id']: b for b in self.jcall('/api/state')[1]['banks']['banks']}
         self.assertEqual((banks[bank_id]['source'], banks['old.sf2']['source']), ('imported', 'installed'))
         code, r = self.jcall('/api/bank', {'id': bank_id})
         self.assertEqual((code, r['started']), (200, True))
         self.app.switcher.join(10)
         self.assertEqual(self.jcall('/api/state')[1]['banks']['current'], bank_id)
-        self.assertIn(self.import_dir, self.conf_text())                              # the configuration points into the library
+        self.assertIn(self.import_dir, self.conf_text())  # the configuration points into the library
         code, r = self.jcall('/api/usb', {'action': 'delete', 'id': bank_id})
-        self.assertEqual(code, 400)                                                   # the bank in use
+        self.assertEqual(code, 400)  # the bank in use
         self.assertIn('in use', r['error'])
         self.jcall('/api/bank', {'id': 'old.sf2'})
         self.app.switcher.join(10)
         path = banklib.resolve_any(self.bank_dir, self.import_dir, bank_id)
         with open(self.conf, 'a') as f:
-            f.write('PIANO_SF2_LAST_GOOD="%s"\n' % path)                              # an old bank is still the fallback
+            f.write('PIANO_SF2_LAST_GOOD="%s"\n' % path)  # an old bank is still the fallback
         code, r = self.jcall('/api/usb', {'action': 'delete', 'id': bank_id})
         self.assertEqual(code, 400)
         self.assertEqual(os.listdir(self.import_dir), [bank_id])
         with open(self.conf, 'a') as f:
-            f.write('PIANO_SF2_LAST_GOOD="%s"\n' % self.old)                          # the fallback moved on: nothing holds the bank any more
+            f.write('PIANO_SF2_LAST_GOOD="%s"\n' % self.old)  # the fallback moved on: nothing holds the bank any more
         code, r = self.jcall('/api/usb', {'action': 'delete', 'id': bank_id})
         self.assertEqual((code, r['deleted']), (200, True))
         self.assertEqual(os.listdir(self.import_dir), [])
@@ -305,13 +313,18 @@ class UsbApiTests(ServerCase):
         s = self.wait_import()
         self.assertEqual(s['state'], 'failed')
         self.assertIn('not a usable SoundFont', s['error'])
-        self.assertNotIn(self.work.name, s['error'])                                  # no internal paths
-        self.assertEqual([n for n in os.listdir(self.import_dir)], [])
+        self.assertNotIn(self.work.name, s['error'])  # no internal paths
+        self.assertEqual(list(os.listdir(self.import_dir)), [])
 
     def test_refusals_and_a_second_import_while_one_runs(self):
         self.plug()
-        for body in ({'action': 'import', 'name': '../Grand.sf2'}, {'action': 'import', 'name': 'Missing.sf2'}, {'action': 'import'},
-                     {'action': 'delete', 'id': '../x'}, {'action': 'explode'}):
+        for body in (
+            {'action': 'import', 'name': '../Grand.sf2'},
+            {'action': 'import', 'name': 'Missing.sf2'},
+            {'action': 'import'},
+            {'action': 'delete', 'id': '../x'},
+            {'action': 'explode'},
+        ):
             with self.subTest(body):
                 self.assertEqual(self.call('/api/usb', body)[0], 400)
         self.assertEqual(self.call('/api/usb', raw=b'[1]', ctype='application/json')[0], 400)
@@ -321,18 +334,21 @@ class UsbApiTests(ServerCase):
         def slow(*a, **kw):
             gate.wait(5)
             return real(*a, **kw)
+
         web.bankimport.import_bank = slow
         self.addCleanup(setattr, web.bankimport, 'import_bank', real)
         self.addCleanup(gate.set)
         self.assertEqual(self.jcall('/api/usb', {'action': 'import', 'name': 'Grand.sf2'})[0], 200)
-        code, r = self.jcall('/api/usb', {'action': 'import', 'name': 'Grand.sf2'})
+        code, _r = self.jcall('/api/usb', {'action': 'import', 'name': 'Grand.sf2'})
         self.assertEqual(code, 409)
         gate.set()
         self.assertEqual(self.wait_import()['state'], 'done')
 
     def test_the_token_protects_the_usb_api_too(self):
-        self.start('BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nWEB_TOKEN=secret\nIMPORT_DIR=%s\nUSB_STATUS=%s\n' %
-                   (self.bank_dir, self.old, self.mech, self.import_dir, self.status))
+        self.start(
+            'BANK_DIR=%s\nPIANO_SF2="%s"\nMECH_SF2="%s"\nWEB_TOKEN=secret\nIMPORT_DIR=%s\nUSB_STATUS=%s\n'
+            % (self.bank_dir, self.old, self.mech, self.import_dir, self.status)
+        )
         self.assertEqual(self.call('/api/usb')[0], 401)
         self.assertEqual(self.call('/api/usb', {'action': 'delete', 'id': 'i-0000000000000000'})[0], 401)
 
