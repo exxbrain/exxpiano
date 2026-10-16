@@ -35,6 +35,7 @@ jobs:
         run: |
           scripts/make-soundfonts.sh -p full -o build            # about 700 MB: the piano of the image
           scripts/make-soundfonts.sh -p lite -o build          # the same downloaded samples; the image uses it on boards with 512 MB
+          scripts/make-soundfonts.sh -p starter -o build       # about 9 MB: plays while the main bank loads
 
       - name: Read the pinned DietPi image metadata
         run: cat .github/dietpi-image.env >> "$GITHUB_ENV"

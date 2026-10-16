@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install the piano on a Raspberry Pi (DietPi / Raspberry Pi OS Lite / Debian). Run as root.
 #
-#   sudo ./install.sh --piano /path/piano-full.sf2 --mech /path/mech.sf2 [--device plughw:Headphones] [--gain 0.6]
+#   sudo ./install.sh --piano /path/piano-full.sf2 --mech /path/mech.sf2 [--starter /path/piano-starter.sf2] [--device plughw:Headphones] [--gain 0.6]
 #
 # Safe to run again: /etc/exxpiano.conf is never overwritten,
 # only the values you pass as flags are changed.
@@ -10,7 +10,7 @@ set -euo pipefail
 PREFIX=/opt/exxpiano
 CONF=/etc/exxpiano.conf
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PIANO="" MECH="" DEVICE="" GAIN=""
+PIANO="" MECH="" STARTER="" DEVICE="" GAIN=""
 
 usage() { sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
@@ -18,6 +18,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --piano)  PIANO="$2"; shift 2 ;;
     --mech)   MECH="$2";  shift 2 ;;
+    --starter) STARTER="$2"; shift 2 ;;
     --device) DEVICE="$2"; shift 2 ;;
     --gain)   GAIN="$2";  shift 2 ;;
     -h|--help) usage 0 ;;
@@ -28,6 +29,7 @@ done
 [ "$(id -u)" = 0 ] || { echo "Run as root: sudo $0 ..."; exit 1; }
 if [ -n "$PIANO" ] && [ ! -f "$PIANO" ]; then echo "No such file: $PIANO"; exit 1; fi
 if [ -n "$MECH" ] && [ ! -f "$MECH" ]; then echo "No such file: $MECH"; exit 1; fi
+if [ -n "$STARTER" ] && [ ! -f "$STARTER" ]; then echo "No such file: $STARTER"; exit 1; fi
 if [ ! -f "$CONF" ] && { [ -z "$PIANO" ] || [ -z "$MECH" ]; }; then
   echo "The first installation needs both --piano and --mech"; usage 1
 fi
@@ -43,6 +45,7 @@ install -d "$PREFIX/soundfonts"
 install -m 755 "$HERE/exxpiano-fx.py" "$PREFIX/exxpiano-fx.py"
 [ -f "$HERE/../VERSION" ] && install -m 644 "$HERE/../VERSION" "$PREFIX/VERSION"
 install -m 755 "$HERE/exxpiano-run" "$PREFIX/exxpiano-run"
+install -m 755 "$HERE/exxpiano-synth.py" "$PREFIX/exxpiano-synth.py"
 install -m 644 "$HERE/exxpianoconf.py" "$PREFIX/exxpianoconf.py"
 install -m 755 "$HERE/sf2info.py" "$PREFIX/sf2info.py"
 install -m 644 "$HERE/banklib.py" "$PREFIX/banklib.py"
@@ -70,6 +73,7 @@ install -d "$PREFIX/web"
 install -m 644 "$HERE/web/index.html" "$PREFIX/web/index.html"
 [ -n "$PIANO" ] && install -m 644 "$PIANO" "$PREFIX/soundfonts/piano.sf2"
 [ -n "$MECH" ]  && install -m 644 "$MECH"  "$PREFIX/soundfonts/mech.sf2"
+[ -n "$STARTER" ] && install -m 644 "$STARTER" "$PREFIX/starter.sf2"     # the small piano that plays while the main bank loads
 
 echo "==> Configuration $CONF"
 [ -f "$CONF" ] || install -m 644 "$HERE/exxpiano.conf" "$CONF"

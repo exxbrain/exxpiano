@@ -9,7 +9,7 @@
 # The image is NOT started here: nothing can be tried without a Pi. It is checked by reading it back (the last step).
 set -euo pipefail
 
-IMAGE="" OUT="" DIETPI_VERSION_OUT="" DEB="" PIANO="" PIANO_LITE="" ONBOARD_AUDIO=1 MECH="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
+IMAGE="" OUT="" DIETPI_VERSION_OUT="" DEB="" PIANO="" PIANO_LITE="" PIANO_STARTER="" ONBOARD_AUDIO=1 MECH="" HOSTNAME_NEW="" PASSWORD="" AP_PASSWORD="" COUNTRY="GB" TIMEZONE="UTC" LOCALE="en_GB.UTF-8"
 KEYBOARD="us" EXTRA_MB="" WORKDIR="${TMPDIR:-/tmp}/piano-sd-work"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -24,6 +24,7 @@ while [ $# -gt 0 ]; do
     --deb) DEB="$2"; shift 2 ;;
     --piano) PIANO="$2"; shift 2 ;;
     --piano-lite) PIANO_LITE="$2"; shift 2 ;;
+    --piano-starter) PIANO_STARTER="$2"; shift 2 ;;
     --onboard-audio) ONBOARD_AUDIO="$2"; shift 2 ;;
     --mech) MECH="$2"; shift 2 ;;
     --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
@@ -133,6 +134,7 @@ case "$IMAGE" in
   *) cp "$IMAGE" "$DISK" ;;
 esac
 [ -z "$PIANO_LITE" ] || [ -r "$PIANO_LITE" ] || die "--piano-lite must be readable"
+[ -z "$PIANO_STARTER" ] || [ -r "$PIANO_STARTER" ] || die "--piano-starter must be readable"
 SIZE_BANKS=$(( ( $(stat -c %s "$PIANO") + $(stat -c %s "$MECH") + $( [ -n "$PIANO_LITE" ] && stat -c %s "$PIANO_LITE" || echo 0 ) ) / 1048576 ))
 [ -n "$EXTRA_MB" ] || EXTRA_MB=$(( SIZE_BANKS + 400 ))
 echo "image $(( $(stat -c %s "$DISK") / 1048576 )) MB, banks $SIZE_BANKS MB, room added $EXTRA_MB MB"
@@ -176,6 +178,7 @@ install -d "$MNT/opt/exxpiano/soundfonts"
 install -m 644 "$PIANO" "$MNT/opt/exxpiano/soundfonts/piano.sf2"
 install -m 644 "$MECH" "$MNT/opt/exxpiano/soundfonts/mech.sf2"
 [ -z "$PIANO_LITE" ] || install -m 644 "$PIANO_LITE" "$MNT/opt/exxpiano/soundfonts/piano-lite.sf2"      # the first start switches to it on a board with little memory
+[ -z "$PIANO_STARTER" ] || install -m 644 "$PIANO_STARTER" "$MNT/opt/exxpiano/starter.sf2"   # plays while the main bank loads; not in soundfonts/: not a bank to choose
 ls -l "$MNT/opt/exxpiano/soundfonts"
 
 say "6/9 Generic image identity; the installation ID is created at first boot"
@@ -213,6 +216,7 @@ check "dnsmasq-base and hostapd are installed" "[ -x '$MNT/usr/sbin/dnsmasq' ] &
 check "avahi is installed" "[ -x '$MNT/usr/sbin/avahi-daemon' ]"
 check "the banks are in place" "[ -s '$MNT/opt/exxpiano/soundfonts/piano.sf2' ] && [ -s '$MNT/opt/exxpiano/soundfonts/mech.sf2' ]"
 [ -z "$PIANO_LITE" ] || check "the smaller bank for 512 MB boards is in place" "[ -s '$MNT/opt/exxpiano/soundfonts/piano-lite.sf2' ]"
+[ -z "$PIANO_STARTER" ] || check "the starter bank is in place" "[ -s '$MNT/opt/exxpiano/starter.sf2' ] && [ -f '$MNT/opt/exxpiano/exxpiano-synth.py' ]"
 check "the configured banks are the installed defaults" "grep -qx 'PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2' '$CONF' && grep -qx 'MECH_SF2=/opt/exxpiano/soundfonts/mech.sf2' '$CONF'"
 check "no installation ID is baked into the reusable image" "[ ! -e '$MNT/var/lib/exxpiano/installation-id' ]"
 check "the host name is set" "[ \"\$(cat '$MNT/etc/hostname')\" = '$HOSTNAME_NEW' ] && grep -q '$HOSTNAME_NEW' '$MNT/etc/hosts'"

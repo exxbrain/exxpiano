@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build Debian packages without dpkg-deb (works on macOS and Linux, only the standard library).
 
-  scripts/build-deb.py [--version 1.0.0] [--out dist] [--banks PIANO.sf2 MECH.sf2]
+  scripts/build-deb.py [--version 1.0.0] [--out dist] [--banks PIANO.sf2 MECH.sf2] [--starter STARTER.sf2]
 
 Always builds  exxpiano_<version>_all.deb   (program, services, config, dependencies).
-With --banks also builds exxpiano-soundfonts_<version>_all.deb (the two .sf2 files, hundreds of MB).
+With --banks also builds exxpiano-soundfonts_<version>_all.deb (the two .sf2 files, hundreds of MB; with --starter also the starter bank).
 Install on the Pi:  sudo apt install ./exxpiano_1.0.0_all.deb
 """
 
@@ -153,6 +153,7 @@ def main():
     ap.add_argument('--version', default=read(src('VERSION')).decode().strip(), help='default: the VERSION file')
     ap.add_argument('--out', default=src('dist'))
     ap.add_argument('--banks', nargs=2, metavar=('PIANO_SF2', 'MECH_SF2'))
+    ap.add_argument('--starter', metavar='STARTER_SF2', help='the small piano that plays while the main bank loads (into the soundfonts package)')
     args = ap.parse_args()
 
     mtime = int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))
@@ -170,6 +171,7 @@ def main():
         ('opt/exxpiano/exxpiano-fx.py', src('pi', 'exxpiano-fx.py'), 0o755),
         ('opt/exxpiano/VERSION', (args.version + '\n').encode(), 0o644),
         ('opt/exxpiano/exxpiano-run', src('pi', 'exxpiano-run'), 0o755),
+        ('opt/exxpiano/exxpiano-synth.py', src('pi', 'exxpiano-synth.py'), 0o755),
         ('opt/exxpiano/exxpianoconf.py', src('pi', 'exxpianoconf.py'), 0o644),
         ('opt/exxpiano/sf2info.py', src('pi', 'sf2info.py'), 0o755),
         ('opt/exxpiano/banklib.py', src('pi', 'banklib.py'), 0o644),
@@ -234,13 +236,15 @@ def main():
         ]
         if args.banks:
             piano, mech = args.banks
-            for p in (piano, mech):
-                if not os.path.isfile(p):
+            for p in (piano, mech, args.starter):
+                if p and not os.path.isfile(p):
                     sys.exit('No such file: ' + p)
             bank_files = [
                 ('opt/exxpiano/soundfonts/piano.sf2', os.path.abspath(piano), 0o644),
                 ('opt/exxpiano/soundfonts/mech.sf2', os.path.abspath(mech), 0o644),
             ]
+            if args.starter:  # outside soundfonts/: it is not a bank to choose on the web page
+                bank_files.append(('opt/exxpiano/starter.sf2', os.path.abspath(args.starter), 0o644))
             bank_desc = (
                 'Salamander piano sound banks for exxpiano\n'
                 ' piano.sf2 (piano) and mech.sf2 (mechanics), built from Salamander Grand Piano V3\n'
