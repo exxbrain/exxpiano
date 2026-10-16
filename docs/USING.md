@@ -30,8 +30,8 @@ The pictures of every section are in the README, under [What it looks like](../R
 - the status of the services and of the chosen output.
 
 Everything is stored in `/etc/exxpiano.conf`, so the web interface and the file always agree. The web interface changes only the whitelisted
-settings, each within a fixed range. **There is no password by default**: anybody on your network can change these settings
-(nothing else, there is no shell access). Set `WEB_TOKEN=<secret>` in the config to require it, or `WEB_BIND=127.0.0.1` to
+settings, each within a fixed range. **There is no password by default**: anybody on your network can use the whole web API:
+these settings, but also importing and deleting banks and changing the Wi-Fi (there is no shell access). Set `WEB_TOKEN=<secret>` in the config to require it, or `WEB_BIND=127.0.0.1` to
 reach the web interface only from the device itself. The service runs as root because it writes `/etc/exxpiano.conf` and restarts
 the synthesizer; hardening that is a task for a real product.
 
@@ -86,7 +86,7 @@ When the Pi has **no network** (no Ethernet cable and no Wi-Fi it knows: a new d
 If the network or the password is wrong, the Pi puts the previous settings back; in setup mode it starts its setup network again and the web interface says why it failed.
 Good to know:
 
-- **The password of the setup network.** It is `exxpianosetup` unless you set another one, and it is the same for every device (only the network name is unique: it ends with the installation ID). Set your own with `WIFI_AP_PASSWORD=...` in `/etc/exxpiano.conf` (8 to 63 ordinary characters; an unusable value is replaced by the default and logged), or for a whole image with `--ap-password` / `SD_AP_PASSWORD` when it is built (see `docs/BUILD-IMAGE.md`). The Wi-Fi section shows the current name and password with the QR code that joins it, so a sticker printed from the web interface is always right.
+- **The password of the setup network.** It is `exxpianosetup` unless you set another one, and it is the same for every device (only the network name is unique: it ends with the installation ID). Set your own with `WIFI_AP_PASSWORD=...` in `/etc/exxpiano.conf` (8 to 63 ordinary characters; an unusable value is replaced by the default and logged), or for a whole image with `--ap-password` / `SD_AP_PASSWORD` when it is built (see [BUILD-IMAGE.md](BUILD-IMAGE.md)). The Wi-Fi section shows the current name and password with the QR code that joins it, so a sticker printed from the web interface is always right.
 - The Pi waits before starting its network: 10 s if it has no saved network, **150 s** if it has some (after a power cut it boots faster than the router).
   With saved networks, an unused setup network is left every 2 minutes to look for them again; a phone connected to it is never thrown out.
 - A wired connection is another way in, and it closes the setup network when a cable is plugged in: the board's own network port, and also a USB network adapter or a USB hub with a network port (an interface that nothing else configures gets its address by DHCP when a cable is plugged in). **A USB adapter has not been tried on a real Pi.**

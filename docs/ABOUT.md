@@ -6,7 +6,7 @@ How the piano and its mechanics are made, why the banks are reduced, what it was
 
 ## How it works
 
-A digital piano appliance for Raspberry Pi 2/3/4/5 (ARMv8): SoundFont banks through FluidSynth (the ready images carry **Salamander Grand Piano V3**, Yamaha C5; the mechanics are tuned on it, so with another bank the levels may need adjusting in the web interface), plus
+A digital piano appliance for Raspberry Pi 2 (v1.2 and later)/3/4/5 (ARMv8): SoundFont banks through FluidSynth (the ready images carry **Salamander Grand Piano V3**, Yamaha C5; the mechanics are tuned on it, so with another bank the levels may need adjusting in the web interface), plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
 express by itself, so a small bridge program adds them.
 
