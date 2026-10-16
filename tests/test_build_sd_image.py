@@ -173,7 +173,7 @@ class PlanTests(Case):
 
 
 class BuildTests(Case):
-    def test_the_pi5_target_has_its_own_names_no_lite_bank_and_no_onboard_audio_setup(self):
+    def test_the_pi5_target_has_its_own_names_the_lite_bank_too_and_no_onboard_audio_setup(self):
         lite = self.touch('banks/piano-lite.sf2', b'l' * 10)
         r = self.run_build('--target', 'rpi5', '--piano-lite', lite)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -184,7 +184,7 @@ class BuildTests(Case):
         with open(os.path.join(self.out, 'manifest-rpi5.json'), encoding='utf-8') as f:
             manifest = json.load(f)
         self.assertEqual(manifest['target_family'], 'rpi5')
-        self.assertNotIn('piano-lite.sf2', manifest['banks'])  # 2 GB or more: only the full bank
+        self.assertIn('piano-lite.sf2', manifest['banks'])  # one more bank to choose on the web page
         with open(os.path.join(self.out, 'README-rpi5.txt'), encoding='utf-8') as f:
             text = f.read()
         self.assertIn('Raspberry Pi 5', text)
@@ -192,7 +192,7 @@ class BuildTests(Case):
         build = [c for c in self.docker_calls() if 'sd-image-inner.sh' in ' '.join(c['args'])][-1]
         args = build['args']
         self.assertEqual(args[args.index('--onboard-audio') + 1], '0')
-        self.assertNotIn('--piano-lite', args)
+        self.assertIn('--piano-lite', args)
 
     def test_the_default_target_keeps_the_jack_setup_and_the_pi5_download_name(self):
         r = self.run_build()

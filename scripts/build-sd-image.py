@@ -130,8 +130,10 @@ def resolve_inputs(args):
         raise BuildError('no such DietPi image: %s' % inputs['dietpi'])
     inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-full.sf2'))
     inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
-    lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')  # for boards with 512 MB; optional unless asked for by name
-    if target_of(args)[0] == 'rpi234' and (args.piano_lite or os.path.isfile(lite)):  # the smallest Pi 5 has 1 GB, which holds the full bank: only that one
+    # for boards with 512 MB; optional unless asked for by name. A Pi 5 has enough memory for the full bank, but gets the lite one too:
+    # it is one more bank on the web page to choose from
+    lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')
+    if args.piano_lite or os.path.isfile(lite):
         inputs['piano_lite'] = os.path.abspath(lite)
     for key in [k for k in ('piano', 'mech', 'piano_lite') if k in inputs]:
         if not os.path.isfile(inputs[key]) or not os.access(inputs[key], os.R_OK):
