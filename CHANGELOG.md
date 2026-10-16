@@ -2,6 +2,13 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## 1.10.22
+
+- **The piano no longer sounds on key release after a restart.** The mechanics channels (hammer noise and string resonance, played when a key is released) could lose their presets and fall back to program 0, which is the piano itself: then every release started a piano note that was never stopped. The bridge selected the presets only once, when the synthesizer appeared, and passed everything from the keyboard on, so a keyboard's GM/GS reset (system exclusive), program change or bank select reached the synthesizer. Now the bridge drops those messages and selects the presets of all seven channels again every 2 seconds, so whatever resets them is healed within one scan. Reported on a Raspberry Pi 5 after playing while the synthesizer was still starting; **the exact trigger was not seen on the device**, and the fix is covered by automatic tests only.
+- **The Pi 5 image also carries the `lite` bank**, as one more bank to choose on the web page.
+- **The Monitor shows throttling and under-voltage on a Pi 5 without `vcgencmd`** (its firmware node has another path).
+- The documentation says that the keys give no piano sound until the bank has loaded (several minutes on the first start), and records the check on a Raspberry Pi 5 with a Zoom U-24.
+
 ## 1.10.21
 
 - **Low notes no longer stop abruptly when the pedal is lifted.** Every key of the piano banks had the same release, 0.7 s, so on a pedal lift the bass dropped out at once (heard at 0:37 of the La Campanella demonstration from bar 1:48). The release now follows the key: 2.6 s at A0, 1.5 s at C3, 0.95 s at C5, 0.7 s at the top, log-interpolated in between (`RELEASE_BY_KEY` in `tools/build_piano_sf2.py`); an SFZ release of 5 s or more is kept as before. It is in the banks built from this version on (`full` and `lite`); a bank built earlier or imported from a USB drive does not change. Measured offline on that moment: the level dip went from about 10 dB to about 5 dB. **Heard on a Raspberry Pi in the demonstration pieces.**

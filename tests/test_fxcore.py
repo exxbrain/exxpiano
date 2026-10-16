@@ -290,6 +290,26 @@ class BridgeMappingTests(unittest.TestCase):
         self.assertEqual(b.sent[0].velocity, 0)
         self.assertEqual(b.sent[1].value, 127)
 
+    def test_a_keyboard_cannot_change_or_reset_the_presets(self):
+        b = self.make_bridge(1.0)
+        b.on_msg(FakeMsg('sysex', data=(0x7E, 0x7F, 0x09, 0x01)))  # GM System On: would set every channel to program 0
+        b.on_msg(FakeMsg('program_change', channel=0, program=1))  # would put the hammer noise on the piano channel
+        b.on_msg(FakeMsg('control_change', channel=0, control=0, value=1))
+        b.on_msg(FakeMsg('control_change', channel=0, control=32, value=1))
+        self.assertEqual(b.sent, [])
+        b.on_msg(FakeMsg('control_change', channel=0, control=1, value=5))  # other controllers still pass
+        self.assertEqual([m.control for m in b.sent], [1])
+
+    def test_every_scan_selects_the_presets_again(self):
+        import types
+
+        b = self.make_bridge(1.0)
+        b.out_name = 'FLUID Synth (123):Synth input port (123:0) 128:0'
+        b.mido = types.SimpleNamespace(Message=FakeMsg, get_output_names=lambda: [b.out_name], get_input_names=list)
+        b.scan()
+        progs = {m.channel: m.program for m in b.sent if m.type == 'program_change'}
+        self.assertEqual(progs, {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6})
+
 
 if __name__ == '__main__':
     unittest.main()
