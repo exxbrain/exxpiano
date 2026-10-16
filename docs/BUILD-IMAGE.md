@@ -2,6 +2,27 @@
 
 The shipped artifacts are two complete bootable images, each for a clean SD card: one for the Raspberry Pi 2/3/4 (ARMv8, built from `DietPi_RPi234-ARMv8-Trixie.img.xz`) and one for the Raspberry Pi 5 (built from `DietPi_RPi5-ARMv8-Trixie.img.xz`). Each contains DietPi, exxpiano, the full piano and the mechanics bank; both also carry the smaller `lite` piano (picked by itself on a 512 MB board; on a Pi 5 it is one more bank to choose). One ZIP can be flashed to many cards.
 
+## What is in the image
+
+This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: the piano (`full`, about 700 MB, installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself when the image carries it, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards the piano of the image stays and `lite` can be chosen in the **Piano bank** section of the web interface. At first boot every installed copy creates a
+persistent random 6-character hexadecimal installation ID. The ID gives it a unique hostname
+`exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
+
+It makes `dist/sd/`: `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`, `manifest-rpi234.json`, and `README-rpi234.txt`. For a **Raspberry Pi 5** add `--target rpi5` and pass the Pi 5 DietPi image (`DietPi_RPi5-ARMv8-Trixie.img.xz`): the release has a separate `exxpiano-rpi5-…` ZIP. The Pi 5 has no 3.5 mm jack, so it plays only through a USB sound card or audio interface; its image carries the full bank and, as one more choice, the `lite` one. The Pi 5 image was started on a Raspberry Pi 5 (8 GB) and played through a USB sound card (see [Tested on](ABOUT.md#tested-on)). Write the zip with **Raspberry Pi
+Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as it is); there is nothing to unzip onto the card by hand, because a Raspberry Pi card needs
+its partitions, which only an image carries. Switch the Pi on without preparing a network: the product image skips DietPi's online first-run update. The device is
+`http://exxpiano-<id>.local:8080/`; with no Ethernet or saved Wi-Fi it starts its unique setup network (see [Connecting to a new Wi-Fi](USING.md#connecting-to-a-new-wi-fi)).
+
+- **Installation identity.** The ID is generated once from 24 cryptographically random bits (6 hexadecimal characters) and stored in `/var/lib/exxpiano/installation-id`. The full ID is present in the setup SSID and QR codes, so two devices in one room almost never share a name (a copy made by an earlier version keeps its longer ID).
+- **How it is made.** In a Linux container (Docker Desktop must be running; on Linux with root use `--no-docker`): the image is opened, the package and its dependencies are
+  installed into it (`apt`, no recommended packages), the banks are copied, and DietPi is configured as a pre-installed offline system. DietPi does not own `wlan0`, wait for
+  a network, or run update checks at first boot; `exxpiano-wifi` owns the radio and starts the setup AP. The finished image is read back and its web service is started in a
+  container as a test. The passwords go in through the environment, never through arguments.
+- **Honest status.** The whole build is tested on a stand-in image with DietPi's layout, and the programs inside the finished image run; the Pi 5 image of v1.10.21 has been started on a
+  Raspberry Pi 5. With a changed builder, write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log` before the next reboot (DietPi keeps `/var/log` in memory, so the log is gone after a reboot). `--download` has not been tried against dietpi.com either: if the address
+  has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
+  test changes to the builder without a Pi.
+
 ## Prerequisites
 
 Use Docker Desktop on macOS or Docker on Linux, the official `DietPi_RPi234-ARMv8-Trixie.img.xz`, and prepare the banks:
