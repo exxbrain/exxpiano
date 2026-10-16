@@ -62,6 +62,16 @@ The release title names exxpiano, its version, and the supported Raspberry Pi fa
 
 No release is created if any preceding step fails. For an existing release the title and description are updated and missing assets are added; an asset whose name already exists is never overwritten (the upload fails and the operator decides).
 
+### Download mirror
+
+The images are close to 1 GB, and GitHub can be slow to download them from. The release workflow therefore also copies the release files to a public Cloudflare R2 bucket (`scripts/mirror-to-r2.sh`, into `<bucket>/<tag>/`) and adds a **Faster download (mirror)** section with links to the ZIP files to the release description. R2 does not charge for downloads, and 10 GB of storage is free. Set it up once:
+
+1. In Cloudflare create an R2 bucket and make it public: connect a custom domain to it (recommended) or turn on its `r2.dev` address (Cloudflare limits its rate).
+2. Create an R2 API token with **Object Read & Write** on that bucket.
+3. In the repository settings add the secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and the variable (not a secret) `R2_PUBLIC_URL`, the bucket's public address without a trailing slash.
+
+Without `R2_PUBLIC_URL` the step is skipped. A failed copy does not stop the release: it is published without the mirror links, and the copy can be repeated. For a release published before the mirror existed, or whose copy failed, run the workflow **release-mirror** from the **Actions** tab with its tag: it downloads the release files, checks them against `SHA256SUMS`, copies them to the bucket and adds the mirror links to the published description, leaving the rest of it as it is.
+
 The DietPi build-input prerelease is not a product release. Its tag includes the first eight characters of the verified upstream SHA-256, and its only binary asset is the unchanged official image named by `.github/dietpi-image.env`. Updating DietPi requires a new prerelease/tag and checksum; an existing pinned input is never replaced. Local `--download` remains available and identifies the builder with an HTTP User-Agent accepted by the upstream service.
 
 The Pi 5 image has a pinned copy of its own (`DIETPI_RPI5_*` in `.github/dietpi-image.env`, tag `dietpi-rpi5-armv8-trixie-<8 characters>`). Create it once from the **Actions** tab: run the workflow **dietpi-mirror** with the target `rpi5` (it downloads the official image, checks it against the pin, and makes the pre-release; it stops if the pre-release already exists). Until the pre-release exists, a release downloads the official Pi 5 image and checks it against the checksum DietPi publishes next to it.

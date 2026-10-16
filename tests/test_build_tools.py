@@ -149,7 +149,7 @@ class BuilderPackageTests(unittest.TestCase):
 
 
 class ReleaseNotesTests(unittest.TestCase):
-    def run_notes(self, version, changelog):
+    def run_notes(self, version, changelog, **kw):
         with tempfile.TemporaryDirectory() as d:
             os.makedirs(os.path.join(d, '.github'))
             with open(os.path.join(d, 'CHANGELOG.md'), 'w') as f:
@@ -159,7 +159,7 @@ class ReleaseNotesTests(unittest.TestCase):
             spec = importlib.util.spec_from_file_location('release_notes', os.path.join(ROOT, 'scripts', 'release-notes.py'))
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
-            return mod.notes(version, d)
+            return mod.notes(version, d, **kw)
 
     def test_the_section_of_the_version_is_appended_to_the_description(self):
         text = self.run_notes('1.2.0', '# Changelog\n\n## 1.2.0\n\n- new\n\n## 1.1.0\n\n- old\n')
@@ -174,6 +174,28 @@ class ReleaseNotesTests(unittest.TestCase):
             self.run_notes('1.2.0', '## 1.2.0\n\n## 1.1.0\n\n- x\n')
         with self.assertRaises(ValueError):
             self.run_notes('1.2', '## 1.2.0\n\n- x\n')  # 1.2 is not 1.2.0
+
+    def test_the_mirror_links_go_between_the_description_and_the_changes(self):
+        text = self.run_notes('1.2.0', '## 1.2.0\n\n- new\n', mirror='https://dl.example.org/v1.2.0/', mirror_files=['dist/sd/b-sd.zip', 'dist/sd/a-sd.zip'])
+        self.assertIn('- [a-sd.zip](https://dl.example.org/v1.2.0/a-sd.zip)\n- [b-sd.zip](https://dl.example.org/v1.2.0/b-sd.zip)', text)
+        self.assertLess(text.index('Description.'), text.index('## Faster download'))
+        self.assertLess(text.index('## Faster download'), text.index('## What changed'))
+
+    def test_mirror_links_go_into_a_published_description_once(self):
+        spec = importlib.util.spec_from_file_location('release_notes', os.path.join(ROOT, 'scripts', 'release-notes.py'))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        old = 'Description.\n\n## What changed in 1.2.0\n\n- new\n'
+        once = mod.add_mirror(old, 'https://a.example.org/v1.2.0', ['x-sd.zip'])
+        twice = mod.add_mirror(once, 'https://b.example.org/v1.2.0', ['x-sd.zip'])
+        self.assertEqual(twice.count('## Faster download'), 1)
+        self.assertIn('https://b.example.org/v1.2.0/x-sd.zip', twice)
+        self.assertNotIn('a.example.org', twice)
+        self.assertLess(twice.index('## Faster download'), twice.index('## What changed'))
+        self.assertTrue(twice.endswith('- new\n'))
+
+    def test_no_mirror_no_mirror_section(self):
+        self.assertNotIn('mirror', self.run_notes('1.2.0', '## 1.2.0\n\n- new\n'))
 
 
 if __name__ == '__main__':
