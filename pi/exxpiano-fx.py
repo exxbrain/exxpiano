@@ -404,6 +404,11 @@ class Bridge:
         mido = self.mido
         if msg.type in ('clock', 'active_sensing', 'reset', 'start', 'stop', 'continue'):
             return
+        # The presets of the synthesizer belong to this bridge. A keyboard's program change or bank select would put a mechanics preset (or
+        # nothing) on the piano channel, and a GM/GS reset (system exclusive) sets every channel back to program 0: the mechanics channels then
+        # play the piano itself, on key release, with no note-off.
+        if msg.type in ('sysex', 'program_change') or (msg.type == 'control_change' and msg.control in (0, 32)):
+            return
         if hasattr(msg, 'channel') and msg.channel != 0:
             msg = msg.copy(channel=0)
         if msg.type == 'note_on' and msg.velocity > 0:
@@ -451,6 +456,11 @@ class Bridge:
                         print('synth:', synth, flush=True)
                     except Exception as exc:
                         print('open synth failed:', exc, file=sys.stderr)
+        elif self.out is not None:
+            # select the presets again on every scan: whatever reset them (a message that reached the synthesizer before the bridge did,
+            # a restart that was not seen), the mechanics channels play their own presets again within one scan
+            with self.lock:
+                self.setup_programs()
         for name in ins:
             if name in self.inputs or SKIP_RE.search(name):
                 continue

@@ -19,7 +19,7 @@ The image already includes:
 
 1. Download the ZIP for your board from this release's assets: `exxpiano-rpi234-…-sd.zip` or `exxpiano-rpi5-…-sd.zip`.
 2. Flash the ZIP to a clean SD card with Raspberry Pi Imager (`Choose OS` → `Use custom`) or balenaEtcher. Do not extract the ZIP manually.
-3. Insert the card into the Raspberry Pi and power it on. The offline first boot may take several minutes.
+3. Insert the card into the Raspberry Pi and power it on. The offline first boot may take several minutes; until the piano bank has loaded the keys give no piano sound.
 4. If no saved network is available, join `exxpiano-Setup-<ID>` (password `exxpianosetup`, the same for every card) and open `http://10.42.0.1:8080/`.
 5. Open the **Wi-Fi** section of the device's web interface to download the QR codes of this very card (join the setup network, open the web interface in the setup network) as PNG or SVG and print a sticker. The image itself contains no QR codes: the ID is created at the first boot.
 
