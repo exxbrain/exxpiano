@@ -10,6 +10,10 @@ English | [Русский](README.ru.md)
 
 **A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
 
+> **Made for boards with 1 GB of memory.** The full grand piano bank (about 700 MB, the one in the videos below) is built to fit a 1 GB board such as the Raspberry Pi 3 Model B, and that is the board it was tuned and tested on. The smaller `lite` bank exists so that a 512 MB board (Pi 3 A+) plays too.
+>
+> **No computer needed to play.** Once the card is written, the piano is a device on its own: plug in the keyboard and the headphones, power it on and play. The piano starts by itself; the phone is only for changing settings, and the computer only for writing the card.
+
 ## Start in 4 steps (nothing to build)
 
 You need a Raspberry Pi 2, 3 or 4, a microSD card, a **5.1 V / 2.5 A** power supply, a USB MIDI keyboard, and headphones or speakers.
@@ -24,7 +28,7 @@ Then play. Details: "Connecting to a new Wi-Fi", "Power supply" and "Audio outpu
 ## What it can do
 
 - **Real piano sound:** SoundFont banks through FluidSynth, plus the piano mechanics (hammer and damper noise, string resonance, pedal noise) that the SF2 format cannot express by itself. The ready images carry the Salamander Grand Piano V3 (Yamaha C5); any other `.sf2` / `.sf3` bank can be added from a USB drive and chosen in the web interface, and every bank remembers its own touch and mechanics settings.
-- **Fits cheap boards:** the `full` bank (about 700 MB) for a board with 1 GB, a smaller `lite` bank for 512 MB; the image picks the bank by itself.
+- **Made for 1 GB boards:** the `full` bank (about 700 MB) is built for a board with 1 GB; a 512 MB board gets the smaller `lite` bank. The image picks the bank by itself.
 - **A ready image:** one ZIP for the Raspberry Pi 2/3/4 and one for the Pi 5; the first start is offline and asks for nothing. The Pi 5 has no 3.5 mm jack and plays through a USB sound card.
 - **Automatic choices:** any USB MIDI keyboard is found by itself; the sound goes through a USB sound card (small delay) when there is one, else through the 3.5 mm jack.
 - **Setup from a phone:** a web interface for the touch curve, the mechanics, volume, banks, audio output, Wi-Fi (through the device's own setup network and a QR code) and monitoring (processor, temperature, power, memory, errors).
