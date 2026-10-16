@@ -10,7 +10,7 @@ English | [Русский](README.ru.md)
 
 **A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
 
-> **Made for boards with 1 GB of memory.** The full grand piano bank (about 700 MB, the one in the videos below) is built to fit a 1 GB board such as the Raspberry Pi 3 Model B, and that is the board it was tuned and tested on. A 512 MB board (Pi 3 A+) also plays, with the smaller `lite` bank.
+> **Made for boards with 1 GB of memory.** The full grand piano bank (about 700 MB, the one in the videos below) is built to fit a 1 GB board such as the Raspberry Pi 3 Model B, and that is the board it was tuned and tested on. The smaller `lite` bank exists so that a 512 MB board (Pi 3 A+) plays too.
 >
 > **No computer needed to play.** Once the card is written, the piano is a device on its own: plug in the keyboard and the headphones, power it on and play. The piano starts by itself; the phone is only for changing settings, and the computer only for writing the card.
 
