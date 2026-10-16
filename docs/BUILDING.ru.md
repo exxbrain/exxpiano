@@ -68,7 +68,7 @@ scripts/make-soundfonts.sh -p full -v 48k24 -o build     # взять пакет
 ## Обновление работающей Pi
 
 ```bash
-scripts/deploy-to-pi.sh 192.168.1.95        # или user@host; вход по SSH-ключу
+scripts/deploy-to-pi.sh 192.168.1.95        # вход под root по SSH-ключу (или root@host)
 ```
 
 Скрипт собирает пакет, отправляет его на Pi и обновляет там: сохраняет `/etc/exxpiano.conf`, сначала делает резервную копию старой версии,

@@ -69,7 +69,7 @@ instead of 14, tails of 9 s instead of 12 s, and the softest note is louder (−
 ## Upgrading a running Pi
 
 ```bash
-scripts/deploy-to-pi.sh 192.168.1.95        # or user@host; logs in by SSH key
+scripts/deploy-to-pi.sh 192.168.1.95        # logs in as root by SSH key (or root@host)
 ```
 
 It builds the package, sends it to the Pi and upgrades it there: it keeps `/etc/exxpiano.conf`, backs the old version up first, checks that
