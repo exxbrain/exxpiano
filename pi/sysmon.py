@@ -4,6 +4,7 @@ Standard library only. Everything is read from /proc and /sys (and `vcgencmd get
 partial answers elsewhere: a value that cannot be read is None, never an error. The roots are parameters so the tests can use fake trees.
 """
 
+import glob
 import os
 import re
 import subprocess
@@ -36,12 +37,14 @@ def read_throttled(sysroot='/sys'):
             return int(m.group(1), 16)
     except (OSError, subprocess.SubprocessError):
         pass
-    for rel in ('devices/platform/soc/soc:firmware/get_throttled', 'devices/platform/soc/soc:firmware/raspberrypi-hwmon/get_throttled'):
-        try:
-            with open(os.path.join(sysroot, rel)) as f:
-                return int(f.read().strip(), 16)
-        except (OSError, ValueError):
-            continue
+    # the firmware node is soc/soc:firmware on a Pi 2/3/4 and soc@107c000000/soc@107c000000:firmware on a Pi 5
+    for pattern in ('devices/platform/*/*:firmware/get_throttled', 'devices/platform/*/*:firmware/raspberrypi-hwmon/get_throttled'):
+        for path in sorted(glob.glob(os.path.join(sysroot, pattern))):
+            try:
+                with open(path) as f:
+                    return int(f.read().strip(), 16)
+            except (OSError, ValueError):
+                continue
     return None
 
 
