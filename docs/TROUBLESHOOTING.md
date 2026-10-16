@@ -36,7 +36,7 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 
 ## Clicks and latency
 
-- First check `vcgencmd get_throttled`. If it is not `0x0`, it is the power supply, not the settings (see the README).
+- First check `vcgencmd get_throttled`. If it is not `0x0`, it is the power supply, not the settings (see [Power supply](../README.md#power-supply-read-this) in the README).
 - Clicks: raise `PERIODS` to 3-4 (or `PERIOD_SIZE`).
 - Latency: `PERIODS=2` on the onboard output, or better a USB sound card.
 - Load: `htop` (if the `fluidsynth` thread sits at 100%, use `lite`, lower `POLYPHONY`, keep `REVERB=0`; on a Pi with 4 cores `CPU_CORES=3` shares the voices between the cores).
