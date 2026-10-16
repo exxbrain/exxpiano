@@ -243,7 +243,7 @@ DietPi: {dietpi_version} (source SHA-256: {dietpi_sha256})
 Banks: {banks}
 Writing the card
   1. Raspberry Pi Imager: "Choose OS" -> "Use custom" -> pick the zip (it is used as it is). Or balenaEtcher: "Flash from file" -> the zip.
-  2. Put the card in a compatible {label} and switch it on. The first start takes several minutes (DietPi sets itself up, then the card grows to its size).
+  2. Put the card in a compatible {label} and switch it on. The first start takes about 1.5 minutes until the piano plays on a Pi 3 with the full bank (DietPi grows the card and sets itself up).
      The first start is offline: it needs neither Internet nor an Ethernet cable.
   3. The installation creates and permanently saves its own 6-character hexadecimal ID.
 
