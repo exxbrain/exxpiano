@@ -181,6 +181,19 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertLess(text.index('Description.'), text.index('## Faster download'))
         self.assertLess(text.index('## Faster download'), text.index('## What changed'))
 
+    def test_mirror_links_go_into_a_published_description_once(self):
+        spec = importlib.util.spec_from_file_location('release_notes', os.path.join(ROOT, 'scripts', 'release-notes.py'))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        old = 'Description.\n\n## What changed in 1.2.0\n\n- new\n'
+        once = mod.add_mirror(old, 'https://a.example.org/v1.2.0', ['x-sd.zip'])
+        twice = mod.add_mirror(once, 'https://b.example.org/v1.2.0', ['x-sd.zip'])
+        self.assertEqual(twice.count('## Faster download'), 1)
+        self.assertIn('https://b.example.org/v1.2.0/x-sd.zip', twice)
+        self.assertNotIn('a.example.org', twice)
+        self.assertLess(twice.index('## Faster download'), twice.index('## What changed'))
+        self.assertTrue(twice.endswith('- new\n'))
+
     def test_no_mirror_no_mirror_section(self):
         self.assertNotIn('mirror', self.run_notes('1.2.0', '## 1.2.0\n\n- new\n'))
 

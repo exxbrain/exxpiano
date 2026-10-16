@@ -3,6 +3,9 @@
 
   python3 scripts/release-notes.py 1.10.10 > notes.md
   python3 scripts/release-notes.py 1.10.10 --mirror https://dl.example.org/v1.10.10 dist/sd/*.zip > notes.md
+  python3 scripts/release-notes.py --existing old.md --mirror https://dl.example.org/v1.10.10 dist/sd/*.zip > notes.md
+
+--existing takes a published description as it is and only puts the mirror links into it (replacing earlier ones).
 
 Fails (exit 1) when CHANGELOG.md has no `## <VERSION>` section, so a release cannot go out without its changes described.
 """
@@ -32,6 +35,16 @@ def mirror_section(base_url, files):
     )
 
 
+def add_mirror(text, base_url, files):
+    """The description with the mirror section before `## What changed` (at the end without it); an earlier mirror section is replaced."""
+    text = re.sub(r'^## Faster download \(mirror\)\n.*?(?=^## |\Z)', '', text, flags=re.M | re.S).rstrip('\n')
+    section_text = mirror_section(base_url, files)
+    m = re.search(r'^## What changed', text, re.M)
+    if not m:
+        return '%s\n\n%s\n' % (text, section_text)
+    return '%s\n\n%s\n\n%s\n' % (text[: m.start()].rstrip('\n'), section_text, text[m.start() :].rstrip('\n'))
+
+
 def notes(version, root=ROOT, mirror=None, mirror_files=()):
     with open(os.path.join(root, 'CHANGELOG.md'), encoding='utf-8') as f:
         body = section(f.read(), version)
@@ -39,9 +52,8 @@ def notes(version, root=ROOT, mirror=None, mirror_files=()):
         raise ValueError('CHANGELOG.md has no section "## %s" (or it is empty)' % version)
     with open(os.path.join(root, '.github', 'release-description.md'), encoding='utf-8') as f:
         description = f.read().rstrip('\n')
-    if mirror and mirror_files:
-        description += '\n\n' + mirror_section(mirror, mirror_files)
-    return '%s\n\n## What changed in %s\n\n%s\n' % (description, version, body)
+    text = '%s\n\n## What changed in %s\n\n%s\n' % (description, version, body)
+    return add_mirror(text, mirror, mirror_files) if mirror and mirror_files else text
 
 
 if __name__ == '__main__':
@@ -52,6 +64,12 @@ if __name__ == '__main__':
             i = args.index('--mirror')
             mirror, mirror_files = args[i + 1], args[i + 2 :]
             args = args[:i]
+        if args[:1] == ['--existing']:
+            if not mirror_files:
+                raise ValueError('--existing needs --mirror URL FILE...')
+            with open(args[1], encoding='utf-8') as f:
+                sys.stdout.write(add_mirror(f.read(), mirror, mirror_files))
+            sys.exit(0)
         if args:
             version = args[0]
         else:
