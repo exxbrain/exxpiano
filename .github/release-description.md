@@ -1,11 +1,11 @@
-Ready-to-flash **exxpiano** digital piano images for a clean SD card: `exxpiano-rpi234-…` for the Raspberry Pi 2, 3 or 4 (ARMv8) and `exxpiano-rpi5-…` for the Raspberry Pi 5 (**not yet tried on a real Pi 5; the Pi 5 has no 3.5 mm jack, so it needs a USB sound card or an audio interface**).
+Ready-to-flash **exxpiano** digital piano images for a clean SD card: `exxpiano-rpi234-…` for the Raspberry Pi 2, 3 or 4 (ARMv8) and `exxpiano-rpi5-…` for the Raspberry Pi 5 (**the Pi 5 has no 3.5 mm jack, so it needs a USB sound card or an audio interface**; tried on a Pi 5 with 8 GB and a USB sound card).
 
 The image already includes:
 
 - DietPi;
 - exxpiano;
 - the Salamander Grand Piano bank (**full**, about 700 MB; reported to start and play on a board with 1 GB, the free memory afterwards was not recorded);
-- the smaller `lite` bank, selected by itself on a board with less than 800 MB of memory (a Pi 3 A+);
+- the smaller `lite` bank, selected by itself on a board with less than 800 MB of memory (a Pi 3 A+), and one more bank to choose on the others;
 - the piano mechanics bank;
 - two demonstration recordings of real pianists in the MIDI player (Liszt, *Un Sospiro* and *La Campanella*, International Piano-e-Competition).
 

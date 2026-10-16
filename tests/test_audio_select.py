@@ -135,6 +135,15 @@ class AudioSelectTests(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('no sound card', r.stderr)
 
+    def test_pi_5_plays_through_the_usb_card_not_its_two_hdmi_outputs(self):
+        pi5 = [(0, 'vc4hdmi0', 'vc4-hdmi-0 - vc4-hdmi-0', False), (1, 'vc4hdmi1', 'vc4-hdmi-1 - vc4-hdmi-1', False)]
+        r = self.run_script(pi5 + [keyboard(2), usb(3, 'Device')])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('audio.alsa.device=plughw:CARD=Device', r.stdout)
+        r = self.run_script(pi5)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('Raspberry Pi 5 has no 3.5 mm jack', r.stderr)
+
     def test_explicit_device_wins(self):
         r = self.run_script([HEADPHONES, usb(1, 'U24')], ALSA_DEVICE='plughw:Headphones', PERIOD_SIZE=512)
         self.assertIn('audio.alsa.device=plughw:Headphones', r.stdout)

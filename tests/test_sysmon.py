@@ -150,6 +150,16 @@ class ThrottleTests(unittest.TestCase):
             finally:
                 os.environ['PATH'] = old
 
+    def test_the_kernel_file_of_a_pi_5_is_found_too(self):
+        with tempfile.TemporaryDirectory() as d:
+            old = os.environ['PATH']
+            os.environ['PATH'] = d  # no vcgencmd here
+            try:
+                put(d, 'devices/platform/soc@107c000000/soc@107c000000:firmware/get_throttled', '80008\n')
+                self.assertEqual(sysmon.read_throttled(d), 0x80008)
+            finally:
+                os.environ['PATH'] = old
+
     def test_vcgencmd_is_used_when_it_exists(self):
         with tempfile.TemporaryDirectory() as d:
             script = os.path.join(d, 'vcgencmd')
