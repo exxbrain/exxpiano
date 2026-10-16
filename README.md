@@ -91,7 +91,7 @@ was tested on a Pi.
 
 - Raspberry Pi 3 Model B (1 GB; a 512 MB Pi 3 A+ needs the smaller `lite` bank, see below), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
   onboard 3.5 mm output;
-- Raspberry Pi 5 (8 GB) with the `exxpiano-rpi5-…` image of v1.10.21 and a Zoom U-24 USB interface: the card was chosen by itself (`plughw:CARD=U24`, 64 x 3, about 4.4 ms of buffering, 44.1 kHz, `S32_LE`, 4 channels), no underruns or errors since the boot, no under-voltage or throttling, the full bank loaded with 953 of 8046 MB in use. Not checked on it yet: re-picking the card when it is plugged in or out, the delay end to end;
+- Raspberry Pi 5 (8 GB) with the `exxpiano-rpi5-…` image of v1.10.21 (DietPi 10.7.2) and a Zoom U-24 USB interface: the card was chosen by itself (`plughw:CARD=U24`, 64 x 3, about 4.4 ms of buffering, 44.1 kHz, `S32_LE`, 4 channels), the level meter runs on it, no underruns or errors since the boot, no under-voltage or throttling, the full bank loaded with 953 of 8046 MB in use. Not checked on it yet: re-picking the card when it is plugged in or out, the delay end to end;
 - building the banks: macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 
 Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see "Audio output and latency");
