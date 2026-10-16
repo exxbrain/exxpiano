@@ -47,15 +47,21 @@ Not yet tried on real hardware: the Pi 5 image, the import from a USB drive (see
 
 ## What it sounds like
 
-***La Campanella* (from bar 1:48)** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4))
+<table>
+<tr><th width="50%">Full bank</th><th width="50%">Lite bank</th></tr>
+<tr><th colspan="2"><i>La Campanella</i> (from 1:48)</th></tr>
+<tr>
+<td><video src="https://github.com/user-attachments/assets/5af2d54a-346b-4e7b-b226-b4280eef114d" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/c7ed836e-0145-4758-84f3-e3ed269441a2" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-lite.mp4">1080p</a></td>
+</tr>
+<tr><th colspan="2"><i>Un Sospiro</i></th></tr>
+<tr>
+<td><video src="https://github.com/user-attachments/assets/c361e8f3-9bf6-4876-bbb2-815873b3b06a" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/7e61fa66-f521-474f-8c34-18ba92c9312f" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-lite.mp4">1080p</a></td>
+</tr>
+</table>
 
-https://github.com/user-attachments/assets/a6098e81-ecb5-4f6a-b3e4-fea3d509dc1e
-
-***Un Sospiro*** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4))
-
-https://github.com/user-attachments/assets/1ae16430-4d23-4692-b5fd-ce684c489c22
-
-*The two pieces that come with the device, played by its MIDI player on a Raspberry Pi and recorded from the device, with the `lite` bank, the mechanics and 256 voices (the 1.10.21 changes, before their release). Nothing was added to the sound but one gain to bring both recordings to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
+*The two pieces that come with the device, played by its MIDI player on a Raspberry Pi 3 Model B running exxpiano 1.10.21 and recorded from the device: the `full` bank on the left, the `lite` bank on the right, both with the mechanics and 256 voices. Nothing was added to the sound but one gain per recording to bring them all to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 
 ## How it works
 

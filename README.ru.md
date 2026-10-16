@@ -47,15 +47,21 @@
 
 ## Как это звучит
 
-**«Кампанелла» (с такта на 1:48)** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella.mp4))
+<table>
+<tr><th width="50%">Банк full</th><th width="50%">Банк lite</th></tr>
+<tr><th colspan="2">«Кампанелла» (с 1:48)</th></tr>
+<tr>
+<td><video src="https://github.com/user-attachments/assets/5af2d54a-346b-4e7b-b226-b4280eef114d" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/c7ed836e-0145-4758-84f3-e3ed269441a2" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-lite.mp4">1080p</a></td>
+</tr>
+<tr><th colspan="2">«Вздох»</th></tr>
+<tr>
+<td><video src="https://github.com/user-attachments/assets/c361e8f3-9bf6-4876-bbb2-815873b3b06a" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/7e61fa66-f521-474f-8c34-18ba92c9312f" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-lite.mp4">1080p</a></td>
+</tr>
+</table>
 
-https://github.com/user-attachments/assets/a6098e81-ecb5-4f6a-b3e4-fea3d509dc1e
-
-**«Вздох»** ([1080p](https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro.mp4))
-
-https://github.com/user-attachments/assets/1ae16430-4d23-4692-b5fd-ce684c489c22
-
-*Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi, звук записан с устройства, с банком `lite`, механикой и 256 голосами (изменения 1.10.21 до их выпуска). К звуку ничего не добавлено, кроме одного усиления, чтобы обе записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
+*Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi 3 Model B с exxpiano 1.10.21, звук записан с устройства: слева банк `full`, справа `lite`, оба с механикой и 256 голосами. К звуку ничего не добавлено, кроме одного усиления на запись, чтобы все записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
 
 ## Как это устроено
 
