@@ -68,7 +68,7 @@ The images are close to 1 GB, and GitHub can be slow to download them from. The 
 
 1. In Cloudflare create an R2 bucket and make it public: connect a custom domain to it (recommended) or turn on its `r2.dev` address (Cloudflare limits its rate).
 2. Create an R2 API token with **Object Read & Write** on that bucket.
-3. In the repository settings add the secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and the variable (not a secret) `R2_PUBLIC_URL`, the bucket's public address without a trailing slash.
+3. In the repository settings add the secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and the variable (not a secret) `R2_PUBLIC_URL`, the bucket's public address without a trailing slash: the custom domain or `https://pub-….r2.dev` from the bucket's **Settings → Public access**, not the S3 API address `https://<account>.r2.cloudflarestorage.com` (it asks for authorization; the copy stops with an error when it is set).
 
 Only the two newest versions stay on the mirror: after each release (and each **release-mirror** run) the older `v*` folders are deleted from the bucket and their mirror links are taken out of those releases' descriptions; the files stay in the GitHub Releases. Without `R2_PUBLIC_URL` these steps are skipped. A failed copy does not stop the release: it is published without the mirror links, and the copy can be repeated. For a release published before the mirror existed, or whose copy failed, run the workflow **release-mirror** from the **Actions** tab with its tag: it downloads the release files, checks them against `SHA256SUMS`, copies them to the bucket and adds the mirror links to the published description, leaving the rest of it as it is.
 
