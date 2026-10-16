@@ -152,9 +152,20 @@ class Actions:
         except OSError:
             return False
 
+    def synth_phase(self, pid):
+        """The phase exxpiano-synth.py wrote for this process: starter, loaded, full or failed; None when it is not running (FluidSynth itself
+        plays: its sequencer client appears only once the banks are loaded)."""
+        try:
+            with open(os.environ.get('SYNTH_STATE', '/run/exxpiano-synth.state'), encoding='ascii') as f:
+                st = json.load(f)
+            return st['phase'] if st.get('pid') == pid else None
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return None
+
     def wait_synth_ready(self, old_pid, timeout=150):
-        """True when a NEW synthesizer process runs and has finished loading its banks (its ALSA sequencer client exists) and
-        stays that way for two polls. False on timeout or when it keeps being restarted (a bank it cannot load)."""
+        """True when a NEW synthesizer process runs and has finished loading its banks (its ALSA sequencer client exists; with the starter bank
+        of exxpiano-synth.py, the main bank is loaded too) and stays that way for two polls. False on timeout, when it keeps being restarted
+        (a bank it cannot load), or when exxpiano-synth.py says the main bank did not load."""
         t0, stable, seen = time.time(), 0, set()
         while time.time() - t0 < timeout:
             time.sleep(2)
@@ -163,7 +174,16 @@ class Actions:
                 seen.add(pid)
             if len(seen) >= 3:
                 return False  # flapping: crashing and being restarted
-            if pid and pid != old_pid and self._service_state('exxpiano') == 'active' and self._seq_has_synth():  # never the cached answer
+            phase = self.synth_phase(pid) if pid and pid != old_pid else None
+            if phase == 'failed':
+                return False
+            if (
+                pid
+                and pid != old_pid
+                and phase in (None, 'loaded', 'full')
+                and self._service_state('exxpiano') == 'active'
+                and self._seq_has_synth()  # never the cached answer
+            ):
                 stable += 1
                 if stable >= 2:
                     return True

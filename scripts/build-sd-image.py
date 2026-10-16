@@ -135,7 +135,11 @@ def resolve_inputs(args):
     lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')
     if args.piano_lite or os.path.isfile(lite):
         inputs['piano_lite'] = os.path.abspath(lite)
-    for key in [k for k in ('piano', 'mech', 'piano_lite') if k in inputs]:
+    # the small piano that plays while the main bank loads (exxpiano-synth.py); optional the same way
+    starter = args.piano_starter or os.path.join(ROOT, 'build', 'piano-starter.sf2')
+    if args.piano_starter or os.path.isfile(starter):
+        inputs['piano_starter'] = os.path.abspath(starter)
+    for key in [k for k in ('piano', 'mech', 'piano_lite', 'piano_starter') if k in inputs]:
         if not os.path.isfile(inputs[key]) or not os.access(inputs[key], os.R_OK):
             raise BuildError(
                 'the required %s bank is missing or unreadable: %s (prepare defaults with scripts/make-soundfonts.sh or pass --%s FILE.sf2)'
@@ -192,6 +196,8 @@ def inner_args(plan, path_of):
     a += ['--piano', path_of('piano'), '--mech', path_of('mech')]
     if plan.get('has_lite'):
         a += ['--piano-lite', path_of('piano_lite')]
+    if plan.get('has_starter'):
+        a += ['--piano-starter', path_of('piano_starter')]
     a += ['--onboard-audio', '1' if plan['onboard_audio'] else '0']
     return a  # the passwords go through the environment (SD_PASSWORD, SD_AP_PASSWORD), not through the arguments
 
@@ -283,6 +289,10 @@ def parse_args(argv):
         '--piano-lite',
         help='the smaller piano bank for boards with 512 MB (.sf2); default build/piano-lite.sf2 when it exists. The image picks it at the first start when the memory is under 800 MB',
     )
+    ap.add_argument(
+        '--piano-starter',
+        help='the small piano that plays while the main bank loads (.sf2); default build/piano-starter.sf2 when it exists. Without it the piano starts as before',
+    )
     ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/mech.sf2')
     ap.add_argument(
         '--password',
@@ -319,6 +329,7 @@ def plan_image(args, inputs):
         label=info['label'],
         onboard_audio=info['onboard_audio'],
         has_lite='piano_lite' in inputs,
+        has_starter='piano_starter' in inputs,
         banks=banks,
         out_dir=os.path.abspath(args.out),
         custom_ap_password=args.ap_password not in (None, ''),  # the passwords themselves stay out of the plan: it feeds the README

@@ -19,8 +19,8 @@ jobs:
         with:
           persist-credentials: false  # nothing after the checkout pushes or calls GitHub with it
 
-      - name: Install ffmpeg (the builder tests use it)
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install ffmpeg (the builder tests use it) and libfluidsynth (the tests of exxpiano-synth.py play through it)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libfluidsynth3
 
       - name: Tests
         run: python3 -m unittest discover -s tests -v

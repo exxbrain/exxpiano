@@ -36,6 +36,13 @@ METER="${METER:-1}"                 # 1 = the output goes through the level mete
 METER_DIR="${METER_DIR:-/run/exxpiano-meter}"
 ALSA_TAP_CONF="${ALSA_TAP_CONF:-/etc/alsa/conf.d/60-exxpiano-tap.conf}"
 METER_PROGRAM="${METER_PROGRAM:-$(dirname "$0")/exxpiano-meter.py}"
+# A big bank takes long to read from the card (the 729 MB one about 33 s on a Pi 3). Meanwhile a small starter bank plays: exxpiano-synth.py
+# runs FluidSynth with it at once and moves to the main bank in the first pause. Empty = no starter (FluidSynth itself, as before);
+# banks under STARTER_MIN_MB load fast enough without it.
+STARTER_SF2="${STARTER_SF2-/opt/exxpiano/starter.sf2}"
+STARTER_MIN_MB="${STARTER_MIN_MB:-64}"
+SYNTH_HOST="${SYNTH_HOST:-$(dirname "$0")/exxpiano-synth.py}"
+export SYNTH_STATE="${SYNTH_STATE:-/run/exxpiano-synth.state}"   # the phase of exxpiano-synth.py for the web interface
 
 # true if the card has a playback device (MIDI keyboards often show up as capture-only USB audio cards)
 has_playback() {
@@ -143,7 +150,13 @@ cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
      -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r 44100
      -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -g "$GAIN"
      "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
+piano_bytes="$(wc -c 2>/dev/null < "$PIANO_SF2" || echo 0)"
+if [ -n "$STARTER_SF2" ] && [ -r "$STARTER_SF2" ] && [ -f "$SYNTH_HOST" ] && command -v python3 >/dev/null \
+   && [ "${piano_bytes// /}" -ge $(( STARTER_MIN_MB * 1048576 )) ]; then
+  cmd=(python3 "$SYNTH_HOST" --starter "$STARTER_SF2" -- "${cmd[@]}")   # it runs the fluidsynth command itself when the starter cannot play
+fi
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "${cmd[*]}"; exit 0; fi
+rm -f "$SYNTH_STATE"          # a phase left by the previous run is not this run's
 if [ "$OUT_DEVICE" != "$DEVICE" ]; then
   # While the pipe is not read, the audio waits: this shell holds the pipe open (read+write, it never blocks and never breaks) and runs the meter in a
   # loop, so a restart of the meter takes a fraction of the 0.37 s that the pipe can hold.
