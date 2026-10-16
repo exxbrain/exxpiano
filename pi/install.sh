@@ -117,6 +117,6 @@ fi
 echo
 systemctl --no-pager --lines=0 status exxpiano exxpiano-fx || true
 echo
-echo "Done. Loading the sound banks takes tens of seconds, then the keyboard connects by itself."
+echo "Done. Loading the sound banks takes about 35 s on a Pi 3 with the full bank, then the keyboard connects by itself."
 echo "Log:  journalctl -u exxpiano -u exxpiano-fx -u exxpiano-web -f"
 echo "Web interface: http://$(hostname -I | awk '{print $1}'):8080/"

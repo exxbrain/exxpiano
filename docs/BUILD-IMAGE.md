@@ -82,7 +82,7 @@ Ordinary pushes and pull requests run only the fast tests. The complete stand-in
 
 1. In Raspberry Pi Imager choose “Choose OS” → “Use custom” and select the ZIP, or select it in balenaEtcher.
 2. Flash a clean SD card, put it in a Raspberry Pi 2, 3 or 4 (the `rpi5` ZIP: in a Pi 5 with a USB sound card), and power it on.
-3. First boot takes several minutes and needs no internet, Ethernet, or saved Wi-Fi. The keys give no piano sound until the bank has loaded.
+3. First boot takes about 1.5 minutes until the piano plays and about 1 minute 45 seconds until the web page and Wi-Fi are up (measured on a Pi 3 Model B with the full bank: DietPi first grows the partition and adds the file-system journal); it needs no internet, Ethernet, or saved Wi-Fi. The keys give no piano sound until the bank has loaded.
 4. The installation creates a persistent random 6-character hexadecimal ID in `/var/lib/exxpiano/installation-id`.
 5. The ID produces a unique `exxpiano-Setup-<ID>` network and `exxpiano-<lowercase-id>` hostname. Join the setup network and open `http://10.42.0.1:8080/`; the web UI shows the exact ID, network name, and QR codes.
 
@@ -96,4 +96,4 @@ For ordinary changes run the fast tests:
 python3 -m unittest tests.test_build_sd_image tests.test_wifilib tests.test_exxpiano_wifi tests.test_web tests.test_demo_web
 ```
 
-Run the full Docker pipeline and image build only when the pipeline itself changes or before a release; GitHub Actions applies the same split automatically. A container smoke test is not a substitute for real Raspberry Pi 2, 3, 4 and 5 checks. On hardware verify `/var/log/exxpiano-firstboot.log`, the unique setup network, web UI, MIDI, sound, and an offline reboot.
+Run the full Docker pipeline and image build only when the pipeline itself changes or before a release; GitHub Actions applies the same split automatically. A container smoke test is not a substitute for real Raspberry Pi 2, 3, 4 and 5 checks. On hardware verify `/var/log/exxpiano-firstboot.log` (before a reboot: `/var/log` is in memory), the unique setup network, web UI, MIDI, sound, and an offline reboot.

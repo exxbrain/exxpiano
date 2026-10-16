@@ -6,7 +6,7 @@ English | [Русский](README.ru.md)
 [![release build](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml)
 [![latest release](https://img.shields.io/github/v/release/exxbrain/exxpiano?label=release)](https://github.com/exxbrain/exxpiano/releases/latest)
 
-**A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. From writing the card to the first sound takes a few minutes (not a timed measurement).
+**A good piano sound on a cheap board, with the least effort.** exxpiano turns a Raspberry Pi (even a used 512 MB Pi 3 A+) into a digital piano for any USB MIDI keyboard: write an image to a card, power the board on, set everything up from a phone. No installation, no screen on the board. The first start of a freshly written card takes about 1.5 minutes to the first sound (measured on a Pi 3 Model B with the full bank).
 
 > **Made for boards with 1 GB of memory.** The full grand piano bank (about 700 MB, the one in the videos below) is built to fit a 1 GB board such as the Raspberry Pi 3 Model B, and that is the board it was tuned and tested on. The smaller `lite` bank exists so that a 512 MB board (Pi 3 A+) plays too.
 >
@@ -18,7 +18,7 @@ You need a Raspberry Pi 2, 3, 4 or 5 (a Pi 5 also needs a USB sound card), a mic
 
 1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi234-…-sd.zip` for a Pi 2/3/4 (`exxpiano-rpi5-…-sd.zip` for a Pi 5: it needs a USB sound card).
 2. **Write it to the microSD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
-3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and may take several minutes. Until the piano bank has loaded (several minutes on the first start, about a minute on later starts) the keys give no piano sound: wait until the web interface opens, then play.
+3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and takes longer: about 1.5 minutes on a Pi 3 Model B. Until the piano bank has loaded (about 1.5 minutes on the first start, about 55 s on later starts, measured on a Pi 3 Model B with the full bank) the keys give no piano sound: press a key now and then until the piano answers. The web interface is not a sign of readiness: on a later start it opens before the bank has loaded, on the first start after it.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. With an Ethernet cable there is no setup network: open that address directly.
 
 Then play. Details: "Connecting to a new Wi-Fi", "Power supply" and "Audio output and latency" below. "Deployment in short", "Quick start" and "SD card image" are only for building the banks and the image yourself.
@@ -94,6 +94,8 @@ was tested on a Pi.
 
 Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see "Audio output and latency");
 its delay was not measured.
+
+**Start time, measured** on the Raspberry Pi 3 Model B with the full bank (image 1.10.21 with the 1.10.22 bridge), the onboard output and no USB sound card, over Ethernet, not the first start: **about 55 s from power-on to the first piano note**. Power-on at about 16:16:11 (worked out from the Pi's journal), the web page opened at 16:16:48, the synthesizer was ready at 16:17:03 and the first note was heard at 16:17:07 (timed on a Mac on the same network). From the journal: about 12 s for the firmware, kernel and services, 2 s waiting for a USB sound card, **33 s reading `piano.sf2` (729 MB) and the mechanics bank from the SD card** and about 3 s starting the audio and selecting the presets, so the synthesizer was ready about 52 s after power-on and the rest is the wait for the next key press (the stages are rounded); Wi-Fi comes up in parallel and does not delay the sound. The card reads at 23 MB/s (measured with `dd`), which is the limit of the Pi 3's SD interface, so a faster card does not help; with the full bank only a Pi 4 or Pi 5 starts noticeably faster. The `lite` bank (248 MB) would load in about 11 s, a calculation, not a measurement. **The first start after writing a card** (image 1.10.21, same Pi 3, full bank) took **about 1.5 minutes from power-on to the first note**: powered on at 16:31:56, first note at 16:33:28. From the journal (seconds after the kernel start): DietPi first grows the partition and adds the ext4 journal (`tune2fs`, 17 s of the 21 s), so the piano services start only at 28 s; the bank is then read in 50 s instead of 33, because DietPi's own first-start setup writes to the same card at the same time; the synthesizer is ready at 81 s. The web page and Wi-Fi come last: DietPi finished at 105 s and the Pi answered on the network at 16:33:46, after the piano was already playing.
 
 ## What you need
 
@@ -218,7 +220,7 @@ its partitions, which only an image carries. Switch the Pi on without preparing 
   a network, or run update checks at first boot; `exxpiano-wifi` owns the radio and starts the setup AP. The finished image is read back and its web service is started in a
   container as a test. The passwords go in through the environment, never through arguments.
 - **Honest status.** The whole build is tested on a stand-in image with DietPi's layout, and the programs inside the finished image run; the Pi 5 image of v1.10.21 has been started on a
-  Raspberry Pi 5. With a changed builder, write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log`. `--download` has not been tried against dietpi.com either: if the address
+  Raspberry Pi 5. With a changed builder, write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log` before the next reboot (DietPi keeps `/var/log` in memory, so the log is gone after a reboot). `--download` has not been tried against dietpi.com either: if the address
   has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
   test changes to the builder without a Pi.
 
