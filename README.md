@@ -18,7 +18,7 @@ English | [Русский](README.ru.md)
 
 You need a Raspberry Pi 2, 3 or 4, a microSD card, a **5.1 V / 2.5 A** power supply, a USB MIDI keyboard, and headphones or speakers.
 
-1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi234-…-sd.zip` for a Pi 2/3/4 (`exxpiano-rpi5-…-sd.zip` for a Pi 5: not yet tried on a real Pi 5, and it needs a USB sound card).
+1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi234-…-sd.zip` for a Pi 2/3/4 (`exxpiano-rpi5-…-sd.zip` for a Pi 5: it needs a USB sound card).
 2. **Write it to the microSD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and may take several minutes.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. With an Ethernet cable there is no setup network: open that address directly.
@@ -35,7 +35,7 @@ Then play. Details: "Connecting to a new Wi-Fi", "Power supply" and "Audio outpu
 - **From a USB drive:** import sound banks and play MIDI files on the chosen piano, with the mechanics.
 - **Open and tested:** open source (scripts MIT, sounds CC-BY, the two demonstration recordings CC BY-NC-SA) with hundreds of automatic tests; what was not tried on a real board is marked as such.
 
-Not yet tried on real hardware: the Pi 5 image, the import from a USB drive (see "Tested on" below).
+Not yet tried on real hardware: the import from a USB drive (see "Tested on" below).
 
 ## What it looks like
 
@@ -85,16 +85,17 @@ was tested on a Pi.
 
 **The keyboard is chosen automatically, no pairing or setup.** The bridge looks at the MIDI ports every 2 seconds and takes every hardware MIDI input except service ports (Through, Timer, Announce, FLUID and the like), so any class-compliant USB keyboard works as soon as it is plugged in, several keyboards can play at once, and the bridge reconnects by itself when the synthesizer restarts. Connecting at boot was tested on a Pi with an Arturia KeyLab Essential 49 mk3; plugging in while the Pi runs is built in but not tested.
 
-**The sound output is chosen automatically, to keep the delay low.** If an external USB sound card or audio interface is plugged in, exxpiano plays through it with a very small buffer (64 frames x 3, about 4.4 ms of buffering plus the delay of the interface itself); without one it falls back to the 3.5 mm jack of the board, where the driver raises the buffer to 444 frames (about 30 ms by calculation). The choice is made when the service starts, the buffers are remembered per interface. The delay was not measured end to end; a Zoom U-24 played without clicks on a Pi 3.
+**The sound output is chosen automatically, to keep the delay low.** If an external USB sound card or audio interface is plugged in, exxpiano plays through it with a very small buffer (64 frames x 3, about 4.4 ms of buffering plus the delay of the interface itself); without one it falls back to the 3.5 mm jack of the board, where the driver raises the buffer to 444 frames (about 30 ms by calculation). The choice is made when the service starts, the buffers are remembered per interface. The delay was not measured end to end; a Zoom U-24 played without clicks on a Pi 3, and on a Pi 5 it was chosen by itself and ran without underruns.
 
 ## Tested on
 
 - Raspberry Pi 3 Model B (1 GB; a 512 MB Pi 3 A+ needs the smaller `lite` bank, see below), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
   onboard 3.5 mm output;
+- Raspberry Pi 5 (8 GB) with the `exxpiano-rpi5-…` image of v1.10.21 and a Zoom U-24 USB interface: the card was chosen by itself (`plughw:CARD=U24`, 64 x 3, about 4.4 ms of buffering, 44.1 kHz, `S32_LE`, 4 channels), no underruns or errors since the boot, no under-voltage or throttling, the full bank loaded with 953 of 8046 MB in use. Not checked on it yet: re-picking the card when it is plugged in or out, the delay end to end;
 - building the banks: macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 
-Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see "Audio output and latency"),
-but this setup was not measured with one.
+Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see "Audio output and latency");
+its delay was not measured.
 
 ## What you need
 
@@ -208,7 +209,7 @@ python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixi
 unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
-It makes `dist/sd/`: `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`, `manifest-rpi234.json`, and `README-rpi234.txt`. For a **Raspberry Pi 5** add `--target rpi5` and pass the Pi 5 DietPi image (`DietPi_RPi5-ARMv8-Trixie.img.xz`): the release has a separate `exxpiano-rpi5-…` ZIP. The Pi 5 has no 3.5 mm jack, so it plays only through a USB sound card or audio interface, and its image carries only the full bank. **The Pi 5 image has not been tried on a real Pi 5.** Write the zip with **Raspberry Pi
+It makes `dist/sd/`: `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`, `manifest-rpi234.json`, and `README-rpi234.txt`. For a **Raspberry Pi 5** add `--target rpi5` and pass the Pi 5 DietPi image (`DietPi_RPi5-ARMv8-Trixie.img.xz`): the release has a separate `exxpiano-rpi5-…` ZIP. The Pi 5 has no 3.5 mm jack, so it plays only through a USB sound card or audio interface; its image carries the full bank and, as one more choice, the `lite` one. The Pi 5 image was started on a Raspberry Pi 5 (8 GB) and played through a USB sound card (see "Tested on"). Write the zip with **Raspberry Pi
 Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as it is); there is nothing to unzip onto the card by hand, because a Raspberry Pi card needs
 its partitions, which only an image carries. Switch the Pi on without preparing a network: the product image skips DietPi's online first-run update. The device is
 `http://exxpiano-<id>.local:8080/`; with no Ethernet or saved Wi-Fi it starts its unique setup network (see "Connecting to a new Wi-Fi").
@@ -218,8 +219,8 @@ its partitions, which only an image carries. Switch the Pi on without preparing 
   installed into it (`apt`, no recommended packages), the banks are copied, and DietPi is configured as a pre-installed offline system. DietPi does not own `wlan0`, wait for
   a network, or run update checks at first boot; `exxpiano-wifi` owns the radio and starts the setup AP. The finished image is read back and its web service is started in a
   container as a test. The passwords go in through the environment, never through arguments.
-- **Honest status.** The whole build is tested on a stand-in image with DietPi's layout, and the programs inside the finished image run; **it has not been started on a
-  Raspberry Pi**: write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log`. `--download` has not been tried against dietpi.com either: if the address
+- **Honest status.** The whole build is tested on a stand-in image with DietPi's layout, and the programs inside the finished image run; the Pi 5 image of v1.10.21 has been started on a
+  Raspberry Pi 5. With a changed builder, write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log`. `--download` has not been tried against dietpi.com either: if the address
   has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
   test changes to the builder without a Pi.
 
@@ -270,7 +271,7 @@ and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A lo
   matters: many interfaces accept only 24/32-bit audio or 4 channels, and opening them directly (`hw:`) fails with
   `Failed to find an audio format supported by alsa`.
   Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 with `64 x 3`: no clicks by ear, latency not
-  measured. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
+  measured; on a Pi 5 the same interface was picked by itself and ran with `64 x 3` without underruns. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
   plug or unplug a card is done by a udev rule that was written from the documentation and **not tested on hardware**;
   if it does not work, run `sudo systemctl restart exxpiano` after changing the interface.
 
