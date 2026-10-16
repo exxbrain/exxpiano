@@ -95,6 +95,8 @@ was tested on a Pi.
 Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see "Audio output and latency");
 its delay was not measured.
 
+**Start time, measured** on the Raspberry Pi 3 Model B with the full bank (image 1.10.21 with the 1.10.22 bridge), the onboard output and no USB sound card, over Ethernet, not the first start: **about 55 s from power-on to the first piano note**. Power-on at about 16:16:11 (worked out from the Pi's journal), the web page opened at 16:16:48, the synthesizer was ready at 16:17:03 and the first note was heard at 16:17:07 (timed on a Mac on the same network). From the journal: about 12 s for the firmware, kernel and services, 2 s waiting for a USB sound card, **33 s reading `piano.sf2` (729 MB) and the mechanics bank from the SD card** and about 3 s starting the audio and selecting the presets; Wi-Fi comes up in parallel and does not delay the sound. The card reads at 23 MB/s (measured with `dd`), which is the limit of the Pi 3's SD interface, so a faster card does not help; with the full bank only a Pi 4 or Pi 5 starts noticeably faster. The `lite` bank (248 MB) would load in about 11 s, a calculation, not a measurement. The first start after writing a card takes several minutes.
+
 ## What you need
 
 | | |
