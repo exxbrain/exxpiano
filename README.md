@@ -14,7 +14,7 @@ English | [Русский](README.ru.md)
 
 ## Start in 4 steps (nothing to build)
 
-You need a Raspberry Pi 2, 3 or 4, a microSD card, a **5.1 V / 2.5 A** power supply, a USB MIDI keyboard, and headphones or speakers.
+You need a Raspberry Pi 2, 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microSD card, a power supply for your board (**5.1 V / 2.5 A** for a Pi 2 or 3, 5.1 V / 3 A for a Pi 4, 5.1 V / 5 A for a Pi 5), a USB MIDI keyboard, and headphones or speakers.
 
 1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi234-…-sd.zip` for a Pi 2/3/4 (`exxpiano-rpi5-…-sd.zip` for a Pi 5: it needs a USB sound card).
 2. **Write it to the microSD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
@@ -99,14 +99,14 @@ its delay was not measured.
 
 | | |
 |---|---|
-| A Raspberry Pi 2, 3 or 4 supported by the DietPi RPi234 ARMv8 image | an SD card containing the product image |
-| **A 5.1 V / 2.5 A power supply and a short cable** | see "Power supply" - this is not a formality |
+| A Raspberry Pi 2, 3 or 4 (the `rpi234` image) or a Raspberry Pi 5 with a USB sound card (the `rpi5` image) | an SD card containing the product image |
+| **A 5.1 V / 2.5 A power supply (3 A for a Pi 4, 5 A for a Pi 5) and a short cable** | see "Power supply" - this is not a formality |
 | A USB MIDI keyboard | class-compliant, no drivers needed |
 | Only to build it yourself: a Mac or Linux machine for the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
 
 ## Deployment in short
 
-The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards; a separate package or installer bundle is not a delivery format.
+The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards (a Pi 5 has an image of its own, built with `--target rpi5`); a separate package or installer bundle is not a delivery format.
 
 1. Build the banks once: `scripts/make-soundfonts.sh -p full` and `-p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-full.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
 2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`.
@@ -181,7 +181,7 @@ This comparison comes from project descriptions and reviews, not from my own mea
 |---|---|---|---|---|
 | Sound | samples of Salamander Grand Piano V3 (CC-BY) through FluidSynth plus a separate mechanics bank (hammers, dampers, resonance, pedal) | physical modelling (Modartt); little memory, the sound is computed live | many engines (piano, electric piano, synths, SoundFont and more) | any SoundFont; no piano mechanics |
 | Software price | free, open source (scripts MIT, sounds CC-BY) | a paid licence | the software is open; the ready Zynthian 5 kit with a screen and knobs is about €490 plus VAT without a Raspberry Pi, about €570 with one (from a review) | free |
-| Hardware | Raspberry Pi 2/3/4, a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official v5.1 kit on a Raspberry Pi 5 with a screen and a control board; Pi 4, 3 and 3B+ are also supported and Pi 4 or better is recommended (a Pi 3 copes worse with several engines at once); the Pi 3 A+ and a minimum amount of memory are not mentioned in the documentation, a forum post says ZynthianOS takes almost 1 GB; a Pi 2 is not supported by the image | any board that runs FluidSynth (Pi Zero and up) |
+| Hardware | Raspberry Pi 2/3/4/5 (a Pi 5 through a USB sound card), a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official v5.1 kit on a Raspberry Pi 5 with a screen and a control board; Pi 4, 3 and 3B+ are also supported and Pi 4 or better is recommended (a Pi 3 copes worse with several engines at once); the Pi 3 A+ and a minimum amount of memory are not mentioned in the documentation, a forum post says ZynthianOS takes almost 1 GB; a Pi 2 is not supported by the image | any board that runs FluidSynth (Pi Zero and up) |
 | Ready image | yes, one ZIP that works from the first power-on with no monitor | no, installed by hand | yes, the ZynthianOS image: about 7 GB compressed and about 16 GB unpacked, a card of 32 GB or more; a lighter variant with a reduced SoundFont library exists | no, usually a guide and scripts |
 | Settings from a phone | yes: touch curve, mechanics, banks, audio output, Wi-Fi, monitor | no single web interface; settings are in the program | a screen and knobs on the device, a web interface exists | at best a simple interface to choose a bank |
 | Piano mechanics | yes, a separate bank and a bridge | part of the physical model | depends on the chosen engine | none |
@@ -258,6 +258,7 @@ vcgencmd get_throttled     # must be 0x0
 Any other value (for example `0x50005`) means the voltage sagged. Effects we saw: clicks in the sound, Wi-Fi dropping
 and SSH breaking while copying large files, reboots when a USB device was unplugged. The cure is a **5.1 V / 2.5 A supply
 and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A long thin cord is the most common cause.
+A Pi 4 needs a 5.1 V / 3 A supply and a Pi 5 a 5.1 V / 5 A one (the official USB-C supplies of these boards).
 
 ## Audio output and latency
 
