@@ -6,8 +6,9 @@
 # -p  Preset of the piano bank (size = memory the bank takes on a Pi 3):
 #       full      ~700 MB  14 layers, stereo, 12 s tails. The main one, for boards with 1 GB or more (gain 0.6)
 #       lite      ~250 MB  6 layers, stereo, 9 s tails (gain 0.6)
-#       starter   ~9 MB    2 layers, mono, 24 kHz, 3 s tails: plays while the main bank loads (exxpiano-synth.py), not a bank to choose.
-#                          The layers and their loudness are those of the same layers in `full`, so the switch does not jump in volume
+#       starter   ~10 MB   3 layers (each in 3 loudness zones), mono, 22 kHz, 2.5 s tails: plays while the main bank loads
+#                          (exxpiano-synth.py), not a bank to choose. The layers and their loudness are those of the same layers in
+#                          `full`, so the switch does not jump in volume
 #
 # -v  Which published Salamander package to take the samples from (all CC-BY, from freepats.zenvoid.org):
 #       44k16       WAV, 44.1 kHz 16 bit, 412 MB download.  Default. Tested on real data.
@@ -45,7 +46,7 @@ done
 
 case "$PRESET" in
   lite)     ARGS="--layers 2,5,8,10,13,15 --tail 9 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
-  starter)  ARGS="--layers 5,13 --tail 3 --mono --rate 24000 --gamma 0.85 --peak-lo -13.4 --peak-hi -3.9 --veltrack 55" ;;
+  starter)  ARGS="--layers 4,8,13 --subzones 3 --tail 2.5 --mono --rate 22050 --gamma 0.85 --peak-lo -14.6 --peak-hi -3.9 --veltrack 55" ;;
   full)     ARGS="--layers 1,2,4,5,6,7,8,9,10,11,12,13,15,16 --tail 12 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
   *) echo "Unknown preset: $PRESET (full | lite | starter)"; exit 1 ;;
 esac
