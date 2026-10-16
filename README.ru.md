@@ -1,5 +1,3 @@
-# exxpiano
-
 [English](README.md) | Русский
 
 ![exxpiano](docs/images/exxpiano.svg)
