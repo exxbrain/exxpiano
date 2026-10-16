@@ -17,6 +17,13 @@ shift
 [ $# -gt 0 ] || { echo "mirror-to-r2: no files" >&2; exit 1; }
 : "${R2_ACCOUNT_ID:?}" "${R2_ACCESS_KEY_ID:?}" "${R2_SECRET_ACCESS_KEY:?}" "${R2_BUCKET:?}" "${R2_PUBLIC_URL:?}"
 
+case "$R2_PUBLIC_URL" in
+  *.r2.cloudflarestorage.com*)
+    # the S3 API address needs a signed request: in a browser it asks for authorization
+    echo "mirror-to-r2: R2_PUBLIC_URL is the S3 API address of the account; set it to the bucket's public address (its custom domain or https://pub-….r2.dev)" >&2
+    exit 1 ;;
+esac
+
 export AWS_ACCESS_KEY_ID=$R2_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$R2_SECRET_ACCESS_KEY AWS_DEFAULT_REGION=auto
 # R2 rejects the default integrity checksums of AWS CLI 2.23 and later
 export AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
