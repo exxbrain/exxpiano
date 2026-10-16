@@ -194,6 +194,14 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertLess(twice.index('## Faster download'), twice.index('## What changed'))
         self.assertTrue(twice.endswith('- new\n'))
 
+    def test_the_mirror_section_comes_out_of_a_published_description(self):
+        spec = importlib.util.spec_from_file_location('release_notes', os.path.join(ROOT, 'scripts', 'release-notes.py'))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        old = 'Description.\n\n## What changed in 1.2.0\n\n- new\n'
+        self.assertEqual(mod.remove_mirror(mod.add_mirror(old, 'https://a.example.org/v1.2.0', ['x-sd.zip'])), old)
+        self.assertEqual(mod.remove_mirror(old), old)
+
     def test_no_mirror_no_mirror_section(self):
         self.assertNotIn('mirror', self.run_notes('1.2.0', '## 1.2.0\n\n- new\n'))
 
