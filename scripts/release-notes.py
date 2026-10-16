@@ -5,7 +5,10 @@
   python3 scripts/release-notes.py 1.10.10 --mirror https://dl.example.org/v1.10.10 dist/sd/*.zip > notes.md
   python3 scripts/release-notes.py --existing old.md --mirror https://dl.example.org/v1.10.10 dist/sd/*.zip > notes.md
 
---existing takes a published description as it is and only puts the mirror links into it (replacing earlier ones).
+  python3 scripts/release-notes.py --existing old.md --remove-mirror > notes.md
+
+--existing takes a published description as it is and only puts the mirror links into it (replacing earlier ones), or with
+--remove-mirror takes them out (the version was deleted from the mirror).
 
 Fails (exit 1) when CHANGELOG.md has no `## <VERSION>` section, so a release cannot go out without its changes described.
 """
@@ -35,9 +38,14 @@ def mirror_section(base_url, files):
     )
 
 
+def remove_mirror(text):
+    """The description without its mirror section."""
+    return re.sub(r'^## Faster download \(mirror\)\n.*?(?=^## |\Z)', '', text, flags=re.M | re.S).rstrip('\n') + '\n'
+
+
 def add_mirror(text, base_url, files):
     """The description with the mirror section before `## What changed` (at the end without it); an earlier mirror section is replaced."""
-    text = re.sub(r'^## Faster download \(mirror\)\n.*?(?=^## |\Z)', '', text, flags=re.M | re.S).rstrip('\n')
+    text = remove_mirror(text).rstrip('\n')
     section_text = mirror_section(base_url, files)
     m = re.search(r'^## What changed', text, re.M)
     if not m:
@@ -64,6 +72,10 @@ if __name__ == '__main__':
             i = args.index('--mirror')
             mirror, mirror_files = args[i + 1], args[i + 2 :]
             args = args[:i]
+        if args[:1] == ['--existing'] and args[2:] == ['--remove-mirror']:
+            with open(args[1], encoding='utf-8') as f:
+                sys.stdout.write(remove_mirror(f.read()))
+            sys.exit(0)
         if args[:1] == ['--existing']:
             if not mirror_files:
                 raise ValueError('--existing needs --mirror URL FILE...')

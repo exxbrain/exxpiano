@@ -57,3 +57,23 @@ jobs:
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > build/release-body.md
           python3 scripts/release-notes.py --existing build/release-body.md --mirror "$MIRROR_URL" dist/sd/*.zip > build/release-notes.md
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file build/release-notes.md
+
+      - name: Keep only the last two versions on the mirror
+        # the older versions are deleted from the bucket, and their mirror links come out of their release descriptions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+        run: |
+          removed=$(scripts/mirror-to-r2.sh --prune 2)
+          mkdir -p build
+          for t in $removed; do
+            echo "Removed $t from the mirror"
+            gh release view "$t" --repo "$GITHUB_REPOSITORY" --json body -q .body > build/old-body.md || continue
+            grep -q '^## Faster download (mirror)' build/old-body.md || continue
+            python3 scripts/release-notes.py --existing build/old-body.md --remove-mirror > build/old-notes.md
+            gh release edit "$t" --repo "$GITHUB_REPOSITORY" --notes-file build/old-notes.md
+          done
