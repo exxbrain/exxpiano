@@ -1,5 +1,5 @@
 # built sound banks and the downloaded Salamander archive
-build/
+/build/
 dist/
 registry/
 *.deb

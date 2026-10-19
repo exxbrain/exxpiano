@@ -1,7 +1,7 @@
 name: build
 
-# Every push and pull request gets the fast test suite. Image-pipeline checks and
-# release image builds live in separate workflows because they are much slower.
+# Every push and pull request gets the fast test suite. The package and image checks and the release image build
+# live in separate workflows because they are much slower.
 on:
   push:
     branches:

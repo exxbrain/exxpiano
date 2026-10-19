@@ -1,14 +1,16 @@
 # Re-pick the audio output when a USB sound card is plugged in or removed.
 # (the exxpiano-fx bridge rescans the MIDI ports by itself and reconnects)
 #
-# UNTESTED on real hardware: written from the udev documentation. If it misbehaves, delete this file and run
-# `sudo systemctl restart exxpiano` after plugging or unplugging the interface.
+# eudev waits for a RUN program and kills one that takes long, so the work is handed to a new session (setsid -f of util-linux) and the rule
+# returns at once. --ifstarted: a synthesizer that was stopped by hand stays stopped.
+# UNTESTED on real hardware. If it misbehaves, delete this file and run `rc-service exxpiano restart` after plugging or unplugging the interface.
 #
 # add: the parent chain in sysfs is still there, so match the USB parent.
-ACTION=="add", SUBSYSTEM=="sound", KERNEL=="card*", SUBSYSTEMS=="usb", RUN+="/bin/systemctl --no-block try-restart exxpiano.service"
+ACTION=="add", SUBSYSTEM=="sound", KERNEL=="card*", SUBSYSTEMS=="usb", RUN+="/usr/bin/setsid -f /sbin/rc-service --ifstarted exxpiano restart"
 # remove: sysfs is already gone, so rely on the path id stored in the udev database (e.g. platform-...usb-usb-0:1.4:1.0).
-ACTION=="remove", SUBSYSTEM=="sound", KERNEL=="card*", ENV{ID_PATH}=="*usb*", RUN+="/bin/systemctl --no-block try-restart exxpiano.service"
+ACTION=="remove", SUBSYSTEM=="sound", KERNEL=="card*", ENV{ID_PATH}=="*usb*", RUN+="/usr/bin/setsid -f /sbin/rc-service --ifstarted exxpiano restart"
 
-# A USB drive with a file system (a partition, or a whole drive without a partition table): mount it read only for the bank import.
-# systemd starts exxpiano-usb@<device>.service, which unmounts it when the device disappears. UNTESTED on real hardware.
-ACTION=="add", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", ENV{ID_FS_USAGE}=="filesystem", TAG+="systemd", ENV{SYSTEMD_WANTS}+="exxpiano-usb@%k.service"
+# A USB drive with a file system (a partition, or a whole drive without a partition table): mounted read only for the bank import, and
+# unmounted when it disappears. UNTESTED on real hardware.
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", ENV{ID_FS_USAGE}=="filesystem", RUN+="/usr/bin/setsid -f /usr/bin/python3 /opt/exxpiano/exxpiano-usb.py add /dev/%k"
+ACTION=="remove", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", RUN+="/usr/bin/setsid -f /usr/bin/python3 /opt/exxpiano/exxpiano-usb.py remove /dev/%k"

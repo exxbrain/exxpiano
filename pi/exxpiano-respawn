@@ -1,0 +1,52 @@
+#!/bin/bash
+# Runs a program again when it fails, and stops when it ends well (what systemd's Restart=on-failure did). Used by the OpenRC service of the
+# Wi-Fi supervisor: it ends with 0 where another network manager owns the network or WIFI_SETUP=0, and must not be started again and again.
+#
+#   exxpiano-respawn [--delay SECONDS] [--service NAME] -- PROGRAM [ARG ...]
+#
+# --service: the OpenRC service this runs for; after a clean end it is marked stopped rather than crashed.
+# A stop of the service (SIGTERM) is passed to the program, and the wrapper ends after it.
+set -u
+DELAY=5
+SERVICE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --delay) DELAY="$2"; shift 2 ;;
+    --service) SERVICE="$2"; shift 2 ;;
+    --) shift; break ;;
+    *) echo "exxpiano-respawn: unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+[ $# -gt 0 ] || { echo "usage: exxpiano-respawn [--delay SECONDS] [--service NAME] -- PROGRAM [ARG ...]" >&2; exit 2; }
+
+child=""
+stop() {
+  [ -n "$child" ] && kill -TERM "$child" 2>/dev/null && wait "$child" 2>/dev/null
+  exit 0
+}
+trap stop TERM INT
+
+while :; do
+  "$@" &
+  child=$!
+  wait "$child"
+  rc=$?
+  child=""
+  if [ "$rc" = 0 ]; then
+    # under OpenRC the program has ended on purpose: say "stopped" rather than let the status read "crashed"
+    # (a clean environment: rc-service started with the RC_* variables of the service takes itself for a part of that service and does nothing).
+    # A program that ends at once ends before OpenRC has finished starting the service: wait for that first, or the mark is overwritten.
+    if [ -n "$SERVICE" ] && command -v rc-service >/dev/null; then
+      for _ in $(seq 1 40); do
+        case "$(env -i PATH="/usr/sbin:/usr/bin:/sbin:/bin" rc-service "$SERVICE" status 2>&1)" in
+          *started*|*crashed*) env -i PATH="/usr/sbin:/usr/bin:/sbin:/bin" rc-service "$SERVICE" zap >/dev/null 2>&1; break ;;
+        esac
+        sleep 0.25
+      done
+    fi
+    exit 0
+  fi
+  echo "exxpiano-respawn: $1 ended with code $rc, starting it again in $DELAY s" >&2
+  sleep "$DELAY" &
+  wait $!
+done

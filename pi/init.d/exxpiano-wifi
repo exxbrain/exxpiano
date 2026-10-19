@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+# The Wi-Fi supervisor: the only owner of wlan0, its own setup network when there is no other way in. It ends by itself (code 0) where
+# another network manager owns the network or WIFI_SETUP=0: exxpiano-respawn starts it again only after a failure, and then marks the
+# service stopped instead of crashed. A failure here never stops the piano.
+
+description="exxpiano Wi-Fi setup (its own access point when there is no network)"
+command=/opt/exxpiano/exxpiano-respawn
+command_args="--delay 5 --service ${RC_SVCNAME} -- /opt/exxpiano/exxpiano-env --optional /etc/exxpiano.conf -- /usr/bin/python3 /opt/exxpiano/exxpiano-wifi.py"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+output_logger="logger -t exxpiano-wifi -p daemon.info"
+error_logger="logger -t exxpiano-wifi -p daemon.info"
+
+depend() {
+	need localmount
+	after networking exxpiano-firstboot
+	use logger
+}
+
+start_pre() {
+	checkpath -d -m 0700 -o root:root /run/exxpiano-wifi
+}

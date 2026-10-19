@@ -8,10 +8,13 @@ context: |
   Keep normative keywords such as MUST and SHALL in English.
   This repository builds a Raspberry Pi 3 digital piano around FluidSynth,
   Salamander Grand Piano soundfonts, a Python MIDI mechanics bridge, a
-  standard-library web UI, and DietPi provisioning scripts.
-  Runtime code targets Debian/DietPi and uses Python 3 plus Bash. Keep the web
+  standard-library web UI, and an Alpine Linux SD image builder.
+  Runtime code targets Alpine Linux 3.24 aarch64 (sys mode, musl, OpenRC with
+  supervise-daemon, eudev, busybox syslog) and uses Python 3 plus Bash. The
+  application ships as signed .apk packages built with abuild. Keep the web
   server dependency-free unless a proposal explicitly justifies a dependency.
-  Treat /etc/exxpiano.conf as the persisted systemd EnvironmentFile and keep
+  Treat /etc/exxpiano.conf as the persisted environment file of the OpenRC
+  services (read literally by exxpiano-env, never sourced by a shell) and keep
   its existing validation and atomic-write guarantees.
   Run `python3 -m unittest discover -s tests -v` for repository verification.
   Distinguish automated coverage from real Raspberry Pi verification. Never

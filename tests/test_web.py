@@ -313,6 +313,7 @@ class GainScaleTests(ServerCase):
         css = _re.search(r'input\[type=range\]\.gain \{[^}]*transparent (\d+)%', page)
         self.assertEqual(int(css.group(1)) / 100.0, round(share, 2))              # the orange part of the track starts at the safe position
         self.assertIn('0 is the loudest setting at which even the densest passages', page)
+        self.assertIn('set by the sound card volume (below, and in Audio output)', page)
         code, r = self.jcall('/api/settings', {'gain': round(safe * 10 ** (hi_db / 20.0), 4)})     # the top of the slider is accepted
         self.assertEqual(code, 200)
 
@@ -372,6 +373,15 @@ class OutputVolumeTests(ServerCase):
         self.assertEqual(self.jcall('/api/output-volume', {'db': -10})[0], 400)
         self.actions.no_volume, self.actions.volume_fails = False, True
         self.assertEqual(self.jcall('/api/output-volume', {'db': -10})[0], 500)
+
+    def test_the_page_has_the_card_volume_in_audio_output_and_under_the_master_volume_on_home(self):
+        self.start()
+        page = self.call('/')[1].decode()
+        for needle in ('id="outVol"', 'id="outVol2"', 'id="outVolRow2"', 'id="outVolVal2"', '["outVolRow2", "outVol2", "outVolVal2"]'):
+            self.assertIn(needle, page)
+        home = page[page.index('id="paneHome"'):page.index('id="paneBank"')]
+        self.assertIn('id="outVol2"', home)                                                       # next to the master volume and the meter
+        self.assertLess(home.index('id="volumeRows"'), home.index('id="outVol2"'))
 
     def test_the_token_protects_it_and_the_amixer_text_is_understood(self):
         self.start(CONF + 'WEB_TOKEN=s3cret\n')
@@ -591,13 +601,25 @@ class ActionsCacheTests(unittest.TestCase):
             self.calls.append(cmd[0])
 
             class R:
-                stdout = {'fluidsynth': 'FluidSynth runtime version 2.4.4\n', 'systemctl': 'active\n',
-                          'journalctl': 'exxpiano: audio output plughw:CARD=U24 (usb), period 64 x 3\n'}.get(cmd[0], '')
+                stdout = {'fluidsynth': 'FluidSynth runtime version 2.4.4\n', 'rc-service': ' * status: started\n'}.get(cmd[0], '')
+                stderr = ''
                 returncode = 0
             return R()
         web.subprocess.run = fake_run
         self.addCleanup(setattr, web.subprocess, 'run', self.real_run)
-        self.actions = web.Actions(asound=tempfile.mkdtemp())
+        self.log_dir = tempfile.mkdtemp()
+        self.log_file = os.path.join(self.log_dir, 'messages')
+        with open(self.log_file, 'w') as f:
+            f.write('Oct 19 13:37:27 h syslog.info syslogd started: BusyBox v1.37.0\n'
+                    'Oct 19 13:37:28 h daemon.info exxpiano: exxpiano: audio output plughw:CARD=U24 (usb), period 64 x 3\n')
+        real_read = web.oslib.read_messages
+
+        def counted_read(files, now=None):
+            self.calls.append('log')
+            return real_read(files, now)
+        web.oslib.read_messages = counted_read
+        self.addCleanup(setattr, web.oslib, 'read_messages', real_read)
+        self.actions = web.Actions(asound=tempfile.mkdtemp(), log_files=(self.log_file,))
 
     def test_repeated_questions_start_each_program_once(self):
         a = self.actions
@@ -606,7 +628,7 @@ class ActionsCacheTests(unittest.TestCase):
             self.assertEqual(a.service_state('exxpiano'), 'active')
             self.assertEqual(a.service_state('exxpiano-fx'), 'active')
             self.assertEqual(a.audio_output()['period'], 64)
-        self.assertEqual(sorted(self.calls), ['fluidsynth', 'journalctl', 'systemctl', 'systemctl'])      # one per unit
+        self.assertEqual(sorted(self.calls), ['fluidsynth', 'log', 'rc-service', 'rc-service'])      # one per unit
 
     def test_entries_expire(self):
         a = self.actions
@@ -615,7 +637,7 @@ class ActionsCacheTests(unittest.TestCase):
             key = ('service', 'exxpiano')
             a._cache[key] = (a._cache[key][0] - 3, a._cache[key][1])        # older than its 2 s
         a.service_state('exxpiano')
-        self.assertEqual(self.calls, ['systemctl', 'systemctl'])
+        self.assertEqual(self.calls, ['rc-service', 'rc-service'])
 
     def test_a_restart_forgets_the_service_state_and_the_output(self):
         a = self.actions
@@ -626,7 +648,7 @@ class ActionsCacheTests(unittest.TestCase):
         a.restart_synth()
         self.calls.clear()
         a.service_state('exxpiano'); a.audio_output(); a.fluidsynth_version()
-        self.assertEqual(sorted(self.calls), ['journalctl', 'systemctl'])    # the version of the program does not change with a restart
+        self.assertEqual(sorted(self.calls), ['log', 'rc-service'])    # the version of the program does not change with a restart
 
     def test_readiness_never_uses_the_cached_state(self):
         a = self.actions
@@ -637,7 +659,7 @@ class ActionsCacheTests(unittest.TestCase):
         web.time.sleep, orig = (lambda s: None), web.time.sleep
         self.addCleanup(setattr, web.time, 'sleep', orig)
         self.assertTrue(a.wait_synth_ready(1, timeout=30))
-        self.assertGreaterEqual(self.calls.count('systemctl'), 2)
+        self.assertGreaterEqual(self.calls.count('rc-service'), 2)
 
 
 class WifiApiTests(ServerCase):
@@ -789,7 +811,7 @@ class DeviceNameTests(ServerCase):
         self.assertEqual(self.call('/api/device', {'name': 'x'})[0], 401)
         self.assertEqual(self.actions.renamed, [])
 
-    def test_the_real_action_runs_hostnamectl_and_keeps_the_hosts_file_when_it_cannot_write_it(self):
+    def test_the_real_action_stores_and_sets_the_name_and_keeps_the_hosts_file_when_it_cannot_write_it(self):
         calls = []
         real = web.subprocess.run
 
@@ -797,10 +819,18 @@ class DeviceNameTests(ServerCase):
             returncode, stdout, stderr = 0, '', ''
         web.subprocess.run = lambda cmd, *a, **kw: (calls.append(cmd), R())[1]
         self.addCleanup(setattr, web.subprocess, 'run', real)
+        folder = tempfile.mkdtemp()
+        self.addCleanup(__import__('shutil').rmtree, folder)
+        for name in ('HOSTNAME_PATH', 'HOSTS_PATH'):
+            self.addCleanup(setattr, web.wifilib, name, getattr(web.wifilib, name))
+        web.wifilib.HOSTNAME_PATH = os.path.join(folder, 'hostname')
+        web.wifilib.HOSTS_PATH = os.path.join(folder, 'missing', 'hosts')               # cannot be written: the name is set all the same
         web.Actions().set_hostname('piano-test')
-        self.assertEqual(calls[0], ['hostnamectl', 'set-hostname', 'piano-test'])
-        self.assertIn(['systemctl', 'try-restart', 'avahi-daemon.service'], calls)
-        R.returncode, R.stderr = 1, 'Access denied'
+        self.assertEqual(calls[0], ['hostname', '-F', web.wifilib.HOSTNAME_PATH])
+        self.assertIn(['rc-service', '--ifstarted', 'avahi-daemon', 'restart'], calls)
+        with open(web.wifilib.HOSTNAME_PATH) as f:
+            self.assertEqual(f.read(), 'piano-test\n')
+        R.returncode, R.stderr = 1, 'Operation not permitted'
         with self.assertRaises(OSError):
             web.Actions().set_hostname('piano-test')
 
@@ -856,34 +886,47 @@ class MonitorEndpointTests(ServerCase):
         code, r = self.jcall('/api/errors')
         self.assertEqual(code, 200)
         self.assertEqual(r['errors'][0]['text'], 'no sound card found')
+        self.assertTrue(r['available'])
 
     def test_the_kernel_log_reports_the_program_killed_for_lack_of_memory(self):
-        import json as j
         msg = '[  127.7] Out of memory: Killed process 743 (fluidsynth) total-vm:489696kB, anon-rss:370048kB, file-rss:188kB, shmem-rss:0kB, UID:0 pgtables:864kB oom_score_adj:0'
-        text = '\n'.join([j.dumps({'__REALTIME_TIMESTAMP': '5000000', 'MESSAGE': msg}), j.dumps({'__REALTIME_TIMESTAMP': '6000000', 'MESSAGE': 'usb 1-1: new device'}), 'junk'])
-        self.assertEqual(web.parse_oom(text), [dict(t=5000, unit='kernel', level='error', text=web.parse_oom(text)[0]['text'])])
-        self.assertIn('killed fluidsynth, which held 361 MB', web.parse_oom(text)[0]['text'])
+        found = web.parse_oom([dict(t=5000, text=msg), dict(t=6000, text='usb 1-1: new device')])
+        self.assertEqual(found, [dict(t=5000, unit='kernel', level='error', text=found[0]['text'])])
+        self.assertIn('killed fluidsynth, which held 361 MB', found[0]['text'])
 
-    def test_journal_lines_become_errors(self):
-        import json as j
-        lines = '\n'.join([
-            j.dumps({'__REALTIME_TIMESTAMP': '1700000000123456', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '3', 'MESSAGE': 'exxpiano: no sound card found'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '1700000001000000', '_SYSTEMD_UNIT': 'exxpiano-web.service', 'PRIORITY': '4', 'MESSAGE': [104, 105]}),
-            'not json', j.dumps({'PRIORITY': '3', 'MESSAGE': 'no time'}), j.dumps({'__REALTIME_TIMESTAMP': '1', 'MESSAGE': '  '})])
-        got = web.parse_journal_errors(lines)
-        self.assertEqual(got, [dict(t=1700000000123, unit='exxpiano', level='error', text='exxpiano: no sound card found'),
-                               dict(t=1700000001000, unit='exxpiano-web', level='warning', text='hi')])
+    def system_log(self, text):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(__import__('shutil').rmtree, folder)
+        path = os.path.join(folder, 'messages')
+        with open(path, 'w') as f:
+            f.write(text)
+        return web.Actions(asound=folder, log_files=(path,))
 
-    def test_the_notes_of_our_scripts_are_info_and_other_info_lines_are_not_listed(self):
-        import json as j
-        lines = '\n'.join([
-            j.dumps({'__REALTIME_TIMESTAMP': '1000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '6', 'MESSAGE': 'exxpiano: audio output plughw:CARD=Headphones (onboard), period 64 x 3'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '2000000', '_SYSTEMD_UNIT': 'exxpiano-wifi.service', 'PRIORITY': '6', 'MESSAGE': 'exxpiano-wifi: started'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '3000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '6', 'MESSAGE': 'FluidSynth runtime version 2.4.4'}),
-            j.dumps({'__REALTIME_TIMESTAMP': '4000000', '_SYSTEMD_UNIT': 'exxpiano.service', 'PRIORITY': '4', 'MESSAGE': 'fluidsynth: warning: No preset found'})])
-        got = web.parse_journal_errors(lines)
-        self.assertEqual([(g['level'], g['text'][:20]) for g in got],
-                         [('info', 'exxpiano: audio outp'), ('info', 'exxpiano-wifi: start'), ('warning', 'fluidsynth: warning:')])
+    def test_the_system_log_becomes_the_service_messages(self):
+        actions = self.system_log(
+            'Oct 19 13:37:27 h syslog.info syslogd started: BusyBox v1.37.0\n'
+            'Oct 19 13:37:28 h daemon.info exxpiano: exxpiano: audio output plughw:CARD=Headphones (onboard), period 64 x 3\n'
+            'Oct 19 13:37:28 h daemon.info exxpiano: FluidSynth runtime version 2.5.4\n'
+            'Oct 19 13:37:29 h daemon.err exxpiano-web: no sound card found\n'
+            'Oct 19 13:37:30 h daemon.info exxpiano-usb: exxpiano-usb: /dev/sda1 mounted\n'
+            'Oct 19 13:37:31 h kern.err kernel: Out of memory: Killed process 743 (fluidsynth) total-vm:1kB, anon-rss:370048kB\n')
+        got = actions.errors()
+        self.assertEqual([(g['unit'], g['level'], g['text'][:20]) for g in got], [
+            ('exxpiano', 'info', 'exxpiano: audio outp'), ('exxpiano-web', 'error', 'no sound card found'),
+            ('exxpiano-usb', 'info', 'exxpiano-usb: /dev/s'), ('kernel', 'error', 'out of memory: the k')])
+        self.assertEqual(actions.audio_output(), dict(device='plughw:CARD=Headphones', kind='onboard', period=64, periods=3))
+
+    def test_an_unreadable_log_is_said_so(self):
+        actions = web.Actions(asound=tempfile.mkdtemp(), log_files=('/nonexistent/messages',))
+        self.assertIsNone(actions.errors())
+        self.assertIsNone(actions.audio_output())
+
+    def test_another_network_manager_is_noticed(self):
+        actions = web.Actions(asound=tempfile.mkdtemp())
+        actions._service_state = lambda name: 'active' if name == 'iwd' else 'unknown'
+        self.assertTrue(actions.network_manager_active())
+        actions._service_state = lambda name: 'unknown'
+        self.assertFalse(actions.network_manager_active())
 
     def test_the_page_calls_the_card_service_messages_not_errors(self):
         self.start()

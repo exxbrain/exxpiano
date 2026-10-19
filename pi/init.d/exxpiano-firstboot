@@ -1,0 +1,23 @@
+#!/sbin/openrc-run
+# The first start of a card made from the image: the root partition grows to the whole card, the installation ID and the host name are
+# made, a board with little memory gets the smaller piano bank. Done once; see /var/log/exxpiano-firstboot.log. At every start the SSH keys
+# in authorized_keys on the boot partition are added for root.
+
+description="exxpiano: finish the first start of the image"
+
+depend() {
+	need localmount
+	after bootmisc
+	after hostname
+	before exxpiano exxpiano-wifi exxpiano-web avahi-daemon
+}
+
+start() {
+	if [ -e /var/lib/exxpiano/image-firstboot.done ]; then
+		/opt/exxpiano/exxpiano-firstboot              # only the keys of the boot partition
+		return 0
+	fi
+	ebegin "Finishing the first start of exxpiano"
+	/opt/exxpiano/exxpiano-firstboot
+	eend $?
+}

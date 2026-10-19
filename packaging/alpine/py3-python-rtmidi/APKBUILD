@@ -1,0 +1,29 @@
+# Maintainer: Denis Zakharov <noreply@exxpiano.invalid>
+# python-rtmidi (the ALSA sequencer backend of mido) is not in the repositories of Alpine 3.24; the MIDI bridge of exxpiano needs it.
+# Built unchanged from its source release on PyPI, for ALSA only (no JACK on the device); the checksum below pins that release.
+pkgname=py3-python-rtmidi
+_pyname=python_rtmidi
+pkgver=1.5.8
+pkgrel=0
+pkgdesc="Python binding for the RtMidi C++ library (ALSA)"
+url="https://github.com/SpotlightKid/python-rtmidi"
+arch="aarch64 x86_64"
+license="MIT"
+depends="python3"
+makedepends="alsa-lib-dev cython meson py3-gpep517 py3-installer py3-meson-python py3-wheel python3-dev samurai"
+options="!check"
+source="https://files.pythonhosted.org/packages/source/p/python-rtmidi/$_pyname-$pkgver.tar.gz"
+builddir="$srcdir/$_pyname-$pkgver"
+
+build() {
+	gpep517 build-wheel --wheel-dir .dist --output-fd 3 \
+		--config-json '{"setup-args": ["-Djack=false", "-Dcoremidi=false", "-Dwinmm=false"]}' 3>&1 >&2
+}
+
+package() {
+	python3 -m installer -d "$pkgdir" .dist/*.whl
+}
+
+sha512sums="
+0f2b949a2a53f813a891bc391ce0369fbbec0d6e898a9ace2925adc5714d791ce1f4df133edf34c87b3336cb3ab4ad70851a42124241ec1707f32f66a778dc18  python_rtmidi-1.5.8.tar.gz
+"

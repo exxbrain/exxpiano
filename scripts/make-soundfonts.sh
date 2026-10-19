@@ -96,5 +96,6 @@ echo
 ls -lh "$OUT"/mech.sf2 "$OUT/piano-$PRESET.sf2"
 GAIN=0.6
 echo
-echo "Next (on the Pi, from the pi/ folder of the repository):"
-echo "  sudo ./install.sh --piano piano-$PRESET.sf2 --mech mech.sf2 --gain $GAIN"
+echo "Next: build the SD image with these banks (scripts/build-sd-image.py --piano ... --mech ...), or copy them to a running device"
+echo "and install them there as root:"
+echo "  exxpiano-install-banks --piano piano-$PRESET.sf2 --mech mech.sf2 --gain $GAIN"

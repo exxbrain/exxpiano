@@ -1,89 +1,119 @@
 # Building the reusable SD card image
 
-The shipped artifacts are two complete bootable images, each for a clean SD card: one for the Raspberry Pi 2/3/4 (ARMv8, built from `DietPi_RPi234-ARMv8-Trixie.img.xz`) and one for the Raspberry Pi 5 (built from `DietPi_RPi5-ARMv8-Trixie.img.xz`). Each contains DietPi, exxpiano, the full piano and the mechanics bank; the Pi 2/3/4 image also carries the smaller `lite` piano for 512 MB boards. One ZIP can be flashed to many cards.
+The shipped artifact is one complete bootable image for a clean SD card that starts a **Raspberry Pi 3, 4 or 5** (64-bit). It contains Alpine Linux 3.24 (sys mode on ext4, OpenRC), the exxpiano packages, the full piano and the mechanics bank, and the smaller `lite` piano for 512 MB boards. One ZIP can be flashed to many cards. The Raspberry Pi 2 is not supported.
+
+The image is not made from a ready-made image of a distribution: the builder installs Alpine's packages into an empty root file system, from the branch and the HTTPS mirror pinned in `alpine/repositories`, and `apk` checks the signature of every index and package with the official keys in `alpine/keys/` (their SHA-256 are in `.github/alpine-image.env`). A package that does not match stops the build. A stable branch of Alpine replaces packages with fixed builds and keeps no old versions, so two builds on different days can differ; the manifest of each image lists every package with its exact version.
 
 ## Prerequisites
 
-Use Docker Desktop on macOS or Docker on Linux, the official `DietPi_RPi234-ARMv8-Trixie.img.xz`, and prepare the banks:
+Docker Desktop on macOS (it runs the arm64 builder natively on Apple silicon) or Docker on an arm64 Linux machine. Prepare the banks:
 
 ```bash
 scripts/make-soundfonts.sh -p full -o build
 scripts/make-soundfonts.sh -p lite -o build
 ```
 
-The builder defaults to `build/piano-full.sf2` and `build/mech.sf2`. Use `--piano` and `--mech` for controlled replacements.
+The builder defaults to `build/piano-full.sf2`, `build/piano-lite.sf2` (when it exists) and `build/mech.sf2`. Use `--piano`, `--piano-lite` and `--mech` for controlled replacements. An image is never made without the piano and the mechanics bank; the first start uses the `lite` bank on a board with less than 800 MB of memory (a Pi 3 A+).
 
-**The target.** `--target rpi234` (the default) or `--target rpi5`. For the Pi 5 pass the Pi 5 image of DietPi (`--dietpi DietPi_RPi5-ARMv8-Trixie.img.xz`, or `--download`). The target decides the names (`exxpiano-rpi5-v...-sd.zip`, `manifest-rpi5.json`, `README-rpi5.txt`) and two things inside: the Pi 5 image carries no `lite` bank (the board has 2 GB or more) and does not touch the onboard sound settings, because **the Pi 5 has no 3.5 mm jack: it plays only through a USB sound card or audio interface**. Neither Pi 5 image nor its first start has been tried on a real Pi 5.
+Build the packages (they are signed; see below):
 
-Before tagging a release add a section `## <VERSION>` to `CHANGELOG.md`: the workflow appends it to the description of the GitHub Release (`scripts/release-notes.py`) and stops without it.
+```bash
+python3 scripts/build-apks.py
+```
 
-An image is never released without both banks. If `build/piano-lite.sf2` exists (`scripts/make-soundfonts.sh -p lite`, or `--piano-lite FILE`) it goes into the image too, and the first start uses it on a board with less than 800 MB of memory (a Pi 3 A+); the release workflow always builds it.
+This makes `dist/apk/exxpiano/aarch64/` (`exxpiano`, and `py3-mido` and `py3-python-rtmidi`, which Alpine does not have, built unchanged from their pinned releases on PyPI) with its `APKINDEX.tar.gz`, and `dist/apk/<key>.rsa.pub`, the public key the image will trust.
+
+**The signing key.** `EXXPIANO_APK_KEY` holds the private key (PEM) and `EXXPIANO_APK_KEY_NAME` its name (`exxpiano`). Without them the packages are signed with a development key made once in `build/apk-key/` and the builder says so: such an image is for your own devices. The release workflow takes the key from the secret `EXXPIANO_APK_KEY` and stops without it. Make the project key once:
+
+```bash
+openssl genrsa -out exxpiano.rsa 4096        # keep it out of the repository; put its contents into the secret EXXPIANO_APK_KEY
+```
 
 ## Build
 
 Pass passwords through the environment so they do not appear in process arguments:
 
 ```bash
-printf 'DietPi password: '; read -r -s SD_PASSWORD; printf '\n'
+printf 'Root password (SSH, or empty for key login only): '; read -r -s SD_PASSWORD; printf '\n'
 printf 'Setup network password: '; read -r -s SD_AP_PASSWORD; printf '\n'
 export SD_PASSWORD SD_AP_PASSWORD
 
-python3 scripts/build-sd-image.py \
-  --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
-  --country RU --timezone Europe/Moscow --dry-run
-
-python3 scripts/build-sd-image.py \
-  --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
-  --country RU --timezone Europe/Moscow
+python3 scripts/build-sd-image.py --country RU --timezone Europe/Moscow --dry-run
+python3 scripts/build-sd-image.py --country RU --timezone Europe/Moscow
 
 unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
-`--dry-run` validates inputs and prints the plan. The full run writes to `dist/sd/`:
+`--dry-run` validates inputs and prints the plan. `--ssh-key ~/.ssh/id_ed25519.pub` puts a public key for root into the image. The full run writes to `dist/sd/`:
 
-- `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` — the flashable image;
-- `manifest-<target>.json` — versions, base/result SHA-256 values, banks, and the identity scheme;
-- `README-<target>.txt` — brief instructions for that release.
+- `exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip`: the flashable image;
+- `manifest.json`: the product and Alpine versions, the pinned branch, mirror and key checksums, the package signing key, every installed package with its version, the banks, the image checksums and the identity scheme;
+- `README.txt`: brief instructions for that release.
 
-The product version comes from `VERSION`; the DietPi version comes from `dietpi/.version` in the base image. A release is rejected when that version cannot be read, either required bank is absent, or the smoke check fails.
+How the image is made (`scripts/sd-image-inner.sh`, in the `sd-builder` container): `apk --root --initdb` installs `alpine-base`, the kernel `linux-rpi`, the firmware `raspberrypi-bootloader` and the Wi-Fi firmware, eudev, OpenSSH, chrony, ifupdown-ng and `exxpiano`; the OpenRC runlevels get the services (eudev replaces mdev, `hostapd` and `dnsmasq` stay off: `exxpiano-wifi` starts them); the console `tty1` shows the status screen instead of a getty; `/etc/network/interfaces` configures only `eth0` (Wi-Fi belongs to `exxpiano-wifi`). The programs of the image then run in a chroot: the Python modules and the MIDI libraries import, the web service answers and makes the QR code of the setup network, the console screen renders. The root file system becomes an ext4 file with `mkfs.ext4 -d`, the boot partition a FAT32 file with `mtools`; no loop device and no privileged container is needed. The image is read back (`debugfs`, `mdir`) and its promises are checked before the ZIP is written: the kernel, the initramfs and the device trees of the Pi 3, 4 and 5, `arm_64bit=1` and `dtparam=audio=on`, the services of every runlevel, no getty and no automatic login, the banks, the demonstration pieces, no installation ID, the Wi-Fi country, the trusted key, and nothing of Debian or DietPi.
+
+> **Root login.** With `SD_PASSWORD` root logs in over SSH with that password. Without it root has no password at all and logs in with a key only: give `--ssh-key`, or put your public key into a file `authorized_keys` on the boot partition of the card (the FAT partition any computer can open). At every start the device adds the keys of that file for root.
 
 > **Setup network password.** Without `SD_AP_PASSWORD` the image keeps the default `exxpianosetup`, the same for every card made from it; the name of the network is unique per card (it ends with the installation ID). With `SD_AP_PASSWORD` all cards of this image share your password. Change it on one device with `WIFI_AP_PASSWORD` in `/etc/exxpiano.conf`.
 
 ## GitHub Release
 
-Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml`. The workflow checks that the tag exactly matches `VERSION`, runs the fast tests, builds the full and lite banks, downloads the pinned DietPi RPi 2/3/4 ARMv8 base from the repository's dedicated prerelease, verifies the SHA-256 recorded in `.github/dietpi-image.env`, builds and smoke-tests the image, and then creates the product GitHub Release. This avoids depending on the upstream download service during a product release while preserving the exact official input. The product release assets are:
+Before tagging a release add a section `## <VERSION>` to `CHANGELOG.md`: the workflow appends it to the description of the GitHub Release (`scripts/release-notes.py`) and stops without it.
 
-- `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`;
-- `manifest-rpi234.json`, `manifest-rpi5.json`;
-- `README-rpi234.txt`, `README-rpi5.txt`;
+Pushing a tag named `v<VERSION>` starts `.github/workflows/release.yml` on a native arm64 runner. The workflow checks that the tag exactly matches `VERSION` and that the secret `EXXPIANO_APK_KEY` is there, runs the fast tests, builds the full and lite banks, builds the signed packages, builds and checks the image, and then creates the product GitHub Release with:
+
+- `exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip`;
+- `manifest.json`;
+- `README.txt`;
 - `SHA256SUMS`.
 
-The release title names exxpiano, its version, and the supported Raspberry Pi family. Its English description explains the image contents, flashing and first boot, checksum verification, and why an already-booted card must not be cloned.
+The release has no separate `.apk` files: a device is upgraded by `scripts/deploy-to-pi.sh`. The title names exxpiano, its version and the boards. No release is created if any preceding step fails. For an existing release the title and description are updated and missing assets are added; an asset whose name already exists is never overwritten (the upload fails and the operator decides).
 
-No release is created if any preceding step fails. For an existing release the title and description are updated and missing assets are added; an asset whose name already exists is never overwritten (the upload fails and the operator decides).
-
-The DietPi build-input prerelease is not a product release. Its tag includes the first eight characters of the verified upstream SHA-256, and its only binary asset is the unchanged official image named by `.github/dietpi-image.env`. Updating DietPi requires a new prerelease/tag and checksum; an existing pinned input is never replaced. Local `--download` remains available and identifies the builder with an HTTP User-Agent accepted by the upstream service.
-
-The Pi 5 image has a pinned copy of its own (`DIETPI_RPI5_*` in `.github/dietpi-image.env`, tag `dietpi-rpi5-armv8-trixie-<8 characters>`). Create it once from the **Actions** tab: run the workflow **dietpi-mirror** with the target `rpi5` (it downloads the official image, checks it against the pin, and makes the pre-release; it stops if the pre-release already exists). Until the pre-release exists, a release downloads the official Pi 5 image and checks it against the checksum DietPi publishes next to it.
-
-Ordinary pushes and pull requests run only the fast tests. The complete stand-in image pipeline runs separately when image builder, DietPi setup, packaging, or their workflow changes; it can also be started manually from GitHub Actions.
+Ordinary pushes and pull requests run only the fast tests. `.github/workflows/image-pipeline.yml` runs when packaging, the services or the image builder change (or by hand): it builds the packages, starts the OpenRC services in a container (`scripts/test-openrc-services.sh`), installs, upgrades, rolls back and removes the packages (`scripts/test-apk-upgrade.sh`), and builds a complete image with stand-in banks (`scripts/test-sd-image-pipeline.sh`).
 
 ## Flashing and first boot
 
 1. In Raspberry Pi Imager choose “Choose OS” → “Use custom” and select the ZIP, or select it in balenaEtcher.
-2. Flash a clean SD card, put it in a Raspberry Pi 2, 3 or 4, and power it on.
-3. First boot takes several minutes and needs no internet, Ethernet, or saved Wi-Fi.
+2. Flash a clean SD card, put it in a Raspberry Pi 3, 4 or 5, and power it on.
+3. The first boot takes a minute or two and needs no internet, Ethernet, or saved Wi-Fi: the root partition grows to the whole card (`growpart`, `resize2fs`), the name of the device is made, a board with little memory gets the `lite` bank.
 4. The installation creates a persistent random 6-character hexadecimal ID in `/var/lib/exxpiano/installation-id`.
 5. The ID produces a unique `exxpiano-Setup-<ID>` network and `exxpiano-<lowercase-id>` hostname. Join the setup network and open `http://10.42.0.1:8080/`; the web UI shows the exact ID, network name, and QR codes.
 
 Cards cloned from the same ZIP receive different IDs on their own first boot. ID creation is atomic and the stored value is reused, so rebooting does not change Wi-Fi or hostname.
+
+## Moving a device from DietPi
+
+A card made from a DietPi image (version 1.10.20 or older) cannot be upgraded to Alpine in place: write the new image. To keep what the device has learned, copy it first (the device is reachable as before):
+
+```bash
+scp -r root@<device>:/var/lib/exxpiano ./exxpiano-data          # installation ID, imported banks, profiles, MIDI library
+scp root@<device>:/etc/exxpiano.conf ./exxpiano-data/
+scp root@<device>:/etc/wpa_supplicant/wpa_supplicant.conf ./exxpiano-data/     # the saved Wi-Fi networks
+```
+
+After the first start of the new card copy them back as root and restart the services:
+
+```bash
+scp -r ./exxpiano-data/* root@<device>:/tmp/restore/
+ssh root@<device> 'cp -a /tmp/restore/. /var/lib/exxpiano/ && mv /var/lib/exxpiano/exxpiano.conf /etc/ && mv /var/lib/exxpiano/wpa_supplicant.conf /etc/wpa_supplicant/ && reboot'
+```
+
+The old installation ID then names the device again (setup network and hostname follow it after the reboot).
 
 ## Verification
 
 For ordinary changes run the fast tests:
 
 ```bash
-python3 -m unittest tests.test_build_sd_image tests.test_wifilib tests.test_exxpiano_wifi tests.test_web tests.test_demo_web
+python3 -m unittest discover -s tests
 ```
 
-Run the full Docker pipeline and image build only when the pipeline itself changes or before a release; GitHub Actions applies the same split automatically. A container smoke test is not a substitute for real Raspberry Pi 2, 3, and 4 checks. On hardware verify `/var/log/exxpiano-firstboot.log`, the unique setup network, web UI, MIDI, sound, and an offline reboot.
+Run the container checks and the image build when packaging or the builder changes or before a release (GitHub Actions applies the same split):
+
+```bash
+scripts/test-openrc-services.sh
+scripts/test-apk-upgrade.sh
+scripts/test-sd-image-pipeline.sh
+```
+
+A container is not a Raspberry Pi. **The Alpine image has not been started on real hardware yet.** On a Pi 3, 4 and 5 check `/var/log/exxpiano-firstboot.log`, the grown root partition, the console screen, the unique setup network and joining a Wi-Fi network, the web UI, the sound through the 3.5 mm jack and a USB card, plugging a USB sound card, drive and MIDI keyboard in and out, the latency of FluidSynth compared with DietPi, an upgrade and a rollback with `scripts/deploy-to-pi.sh`, and an offline reboot.

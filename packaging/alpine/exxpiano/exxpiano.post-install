@@ -1,0 +1,30 @@
+#!/bin/sh
+# After the first installation. Also runs inside the image builder, where OpenRC is not running: nothing is started there.
+
+# the demonstration pieces go into the MIDI library once; a piece the owner deleted does not come back
+python3 /opt/exxpiano/exxpiano-demo-midi.py >/dev/null 2>&1 || true
+for service in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
+	rc-update add "$service" default >/dev/null 2>&1 || true
+done
+# the setup access point is started by exxpiano-wifi itself: the packages' own services would only get in the way
+for service in hostapd dnsmasq; do
+	rc-update del "$service" default >/dev/null 2>&1 || true
+done
+udevadm control --reload >/dev/null 2>&1 || true
+
+if [ -e /run/openrc/softlevel ]; then
+	# a new device with a generic name (localhost, alpine ...) gets a unique one: exxpiano-<installation-id>; a chosen name is kept
+	python3 /opt/exxpiano/exxpiano-wifi.py ensure-name >/dev/null 2>&1 || true
+	piano="$(sed -n 's/^PIANO_SF2=//p' /etc/exxpiano.conf 2>/dev/null | tail -1 | tr -d '"')"
+	mech="$(sed -n 's/^MECH_SF2=//p' /etc/exxpiano.conf 2>/dev/null | tail -1 | tr -d '"')"
+	if [ -f "${piano:-/opt/exxpiano/soundfonts/piano.sf2}" ] && [ -f "${mech:-/opt/exxpiano/soundfonts/mech.sf2}" ]; then
+		for service in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
+			rc-service "$service" restart >/dev/null 2>&1 || true
+		done
+	else
+		echo "exxpiano: the sound banks are not installed yet." >&2
+		echo "  Install the exxpiano-soundfonts package or run:" >&2
+		echo "  exxpiano-install-banks --piano piano.sf2 --mech mech.sf2" >&2
+	fi
+fi
+exit 0

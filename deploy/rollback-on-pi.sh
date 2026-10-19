@@ -1,31 +1,21 @@
 #!/bin/bash
-# Runs ON THE PI as root: restores the exxpiano files saved by upgrade-on-pi.sh (the version before the upgrade).
+# Runs ON THE PI as root: installs again the exxpiano package that upgrade-on-pi.sh found before the upgrade, and the configuration it saved.
+# apk then lists the version that really runs. Without a saved package nothing is removed: the current version stays.
+set -uo pipefail
 BACKUP="${EXXPIANO_BACKUP:-/root/exxpiano-backup}"
-[ -d "$BACKUP/opt" ] || { echo "No backup in $BACKUP"; exit 1; }
+WAIT="${EXXPIANO_WAIT:-45}"
+TRUST=()
+[ "${EXXPIANO_DEV_UNTRUSTED:-0}" = 1 ] && TRUST=(--allow-untrusted)
+previous="$(cat "$BACKUP/previous" 2>/dev/null || true)"
+if [ -z "$previous" ] || [ ! -s "$previous" ]; then
+  echo "No package of the earlier version is kept ($BACKUP/previous): nothing is rolled back, the current version stays."
+  exit 1
+fi
 
-systemctl stop exxpiano-wifi exxpiano-web exxpiano-fx exxpiano 2>/dev/null     # exxpiano-wifi gives the radio back if it was serving its own network
-# program files and units as they were (the banks were never touched)
-cp -a "$BACKUP/opt/." /opt/exxpiano/
+rc-service exxpiano-wifi stop >/dev/null 2>&1     # exxpiano-wifi gives the radio back if it was serving its own network
+apk add "${TRUST[@]}" "$previous" || { echo "apk could not install $previous: the current version stays"; exit 1; }
 [ -e "$BACKUP/exxpiano.conf" ] && cp -a "$BACKUP/exxpiano.conf" /etc/exxpiano.conf
-for u in exxpiano exxpiano-fx; do
-  [ -e "$BACKUP/units/$u.service" ] && cp -a "$BACKUP/units/$u.service" "/lib/systemd/system/$u.service"
-done
-# an older version had no web interface: take its pieces away again
-if [ ! -e "$BACKUP/units/exxpiano-web.service" ]; then
-  systemctl disable exxpiano-web 2>/dev/null
-  rm -f /lib/systemd/system/exxpiano-web.service /opt/exxpiano/exxpiano-web.py /opt/exxpiano/exxpianoconf.py
-  rm -rf /opt/exxpiano/web
-fi
-# an older version had no Wi-Fi setup either
-if [ ! -e "$BACKUP/units/exxpiano-wifi.service" ]; then
-  systemctl disable exxpiano-wifi 2>/dev/null
-  rm -f /lib/systemd/system/exxpiano-wifi.service /opt/exxpiano/exxpiano-wifi.py /opt/exxpiano/wifilib.py
-fi
-systemctl daemon-reload
-systemctl restart exxpiano
-sleep 45
-systemctl restart exxpiano-fx
-sleep 3
-systemctl is-active exxpiano exxpiano-fx
-cat "$BACKUP/version.txt" 2>/dev/null
-echo "Rolled back the files. (dpkg still lists the newer version; reinstall a package later to make them agree.)"
+for s in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do rc-service "$s" restart >/dev/null 2>&1; done
+sleep "$WAIT"
+for s in exxpiano exxpiano-fx; do printf '%-14s ' "$s"; rc-service "$s" status 2>&1 | sed 's/^ \* //'; done
+echo "Rolled back to $(apk list -I exxpiano 2>/dev/null | head -1)"

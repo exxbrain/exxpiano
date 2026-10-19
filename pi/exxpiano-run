@@ -151,7 +151,12 @@ if [ "$OUT_DEVICE" != "$DEVICE" ]; then
   rm -f "$METER_DIR/pcm" "$METER_DIR/levels.json"
   mkfifo -m 600 "$METER_DIR/pcm"
   exec 6<>"$METER_DIR/pcm"
-  ( while :; do python3 "$METER_PROGRAM" "$METER_DIR/pcm" "$METER_DIR/levels.json" 6<&-; sleep 0.2; done ) &
+  # The loop and the meter end with the synthesizer ($$ is the process FluidSynth replaces below): OpenRC stops only that process, and a loop
+  # left behind would read the next pipe too. The loop does not keep the pipe open itself (6<&-), so the meter sees its end.
+  SYNTH_PID=$$
+  # `|| true`: this script runs with set -e, and without it a meter that crashed or was killed would end the loop: nobody would read the pipe
+  # again and the synthesizer would wait on it for ever (silence while the MIDI player says it plays; seen on a Pi 3 B).
+  ( exec 6<&-; while kill -0 "$SYNTH_PID" 2>/dev/null; do python3 "$METER_PROGRAM" "$METER_DIR/pcm" "$METER_DIR/levels.json" "$SYNTH_PID" || true; sleep 0.2; done ) &
 fi
 rm -f "$CMD_FIFO"
 mkfifo -m 600 "$CMD_FIFO"

@@ -94,5 +94,30 @@ class MeterTests(unittest.TestCase):
                 os.close(holder)
 
 
+
+class ParentTests(unittest.TestCase):
+    """OpenRC stops only the synthesizer: the meter must end with it, or every restart leaves one more meter on the pipe."""
+
+    def test_the_meter_ends_when_its_synthesizer_is_gone(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as d:
+            pipe, out = os.path.join(d, 'pcm'), os.path.join(d, 'levels.json')
+            os.mkfifo(pipe)
+            synth = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
+            writer = os.open(pipe, os.O_RDWR)                     # what the synthesizer holds
+            m = subprocess.Popen([sys.executable, os.path.join(HERE, '..', 'pi', 'exxpiano-meter.py'), pipe, out, str(synth.pid)])
+            time.sleep(0.6)
+            self.assertIsNone(m.poll())                            # it runs while the synthesizer runs
+            synth.kill(); synth.wait()
+            os.close(writer)                                       # the synthesizer's end of the pipe goes with it
+            self.assertEqual(m.wait(timeout=10), 0)
+
+    def test_without_a_parent_it_keeps_running_as_before(self):
+        self.assertTrue(meter.alive(None))
+        self.assertTrue(meter.alive(os.getpid()))
+        self.assertFalse(meter.alive(2 ** 22 + 12345))
+
+
 if __name__ == '__main__':
     unittest.main()

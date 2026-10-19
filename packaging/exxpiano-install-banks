@@ -37,7 +37,7 @@ if [ -n "$MECH" ];  then install -m 644 "$MECH"  "$DEST/mech.sf2";  set_conf MEC
 [ -n "$GAIN" ]   && set_conf GAIN "$GAIN"
 
 if [ -f "$DEST/piano.sf2" ] && [ -f "$DEST/mech.sf2" ]; then
-  systemctl restart exxpiano exxpiano-fx
+  rc-service exxpiano restart && rc-service exxpiano-fx restart
   echo "Done. Loading the banks takes tens of seconds."
 else
   echo "Saved. Both files (piano.sf2 and mech.sf2) are needed to start."

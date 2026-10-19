@@ -1,0 +1,15 @@
+#!/bin/sh
+# After an upgrade: the same as the first installation (the services of a newer version may be new, the running ones get the new code).
+# deploy/upgrade-on-pi.sh then checks that the synthesizer and the bridge came back, and rolls back if not.
+
+python3 /opt/exxpiano/exxpiano-demo-midi.py >/dev/null 2>&1 || true
+for service in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
+	rc-update add "$service" default >/dev/null 2>&1 || true
+done
+udevadm control --reload >/dev/null 2>&1 || true
+if [ -e /run/openrc/softlevel ]; then
+	for service in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
+		rc-service --ifstarted "$service" restart >/dev/null 2>&1 || true
+	done
+fi
+exit 0

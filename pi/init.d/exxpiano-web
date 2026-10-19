@@ -1,0 +1,18 @@
+#!/sbin/openrc-run
+# The web interface on port WEB_PORT (8080) of /etc/exxpiano.conf.
+
+description="exxpiano web interface"
+supervisor=supervise-daemon
+command=/opt/exxpiano/exxpiano-env
+command_args="/etc/exxpiano.conf -- /usr/bin/python3 /opt/exxpiano/exxpiano-web.py"
+pidfile="/run/${RC_SVCNAME}.pid"
+respawn_delay=2
+respawn_max=0
+output_logger="logger -t exxpiano-web -p daemon.info"
+error_logger="logger -t exxpiano-web -p daemon.info"
+
+depend() {
+	need localmount
+	after exxpiano
+	use logger net
+}

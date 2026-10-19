@@ -1,0 +1,74 @@
+#!/bin/bash
+# The first start of a card made from the image (started once by the OpenRC service exxpiano-firstboot; the stamp makes it one-shot).
+# Everything is already installed: this only finishes what needs the real card and board. Nothing here needs the network.
+#
+# At every start (not only the first) the public keys in authorized_keys on the boot partition (the FAT partition any computer can open) are
+# added to root's: that is how an owner without a root password gets SSH access. Keys already there are kept; the file is only read.
+#
+# For tests every path and program can be replaced: FIRSTBOOT_LOG, STAMP, CONF, MEMINFO, LITE, ROOT_SOURCE (the device of /), GROWPART,
+# RESIZE2FS, WIFI (the command that makes the installation ID and the host name), BOOT_KEYS, ROOT_KEYS.
+LOG="${FIRSTBOOT_LOG:-/var/log/exxpiano-firstboot.log}"
+STAMP="${STAMP:-/var/lib/exxpiano/image-firstboot.done}"
+CONF="${CONF:-/etc/exxpiano.conf}"
+MEMINFO="${MEMINFO:-/proc/meminfo}"
+LITE="${LITE:-/opt/exxpiano/soundfonts/piano-lite.sf2}"
+GROWPART="${GROWPART:-growpart}"
+RESIZE2FS="${RESIZE2FS:-resize2fs}"
+# the image is called exxpiano until its first start: that name is generic here, a name chosen later is kept by every other call
+WIFI="${WIFI:-python3 /opt/exxpiano/exxpiano-wifi.py ensure-name exxpiano}"
+BOOT_KEYS="${BOOT_KEYS:-/boot/authorized_keys}"
+ROOT_KEYS="${ROOT_KEYS:-/root/.ssh/authorized_keys}"
+
+import_keys() {
+  [ -r "$BOOT_KEYS" ] || return 0
+  mkdir -p "$(dirname "$ROOT_KEYS")"; chmod 700 "$(dirname "$ROOT_KEYS")"
+  touch "$ROOT_KEYS"; chmod 600 "$ROOT_KEYS"
+  local line added=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"                                          # a file written on Windows
+    case "$line" in ssh-*|ecdsa-*|sk-*) ;; *) continue ;; esac   # only key lines: no options, no comments, nothing else
+    grep -qxF "$line" "$ROOT_KEYS" || { printf '%s\n' "$line" >> "$ROOT_KEYS"; added=$((added + 1)); }
+  done < "$BOOT_KEYS"
+  [ "$added" = 0 ] || logger -t exxpiano-firstboot "exxpiano: $added SSH key(s) from the boot partition added for root" 2>/dev/null || true
+}
+import_keys
+[ -e "$STAMP" ] && exit 0
+exec >>"$LOG" 2>&1
+echo "== exxpiano first start $(date -u +%FT%TZ)"
+
+# 1. The root partition grows to the end of the card (the image is only as big as its contents). A failure is written down and the start
+#    goes on: the device works on the small partition, there is only less room for imported banks.
+root="${ROOT_SOURCE:-$(awk '$2=="/" {print $1}' /proc/mounts | tail -1)}"
+case "$root" in
+  /dev/mmcblk*p[0-9]*|/dev/nvme*n*p[0-9]*) disk="${root%p*}"; part="${root##*p}" ;;
+  /dev/sd[a-z][0-9]*|/dev/vd[a-z][0-9]*) disk="${root%%[0-9]*}"; part="${root#"$disk"}" ;;
+  *) disk=""; part="" ;;
+esac
+if [ -n "$disk" ]; then
+  if $GROWPART "$disk" "$part"; then
+    $RESIZE2FS "$root" && echo "the root file system now fills the card" || echo "resize2fs $root failed: the partition grew, the file system did not"
+  else
+    echo "the root partition was not grown ($GROWPART $disk $part): it is already as big as the card, or the card cannot be changed"
+  fi
+else
+  echo "the root device '$root' is not a card partition: not grown"
+fi
+
+# 2. A generic image name becomes exxpiano-<installation-id>. The ID is created automatically and persists on this installation.
+$WIFI || echo "the installation ID or the host name could not be set: the next start of exxpiano-wifi tries again"
+
+# 3. A board with little memory (a Pi 3 A+ has 512 MB) cannot hold the full piano bank: the kernel would kill the synthesizer again and again.
+#    The image carries a smaller bank next to it; use that one here. exxpiano-run makes the same choice at every start of the service, so this
+#    only saves the choice in the configuration.
+MEM_KB=$(awk '/^MemTotal:/ {print $2}' "$MEMINFO" 2>/dev/null)
+if [ -s "$LITE" ] && [ "${MEM_KB:-0}" -gt 0 ] && [ "$MEM_KB" -lt 800000 ] && grep -qx 'PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2' "$CONF"; then
+  tmp="$CONF.firstboot.$$"
+  sed 's#^PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2$#PIANO_SF2=/opt/exxpiano/soundfonts/piano-lite.sf2#' "$CONF" > "$tmp" && cat "$tmp" > "$CONF"
+  rm -f "$tmp"
+  echo "memory ${MEM_KB} kB: the smaller piano bank is used"
+fi
+
+echo "name: $(hostname), installation ID: $(cat /var/lib/exxpiano/installation-id 2>/dev/null || echo unavailable)"
+mkdir -p "$(dirname "$STAMP")"
+touch "$STAMP"
+echo "== done"

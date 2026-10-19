@@ -291,5 +291,29 @@ class PipePlumbingTests(unittest.TestCase):
                     proc.kill()
 
 
+
+class MeterLoopTests(unittest.TestCase):
+    def test_a_crashed_meter_is_started_again_and_the_loop_ends_with_the_synthesizer(self):
+        """The loop is run as exxpiano-run runs it (set -euo pipefail): a meter that fails is started again, and the loop stops when the
+        synthesizer is gone. A loop that ended would leave the pipe unread and the synthesizer waiting on it."""
+        import re
+        import subprocess
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pi', 'exxpiano-run')) as f:
+            text = f.read()
+        loop = re.search(r'^  \( exec 6<&-; while .*\) &$', text, re.M).group(0).strip()
+        with tempfile.TemporaryDirectory() as d:
+            prog, count = os.path.join(d, 'meter.sh'), os.path.join(d, 'starts')
+            with open(prog, 'w') as f:
+                f.write('echo x >> "%s"; exit 1\n' % count)          # a meter that fails at once, every time
+            # the stand-in synthesizer is a child of the same shell, which reaps it (a zombie would still answer kill -0)
+            script = 'set -euo pipefail\nsleep 3 &\nSYNTH_PID=$!\n%s\nwait\n' % loop.replace('python3 "$METER_PROGRAM"', 'bash "$METER_PROGRAM"')
+            env = dict(os.environ, METER_PROGRAM=prog, METER_DIR=d)
+            r = subprocess.run(['bash', '-c', script], env=env, timeout=20)
+            with open(count) as f:
+                starts = len(f.read().split())
+        self.assertEqual(r.returncode, 0)
+        self.assertGreater(starts, 3)                                    # started again and again while the synthesizer lived, then ended
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -9,7 +9,8 @@ render() {
   local id host ips ip
   id="$(cat "$ID_FILE" 2>/dev/null | tr -d '\n' || true)"
   host="$(hostname 2>/dev/null || echo exxpiano)"; host="${host%.local}"
-  ips="${EXXPIANO_IPS-$(hostname -I 2>/dev/null || true)}"
+  # (busybox hostname has no -I: the global IPv4 addresses come from ip)
+  ips="${EXXPIANO_IPS-$(ip -4 -o addr show scope global 2>/dev/null | awk '{split($4, a, "/"); printf "%s ", a[1]}')}"
   printf '\033[2J\033[H'
   printf 'exxpiano digital piano\n'
   printf '======================\n\n'

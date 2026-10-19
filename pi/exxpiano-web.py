@@ -41,6 +41,7 @@ import banklib
 import exxpianoconf
 import midilib
 import midiplayer
+import oslib
 import profiles
 import base64
 import qrlib
@@ -51,7 +52,8 @@ import wifilib
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 MAX_BODY = 4096
 HOSTNAME_RE = wifilib.HOSTNAME_RE
-ERROR_UNITS = ('exxpiano.service', 'exxpiano-fx.service', 'exxpiano-web.service', 'exxpiano-wifi.service')
+ERROR_UNITS = ('exxpiano', 'exxpiano-fx', 'exxpiano-web', 'exxpiano-wifi', 'exxpiano-usb')
+OTHER_MANAGERS = ('networkmanager', 'iwd', 'connman')        # OpenRC services of network managers that own Wi-Fi themselves
 ERROR_LIMIT = 40
 OOM_RE = re.compile(r'Out of memory: Killed process \d+ \(([^)]*)\).*?anon-rss:(\d+)kB')
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
@@ -80,8 +82,10 @@ def parse_amixer(text):
 class Actions:
     """Everything that touches the system; tests replace this."""
 
-    def __init__(self, asound=None):
+    def __init__(self, asound=None, log_files=None, proc='/proc'):
         self.asound = asound or os.environ.get('ASOUND_DIR', '/proc/asound')
+        self.log_files = log_files or oslib.LOG_FILES          # the system log of busybox syslogd (see oslib.py)
+        self.proc = proc
         self._monitor = sysmon.Monitor(asound=self.asound)
         self.wifi_run_dir = os.environ.get('EXXPIANO_WIFI_RUN', wifilib.RUN_DIR)
         self.wifi_iface = os.environ.get('WIFI_IFACE', 'wlan0')
@@ -138,12 +142,7 @@ class Actions:
         return banklib.mem_available_bytes()
 
     def synth_pid(self):
-        try:
-            r = subprocess.run(['systemctl', 'show', '-p', 'MainPID', '--value', 'exxpiano'], capture_output=True, text=True,
-                               timeout=3)
-            return int(r.stdout.strip() or 0)
-        except (OSError, subprocess.SubprocessError, ValueError):
-            return 0
+        return oslib.synth_pid(self.proc)
 
     def _seq_has_synth(self):
         try:
@@ -175,11 +174,11 @@ class Actions:
         return self._cached(('service', unit), 2, lambda: self._service_state(unit))
 
     def _service_state(self, unit):
-        try:
-            r = subprocess.run(['systemctl', 'is-active', unit], capture_output=True, text=True, timeout=3)
-            return r.stdout.strip() or 'unknown'
-        except (OSError, subprocess.SubprocessError):
-            return 'unknown'
+        return oslib.service_state(unit)
+
+    def log(self):
+        """The system log of this boot, parsed (see oslib.read_messages); None when it cannot be read."""
+        return self._cached('log', 5, lambda: oslib.read_messages(self.log_files))
 
     def monitor(self, since=0):
         return self._monitor.get(since)
@@ -194,24 +193,17 @@ class Actions:
             return None
 
     def errors(self):
-        """Warnings, errors and the notes of our own scripts the piano services logged since the boot: [{t (ms), unit, level, text}], newest last."""
+        """Warnings, errors and the notes of our own scripts the piano services logged since the boot: [{t (ms), unit, level, text}], newest
+        last. None when the system log cannot be read."""
         return self._cached('errors', 5, self._errors)
 
     def _errors(self):
-        cmd = ['journalctl', '-b', '-p', 'info', '-n', '400', '--no-pager', '-o', 'json']
-        for unit in ERROR_UNITS:
-            cmd += ['-u', unit]
-        try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        except (OSError, subprocess.SubprocessError):
-            return []
-        found = parse_journal_errors(r.stdout)
-        try:                                              # the kernel's own log: it says when it killed a program for lack of memory
-            k = subprocess.run(['journalctl', '-k', '-b', '-n', '300', '--no-pager', '-o', 'json'], capture_output=True, text=True, timeout=5)
-            found = sorted(found + parse_oom(k.stdout), key=lambda e: e['t'])[-ERROR_LIMIT:]
-        except (OSError, subprocess.SubprocessError):
-            pass
-        return found
+        entries = self.log()
+        if entries is None:
+            return None
+        found = oslib.service_messages(entries, ERROR_UNITS, limit=ERROR_LIMIT)
+        # the kernel's own lines: it says when it killed a program for lack of memory
+        return sorted(found + parse_oom(oslib.kernel_messages(entries)), key=lambda e: e['t'])[-ERROR_LIMIT:]
 
     # ---- Wi-Fi (the supervisor exxpiano-wifi does the changes; this only reads its status and sends requests)
     def wifi_status(self):
@@ -255,11 +247,12 @@ class Actions:
         return wifilib.installation_id()
 
     def network_manager_active(self):
-        return self._service_state('NetworkManager') == 'active'
+        """Another network manager owns Wi-Fi (the Wi-Fi supervisor then stays out of the way)."""
+        return any(self._service_state(name) in ('active', 'activating') for name in OTHER_MANAGERS)
 
     def restart_synth(self):
-        self._forget('service', 'output')                # the answers are about to change
-        subprocess.Popen(['systemctl', '--no-block', 'restart', 'exxpiano.service'])
+        self._forget('service', 'output', 'log')         # the answers are about to change
+        oslib.restart('exxpiano')
 
     def output_volume(self, card):
         """The hardware volume of a sound card: dict(control, db, lo, hi), or None when the card has no playback volume that has a dB scale."""
@@ -325,62 +318,26 @@ class Actions:
         return self._cached('output', 10, self._audio_output)
 
     def _audio_output(self):
-        try:
-            r = subprocess.run(['journalctl', '-u', 'exxpiano', '-n', '300', '--no-pager', '-o', 'cat'],
-                               capture_output=True, text=True, timeout=5)
-        except (OSError, subprocess.SubprocessError):
+        entries = self.log()
+        if not entries:
             return None
         last = None
-        for m in OUTPUT_RE.finditer(r.stdout):
+        for m in OUTPUT_RE.finditer(oslib.tagged_text(entries, 'exxpiano')):
             last = m
         if not last:
             return None
         return dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)))
 
 
-def parse_oom(text):
-    """Kernel log lines (`journalctl -k -o json`) -> one error for every program the kernel killed for lack of memory."""
+def parse_oom(kernel):
+    """The kernel's lines ([{t, text}], see oslib.kernel_messages) -> one error for every program the kernel killed for lack of memory."""
     out = []
-    for line in text.splitlines():
-        try:
-            e = json.loads(line)
-            t = int(e['__REALTIME_TIMESTAMP']) // 1000
-        except (ValueError, KeyError, TypeError):
-            continue
-        m = OOM_RE.search(e['MESSAGE']) if isinstance(e.get('MESSAGE'), str) else None
+    for e in kernel:
+        m = OOM_RE.search(e['text'])
         if m:
-            out.append(dict(t=t, unit='kernel', level='error',
+            out.append(dict(t=e['t'], unit='kernel', level='error',
                             text='out of memory: the kernel killed %s, which held %d MB. Use a smaller piano bank (the Bank page) or a board with more memory' % (m.group(1), int(m.group(2)) // 1024)))
     return out
-
-
-def parse_journal_errors(text):
-    """`journalctl -o json` lines -> [{t, unit, level, text}]; level is error, warning, or info for the deliberate notes of our own
-    scripts ("exxpiano: ..." logged at info level: which audio output was chosen, that a service started). Kept: warnings, errors and those notes. Lines that are not JSON are skipped; a message repeated again and again is listed once with the last time."""
-    out = []
-    for line in text.splitlines():
-        try:
-            e = json.loads(line)
-            t = int(e['__REALTIME_TIMESTAMP']) // 1000
-            prio = int(e.get('PRIORITY', 4))
-        except (ValueError, KeyError, TypeError):
-            continue
-        msg = e.get('MESSAGE')
-        if isinstance(msg, list):                      # journald stores binary messages as byte lists
-            msg = bytes(b & 255 for b in msg).decode('utf-8', 'replace')
-        if not isinstance(msg, str) or not msg.strip():
-            continue
-        unit = str(e.get('_SYSTEMD_UNIT', '')).replace('.service', '')
-        msg = msg.strip()
-        if prio > 4 and not msg.startswith(('exxpiano:', 'exxpiano-wifi:')):
-            continue
-        item = dict(t=t, unit=unit, level='error' if prio <= 3 else 'warning' if prio <= 4 else 'info', text=msg[:300])
-        for i, old in enumerate(out):
-            if old['unit'] == item['unit'] and old['text'] == item['text']:
-                del out[i]
-                break
-        out.append(item)
-    return out[-ERROR_LIMIT:]
 
 
 class WifiBusy(Exception):
@@ -1014,7 +971,8 @@ def make_handler(app):
             if url.path == '/api/errors':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
-                return self._send(200, dict(errors=app.actions.errors()))
+                found = app.actions.errors()
+                return self._send(200, dict(errors=found or [], available=found is not None))
             if url.path == '/api/monitor':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))

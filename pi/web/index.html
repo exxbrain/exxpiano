@@ -199,6 +199,7 @@
       <div class="meterrow"><span>R</span><div class="meterbar"><i id="mR"></i><b id="mRH"></b></div><output id="mRV"></output></div>
       <p class="small" id="meterNote"></p>
     </div>
+    <div class="row" id="outVolRow2" style="display:none"><label for="outVol2" data-t="out_vol">Sound card volume</label><input type="range" id="outVol2" min="-60" max="0" step="1"><output id="outVolVal2"></output></div>
     <p class="small" id="volumeHint"></p>
   </div>
 
@@ -354,7 +355,7 @@ const T = {
     a_none: "No stream is open: the synthesizer is not playing right now.", a_card: "Card", a_state: "State", a_format: "Format", a_channels: "Channels", a_rate: "Sample rate",
     a_period: "Period", a_buffer: "Buffer (latency)", a_delay: "Queued now", a_clock: "USB clock", a_rates: "Supported rates",
     a_asked: "Asked for {p} × {n} frames; the driver gave {rp} × {rn}.", a_frames: "{n} frames", a_bit: "{n} bit",
-    nav_home: "Home", nav_bank: "Piano bank", nav_midi: "MIDI player", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", nav_about: "About", about_title: "About and licenses", about_links: "Links", about_rights: "Licenses", legal_more: "Licenses and links", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [DietPi](https://dietpi.com) and the [Debian](https://www.debian.org) packages in the image keep their own licenses.", about_code: "exxpiano (the scripts and this web interface): [MIT license](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Source code and documentation](https://github.com/exxbrain/exxpiano)", link_rel: "[Releases and SD card images](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Troubleshooting](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.md)", link_log: "[Changelog](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Report a problem](https://github.com/exxbrain/exxpiano/issues)", menu: "Menu",
+    nav_home: "Home", nav_bank: "Piano bank", nav_midi: "MIDI player", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", nav_about: "About", about_title: "About and licenses", about_links: "Links", about_rights: "Licenses", legal_more: "Licenses and links", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [Alpine Linux](https://alpinelinux.org) and its packages in the image keep their own licenses.", about_code: "exxpiano (the scripts and this web interface): [MIT license](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Source code and documentation](https://github.com/exxbrain/exxpiano)", link_rel: "[Releases and SD card images](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Troubleshooting](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.md)", link_log: "[Changelog](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Report a problem](https://github.com/exxbrain/exxpiano/issues)", menu: "Menu",
     home_now: "Now playing", home_midi: "MIDI player", home_midi_now: "MIDI: {pos} of {len}", home_change: "Change", home_health: "Device", home_more: "Details", h_power: "Power", h_net: "Network",
     h_power_ok: "OK", h_power_now: "Problem", h_power_past: "Earlier", h_net_ap: "Setup mode", h_net_none: "No network", h_loading: "Loading {bank}…",
     w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (exxpiano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
@@ -372,8 +373,8 @@ const T = {
     w_not_connected: "Not connected to a network.", w_ap: "Setup mode: the Pi has no network and runs its own: {ap}. Choose your Wi-Fi below; this page stays reachable at http://10.42.0.1:8080/.",
     w_connecting: "Connecting… up to a minute. If this page stops answering, join your own Wi-Fi again and open http://{host}.local:8080/ or the address from the router's list of clients (the Pi is called {host}).",
     w_ok: "Connected to {ssid}.", w_failed: "Could not connect to {ssid}: {error}.", w_forgot: "Forgot {ssid}.", w_ap_failed: "The setup network could not start.",
-    w_nm: "This system uses NetworkManager. Connect with the command sudo nmtui; this page cannot change the network here.",
-    w_off: "The Wi-Fi service is not running (systemctl status exxpiano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
+    w_nm: "Another network manager (NetworkManager, iwd or connman) owns Wi-Fi on this system; this page cannot change the network here.",
+    w_off: "The Wi-Fi service is not running (rc-service exxpiano-wifi status).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
     e_title: "Service messages", e_hint: "Warnings, errors and notes of the piano services since the boot (not the whole log).", e_none: "No messages since the boot.",
     m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
     m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
@@ -399,7 +400,7 @@ const T = {
     saved: "Saved", restart_needed: "Press \"Apply and restart\" for the audio changes.", restarting: "Restarting the synthesizer, about 45 seconds…",
     gain_not_live: "Saved, but the live volume could not be changed (applies after a restart).", err: "Error", denied: "Wrong or missing token",
     s_velocity_curve: ["Touch curve", "1 = unchanged · below 1: soft touches sound louder · above 1: you must play harder", ""],
-    s_gain: ["Master volume", "Scale in dB: 0 is the loudest setting at which even the densest passages with the pedal do not crackle. The orange end of the track is louder: a loud, dense passage may crackle there. The loudness of the headphones is set in Audio output (sound card volume).", ""],
+    s_gain: ["Master volume", "Scale in dB: 0 is the loudest setting at which even the densest passages with the pedal do not crackle. The orange end of the track is louder: a loud, dense passage may crackle there. The loudness of the headphones is set by the sound card volume (below, and in Audio output).", ""],
     s_hammer_boost: ["Hammer noise level", "dB relative to the original recording (0 = as recorded, very quiet).", " dB"],
     s_hammer_exp: ["Hammer noise vs. touch", "Larger = soft playing makes almost no noise. 0.6–1.0 is gentle.", ""],
     s_random: ["Randomness", "0 = every knock identical, 1 = natural, 2 = lively.", ""],
@@ -411,7 +412,7 @@ const T = {
     a_none: "Ни один поток не открыт: синтезатор сейчас не играет.", a_card: "Карта", a_state: "Состояние", a_format: "Формат", a_channels: "Каналы", a_rate: "Частота дискретизации",
     a_period: "Период", a_buffer: "Буфер (задержка)", a_delay: "В очереди сейчас", a_clock: "Тактирование USB", a_rates: "Поддерживаемые частоты",
     a_asked: "Запрошено {p} × {n} кадров; драйвер дал {rp} × {rn}.", a_frames: "{n} кадров", a_bit: "{n} бит",
-    nav_home: "Главная", nav_bank: "Банк рояля", nav_midi: "MIDI-плеер", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", nav_about: "О проекте", about_title: "О проекте и лицензии", about_links: "Ссылки", about_rights: "Лицензии", legal_more: "Лицензии и ссылки", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [DietPi](https://dietpi.com) и пакеты [Debian](https://www.debian.org) в образе остаются под своими лицензиями.", about_code: "exxpiano (скрипты и этот web-интерфейс): [лицензия MIT](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Исходный код и документация](https://github.com/exxbrain/exxpiano)", link_rel: "[Релизы и образы SD-карт](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Если что-то не работает](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.ru.md)", link_log: "[Список изменений](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Сообщить о проблеме](https://github.com/exxbrain/exxpiano/issues)", menu: "Меню",
+    nav_home: "Главная", nav_bank: "Банк рояля", nav_midi: "MIDI-плеер", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", nav_about: "О проекте", about_title: "О проекте и лицензии", about_links: "Ссылки", about_rights: "Лицензии", legal_more: "Лицензии и ссылки", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [Alpine Linux](https://alpinelinux.org) и её пакеты в образе остаются под своими лицензиями.", about_code: "exxpiano (скрипты и этот web-интерфейс): [лицензия MIT](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Исходный код и документация](https://github.com/exxbrain/exxpiano)", link_rel: "[Релизы и образы SD-карт](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Если что-то не работает](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.ru.md)", link_log: "[Список изменений](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Сообщить о проблеме](https://github.com/exxbrain/exxpiano/issues)", menu: "Меню",
     home_now: "Сейчас играет", home_midi: "MIDI-плеер", home_midi_now: "MIDI: {pos} из {len}", home_change: "Сменить", home_health: "Устройство", home_more: "Подробнее", h_power: "Питание", h_net: "Сеть",
     h_power_ok: "В порядке", h_power_now: "Проблема", h_power_past: "Было", h_net_ap: "Режим настройки", h_net_none: "Нет сети", h_loading: "Загружается {bank}…",
     w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (exxpiano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
@@ -429,8 +430,8 @@ const T = {
     w_not_connected: "К сети не подключено.", w_ap: "Режим настройки: у Pi нет сети, он создал свою: {ap}. Выберите ниже свою Wi-Fi; эта страница доступна по адресу http://10.42.0.1:8080/.",
     w_connecting: "Подключаюсь… до минуты. Если страница перестанет отвечать, подключитесь к своей Wi-Fi и откройте http://{host}.local:8080/ или адрес из списка клиентов роутера (устройство называется {host}).",
     w_ok: "Подключено к {ssid}.", w_failed: "Не удалось подключиться к {ssid}: {error}.", w_forgot: "Сеть {ssid} забыта.", w_ap_failed: "Сеть настройки не запустилась.",
-    w_nm: "В этой системе сетью управляет NetworkManager. Подключайтесь командой sudo nmtui; отсюда сеть изменить нельзя.",
-    w_off: "Служба Wi-Fi не запущена (systemctl status exxpiano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
+    w_nm: "В этой системе Wi-Fi управляет другой сетевой менеджер (NetworkManager, iwd или connman); отсюда сеть изменить нельзя.",
+    w_off: "Служба Wi-Fi не запущена (rc-service exxpiano-wifi status).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
     e_title: "Сообщения служб", e_hint: "Предупреждения, ошибки и пометки служб рояля с момента включения (не весь журнал).", e_none: "С момента включения сообщений нет.",
     m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
     m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
@@ -456,7 +457,7 @@ const T = {
     saved: "Сохранено", restart_needed: "Нажмите «Применить и перезапустить», чтобы изменения звука вступили в силу.", restarting: "Перезапуск синтезатора, около 45 секунд…",
     gain_not_live: "Сохранено, но громкость «на лету» изменить не удалось (применится после перезапуска).", err: "Ошибка", denied: "Неверный или отсутствующий ключ",
     s_velocity_curve: ["Кривая чувствительности", "1 = без изменений · меньше 1: тихие нажатия звучат громче · больше 1: надо играть сильнее", ""],
-    s_gain: ["Общая громкость", "Шкала в дБ: 0 — самая громкая настройка, при которой даже самые плотные места с педалью не трещат. Оранжевый конец дорожки громче: громкое плотное место там может трещать. Громкость наушников задаётся в «Звуковом выходе» (громкость звуковой карты).", ""],
+    s_gain: ["Общая громкость", "Шкала в дБ: 0 — самая громкая настройка, при которой даже самые плотные места с педалью не трещат. Оранжевый конец дорожки громче: громкое плотное место там может трещать. Громкость наушников задаёт громкость звуковой карты (ниже и в «Звуковом выходе»).", ""],
     s_hammer_boost: ["Громкость стука молоточков", "дБ относительно оригинальной записи (0 = как записано, очень тихо).", " дБ"],
     s_hammer_exp: ["Стук молоточков и сила нажатия", "Больше = при тихой игре стука почти нет. 0.6–1.0 — мягко.", ""],
     s_random: ["Случайность", "0 = каждый стук одинаковый, 1 = естественно, 2 = живее.", ""],
@@ -600,24 +601,31 @@ function fillAudio() {
   $("cpuCores").value = state.settings.cpu_cores;
 }
 
-let outVolTimer = null;
-function renderOutVol() {                          // the hardware volume of the card that plays; the row is hidden when the card has no such control
-  const v = state.output_volume, row = $("outVolRow");
-  row.style.display = v ? "" : "none";
-  if (!v) return;
-  const r = $("outVol"); r.min = v.lo; r.max = v.hi;
-  if (document.activeElement !== r && !outVolTimer) r.value = v.db;
-  $("outVolVal").textContent = (+r.value).toFixed(0) + " " + (L === "ru" ? "дБ" : "dB");
+let outVolTimer = null, outVolSource = null;
+const OUT_VOL = [["outVolRow", "outVol", "outVolVal"], ["outVolRow2", "outVol2", "outVolVal2"]];     // the same control in Audio output and under the master volume on Home
+function renderOutVol() {                          // the hardware volume of the card that plays; the rows are hidden when the card has no such control
+  const v = state.output_volume;
+  for (const [rowId, sliderId, valId] of OUT_VOL) {
+    $(rowId).style.display = v ? "" : "none";
+    if (!v) continue;
+    const r = $(sliderId); r.min = v.lo; r.max = v.hi;
+    if (document.activeElement !== r && !outVolTimer) r.value = v.db;
+    else if (outVolSource && outVolSource !== sliderId) r.value = $(outVolSource).value;       // the other slider follows the one that is being moved
+    $(valId).textContent = (+r.value).toFixed(0) + " " + (L === "ru" ? "дБ" : "dB");
+  }
 }
-$("outVol").addEventListener("input", () => {
-  renderOutVol();
-  clearTimeout(outVolTimer);
-  outVolTimer = setTimeout(async () => {
-    outVolTimer = null;
-    try { state.output_volume = (await api("/api/output-volume", { db: +$("outVol").value })).output_volume; renderOutVol(); }
-    catch (e) { say(tr("err") + ": " + e.message, "err"); }
-  }, 250);
-});
+for (const [, sliderId] of OUT_VOL) {
+  $(sliderId).addEventListener("input", () => {
+    outVolSource = sliderId;
+    renderOutVol();
+    clearTimeout(outVolTimer);
+    outVolTimer = setTimeout(async () => {
+      outVolTimer = null;
+      try { state.output_volume = (await api("/api/output-volume", { db: +$(sliderId).value })).output_volume; renderOutVol(); }
+      catch (e) { say(tr("err") + ": " + e.message, "err"); }
+    }, 250);
+  });
+}
 let lastStatus = "";
 let lastBanks = "";
 let bankNote = "";                 // what the last deletion did: shown until a switch starts

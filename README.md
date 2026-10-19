@@ -14,7 +14,7 @@ English | [Русский](README.ru.md)
 
 - **Real piano sound:** SoundFont banks through FluidSynth, plus the piano mechanics (hammer and damper noise, string resonance, pedal noise) that the SF2 format cannot express by itself. The ready images carry the Salamander Grand Piano V3 (Yamaha C5); any other `.sf2` / `.sf3` bank can be added from a USB drive and chosen in the web interface, and every bank remembers its own touch and mechanics settings.
 - **Fits cheap boards:** the `full` bank (about 700 MB) for a board with 1 GB, a smaller `lite` bank for 512 MB; the image picks the bank by itself.
-- **A ready image:** one ZIP for the Raspberry Pi 2/3/4 and one for the Pi 5; the first start is offline and asks for nothing. The Pi 5 has no 3.5 mm jack and plays through a USB sound card.
+- **A ready image:** one ZIP for the Raspberry Pi 3, 4 and 5 (64-bit Alpine Linux); the first start is offline and asks for nothing. The Pi 5 has no 3.5 mm jack and plays through a USB sound card.
 - **Automatic choices:** any USB MIDI keyboard is found by itself; the sound goes through a USB sound card (small delay) when there is one, else through the 3.5 mm jack.
 - **Setup from a phone:** a web interface for the touch curve, the mechanics, volume, banks, audio output, Wi-Fi (through the device's own setup network and a QR code) and monitoring (processor, temperature, power, memory, errors).
 - **From a USB drive:** import sound banks and play MIDI files on the chosen piano, with the mechanics.
@@ -36,7 +36,7 @@ Not yet tried on real hardware: the Pi 5 image, the import from a USB drive, the
 
 ## How it works
 
-A digital piano appliance for Raspberry Pi 2/3/4/5 (ARMv8): SoundFont banks through FluidSynth (the ready images carry **Salamander Grand Piano V3**, Yamaha C5; the mechanics are tuned on it, so with another bank the levels may need adjusting in the web interface), plus
+A digital piano appliance for Raspberry Pi 3/4/5 (64-bit): SoundFont banks through FluidSynth (the ready images carry **Salamander Grand Piano V3**, Yamaha C5; the mechanics are tuned on it, so with another bank the levels may need adjusting in the web interface), plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
 express by itself, so a small bridge program adds them.
 
@@ -57,7 +57,8 @@ was tested on a Pi.
 ## Tested on
 
 - Raspberry Pi 3 Model B (1 GB; a 512 MB Pi 3 A+ needs the smaller `lite` bank, see below), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
-  onboard 3.5 mm output;
+  onboard 3.5 mm output. This is the earlier DietPi image (1.10.20 and older); **the current Alpine Linux image (Alpine 3.24, FluidSynth 2.5) has not been started on a
+  real Raspberry Pi yet**, it is checked in containers only;
 - building the banks: macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 
 Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see "Audio output and latency"),
@@ -67,19 +68,19 @@ but this setup was not measured with one.
 
 | | |
 |---|---|
-| A Raspberry Pi 2, 3 or 4 supported by the DietPi RPi234 ARMv8 image | an SD card containing the product image |
+| A Raspberry Pi 3, 4 or 5 | an SD card containing the product image (the Raspberry Pi 2 is not supported) |
 | **A 5.1 V / 2.5 A power supply and a short cable** | see "Power supply" - this is not a formality |
 | A USB MIDI keyboard | class-compliant, no drivers needed |
 | A Mac or Linux machine to build the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
 
 ## Deployment in short
 
-The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards; a separate package or installer bundle is not a delivery format.
+The shipped product is a ready device with exxpiano already installed. One complete Alpine Linux image is reusable across Raspberry Pi 3, 4 and 5 boards; a separate package or installer bundle is not a delivery format.
 
 1. Build the banks once: `scripts/make-soundfonts.sh -p full` and `-p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-full.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
-2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`.
-3. Flash `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
-4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
+2. Build the signed packages with `scripts/build-apks.py`, then the reusable image with `scripts/build-sd-image.py`.
+3. Flash `exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
+4. Insert the card into a Raspberry Pi 3, 4 or 5 and power it on.
 
 See [the image-building guide](docs/BUILD-IMAGE.md) for the complete procedure and current verification status.
 Version tags named `v<VERSION>` build this image and publish it together with its manifest, README, and checksums as assets of a GitHub Release.
@@ -149,7 +150,7 @@ This comparison comes from project descriptions and reviews, not from my own mea
 |---|---|---|---|---|
 | Sound | samples of Salamander Grand Piano V3 (CC-BY) through FluidSynth plus a separate mechanics bank (hammers, dampers, resonance, pedal) | physical modelling (Modartt); little memory, the sound is computed live | many engines (piano, electric piano, synths, SoundFont and more) | any SoundFont; no piano mechanics |
 | Software price | free, open source (scripts MIT, sounds CC-BY) | a paid licence | the software is open; the ready Zynthian 5 kit with a screen and knobs is about €490 plus VAT without a Raspberry Pi, about €570 with one (from a review) | free |
-| Hardware | Raspberry Pi 2/3/4, a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official v5.1 kit on a Raspberry Pi 5 with a screen and a control board; Pi 4, 3 and 3B+ are also supported and Pi 4 or better is recommended (a Pi 3 copes worse with several engines at once); the Pi 3 A+ and a minimum amount of memory are not mentioned in the documentation, a forum post says ZynthianOS takes almost 1 GB; a Pi 2 is not supported by the image | any board that runs FluidSynth (Pi Zero and up) |
+| Hardware | Raspberry Pi 3/4/5, a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official v5.1 kit on a Raspberry Pi 5 with a screen and a control board; Pi 4, 3 and 3B+ are also supported and Pi 4 or better is recommended (a Pi 3 copes worse with several engines at once); the Pi 3 A+ and a minimum amount of memory are not mentioned in the documentation, a forum post says ZynthianOS takes almost 1 GB; a Pi 2 is not supported by the image | any board that runs FluidSynth (Pi Zero and up) |
 | Ready image | yes, one ZIP that works from the first power-on with no monitor | no, installed by hand | yes, the ZynthianOS image: about 7 GB compressed and about 16 GB unpacked, a card of 32 GB or more; a lighter variant with a reduced SoundFont library exists | no, usually a guide and scripts |
 | Settings from a phone | yes: touch curve, mechanics, banks, audio output, Wi-Fi, monitor | no single web interface; settings are in the program | a screen and knobs on the device, a web interface exists | at best a simple interface to choose a bank |
 | Piano mechanics | yes, a separate bank and a bridge | part of the physical model | depends on the chosen engine | none |
@@ -161,36 +162,37 @@ Sources: [Modartt forum on Pianoteq for ARM](https://forum.modartt.com/viewtopic
 
 ## SD card image for new devices
 
-This is one reusable ZIP for any number of clean cards. It contains DietPi, the application and the banks: the piano (`full`, about 700 MB, installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards the piano of the image stays and `lite` can be chosen in the **Piano bank** section of the web interface. At first boot every installed copy creates a
-persistent random 16-character hexadecimal installation ID. The ID gives it a unique hostname
+This is one reusable ZIP for any number of clean cards and for the Raspberry Pi 3, 4 and 5. It contains Alpine Linux 3.24 (64-bit, OpenRC), the application and the banks: the piano (`full`, about 700 MB, installed as `piano.sf2`) and the mechanics are required, the smaller `piano-lite.sf2` is added when `build/piano-lite.sf2` exists (the release always has it). On a board with less than 800 MB of memory (a Pi 3 A+) the first start selects `piano-lite.sf2` by itself, and on every start `exxpiano-run` replaces a configured bank that does not fit the memory by the largest smaller bank of the library and writes the choice into `/etc/exxpiano.conf` (the log says "does not fit into the memory"); on larger boards the piano of the image stays and `lite` can be chosen in the **Piano bank** section of the web interface. At first boot every installed copy creates a
+persistent random 6-character hexadecimal installation ID. The ID gives it a unique hostname
 `exxpiano-<id>` and setup network `exxpiano-Setup-<ID>`.
 
 ```bash
-# once: download DietPi_RPi234-ARMv8-Trixie.img.xz from dietpi.com (or add --download to let the script fetch it)
-printf 'DietPi password: '; read -r -s SD_PASSWORD; printf '\n'
+python3 scripts/build-apks.py                 # the signed packages (Docker); EXXPIANO_APK_KEY holds the project key for a release
+printf 'Root password (SSH, or empty for key login only): '; read -r -s SD_PASSWORD; printf '\n'
 printf 'Setup network password: '; read -r -s SD_AP_PASSWORD; printf '\n'
 export SD_PASSWORD SD_AP_PASSWORD
-python3 scripts/build-sd-image.py --dietpi ~/Downloads/DietPi_RPi234-ARMv8-Trixie.img.xz \
-    --country RU --timezone Europe/Moscow
+python3 scripts/build-sd-image.py --country RU --timezone Europe/Moscow
 unset SD_PASSWORD SD_AP_PASSWORD
 ```
 
-It makes `dist/sd/`: `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip`, `manifest-rpi234.json`, and `README-rpi234.txt`. For a **Raspberry Pi 5** add `--target rpi5` and pass the Pi 5 DietPi image (`DietPi_RPi5-ARMv8-Trixie.img.xz`): the release has a separate `exxpiano-rpi5-…` ZIP. The Pi 5 has no 3.5 mm jack, so it plays only through a USB sound card or audio interface, and its image carries only the full bank. **The Pi 5 image has not been tried on a real Pi 5.** Write the zip with **Raspberry Pi
+It makes `dist/sd/`: `exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip`, `manifest.json`, and `README.txt`. The Pi 5 has no 3.5 mm jack, so it plays only through a USB sound card or audio interface. Write the zip with **Raspberry Pi
 Imager** ("Choose OS" -> "Use custom") or **balenaEtcher** (both take the zip as it is); there is nothing to unzip onto the card by hand, because a Raspberry Pi card needs
-its partitions, which only an image carries. Switch the Pi on without preparing a network: the product image skips DietPi's online first-run update. The device is
+its partitions, which only an image carries. Switch the Pi on without preparing a network: the first start grows the card to its size and needs no network. The device is
 `http://exxpiano-<id>.local:8080/`; with no Ethernet or saved Wi-Fi it starts its unique setup network (see "Connecting to a new Wi-Fi").
+When the default Alpine mirror is slow from where you are, `EXXPIANO_ALPINE_MIRROR=https://mirrors.dotsrc.org/alpine` (or another mirror) speeds the builds up: the branch stays
+the pinned one and every package is still checked with Alpine's keys; downloads are kept in `build/apk-cache`.
 
 - **Installation identity.** The ID is generated once from 24 cryptographically random bits (6 hexadecimal characters) and stored in `/var/lib/exxpiano/installation-id`. The full ID is present in the setup SSID and QR codes, so two devices in one room almost never share a name (a copy made by an earlier version keeps its longer ID). Step by step: **[docs/BUILD-IMAGE.md](docs/BUILD-IMAGE.md)**.
-- **How it is made.** In a Linux container (Docker Desktop must be running; on Linux with root use `--no-docker`): the image is opened, the package and its dependencies are
-  installed into it (`apt`, no recommended packages), the banks are copied, and DietPi is configured as a pre-installed offline system. DietPi does not own `wlan0`, wait for
-  a network, or run update checks at first boot; `exxpiano-wifi` owns the radio and starts the setup AP. The finished image is read back and its web service is started in a
-  container as a test. The passwords go in through the environment, never through arguments.
-- **Honest status.** The whole build is tested on a stand-in image with DietPi's layout, and the programs inside the finished image run; **it has not been started on a
-  Raspberry Pi**: write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log`. `--download` has not been tried against dietpi.com either: if the address
-  has changed, download the image yourself and give it with `--dietpi`. The stand-in image (`scripts/sd-fake-dietpi.sh`) and `scripts/sd-smoke-test.sh` are there to
-  test changes to the builder without a Pi.
+- **How it is made.** In an Alpine container (Docker Desktop must be running; on Alpine aarch64 with root use `--no-docker`): Alpine's packages from the pinned branch and
+  mirror, checked with the pinned keys, and the exxpiano packages are installed into an empty root file system; the services go into the OpenRC runlevels (eudev handles the
+  devices; `exxpiano-wifi` owns the radio and starts the setup AP); the programs of the image are run in it as a test; the partitions are made from files (no loop devices)
+  and read back. The passwords go in through the environment, never through arguments.
+- **Honest status.** The packages, the services, an upgrade with a rollback and the whole image build are tested in Alpine containers; **the image has not been started on a
+  Raspberry Pi**: write the first card, watch it start, and read `/var/log/exxpiano-firstboot.log`.
+- **Coming from DietPi.** A card with the DietPi image (1.10.20 and older) is not upgraded in place: copy `/var/lib/exxpiano`, `/etc/exxpiano.conf` and the saved Wi-Fi
+  networks, write the new image and copy them back ([docs/BUILD-IMAGE.md](docs/BUILD-IMAGE.md#moving-a-device-from-dietpi)).
 
-**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the web interface, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH (user `root`, DietPi's password).
+**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the web interface, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH as `root`: with the password the image was built with, or, without one, with a key (put your public key into `authorized_keys` on the boot partition of the card, or build with `--ssh-key`).
 
 ## Upgrading a running Pi
 
@@ -198,11 +200,12 @@ its partitions, which only an image carries. Switch the Pi on without preparing 
 scripts/deploy-to-pi.sh 192.168.1.95        # or user@host; logs in by SSH key
 ```
 
-It builds the package, sends it to the Pi and upgrades it there: it keeps `/etc/exxpiano.conf`, backs the old version up first, checks that
-the synthesizer and the bridge come back, and rolls back by itself if they do not (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`).
-The sound banks are not touched.
+It builds the signed packages, sends them to the Pi and upgrades it there with `apk`: it keeps `/etc/exxpiano.conf` (a newer default lands next to it as
+`exxpiano.conf.apk-new`), keeps the package of the version before, checks that the synthesizer and the bridge come back and keep running, and rolls back by itself if they do
+not, by installing that package again (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`). A package signed with a key the device does not trust is refused
+before anything changes; your development key needs `EXXPIANO_DEV_UNTRUSTED=1`. The sound banks are not touched.
 
-**Passwords during an upgrade.** The script logs in with your SSH key and asks no password and no host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs the key with `ssh-copy-id`: the SSH password is asked **that one time**. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). If the key cannot be installed, the script falls back to a plain password login (asked once) rather than stopping: nothing is ever asked on the device itself, which has no monitor. DietPi's password is `dietpi` unless `SD_PASSWORD` (`--password`) was set when the image was built. A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
+**Passwords during an upgrade.** The script logs in with your SSH key and asks no password and no host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs the key with `ssh-copy-id`: the SSH password is asked **that one time**. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). If the key cannot be installed, the script falls back to a plain password login (asked once) rather than stopping: nothing is ever asked on the device itself, which has no monitor. The password is the root password the image was built with (`SD_PASSWORD`); an image without one accepts keys only. A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
 
 ## Where things live
 
@@ -211,7 +214,7 @@ staged file over 5 MB):
 
 | Folder | What | In git |
 |---|---|---|
-| `pi/`, `tools/`, `scripts/`, `deploy/`, `dietpi/`, `packaging/`, `tests/`, `docs/` | the program, image builder, internal packaging, tests | yes |
+| `pi/`, `tools/`, `scripts/`, `deploy/`, `alpine/`, `packaging/`, `tests/`, `docs/` | the program, the pinned Alpine base, the image builder, the packages, tests | yes |
 | `build/` | built banks (`mech.sf2`, `piano-<preset>.sf2`), the downloaded Salamander in `build/salamander-44k16/`, older banks in `build/archive/` | no |
 | `dist/sd/` | the reusable complete SD image and its metadata | no |
 
@@ -229,7 +232,7 @@ and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A lo
 
 ## Audio output and latency
 
-- **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/firmware/config.txt`; on a system you set up by hand: `dietpi-config` -> Audio Options), device
+- **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/usercfg.txt`), device
   `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
   30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The default `PERIOD_SIZE=64` x `PERIODS=3` (the smallest value FluidSynth accepts, the driver rounds it up) played without clicks on a Pi 3; raise `PERIOD_SIZE` in the web interface if you hear any. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
@@ -238,12 +241,12 @@ and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A lo
   `Failed to find an audio format supported by alsa`.
   Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 with `64 x 3`: no clicks by ear, latency not
   measured. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
-  plug or unplug a card is done by a udev rule that was written from the documentation and **not tested on hardware**;
-  if it does not work, run `sudo systemctl restart exxpiano` after changing the interface.
+  plug or unplug a card is done by an eudev rule that was written from the documentation and **not tested on hardware**;
+  if it does not work, run `rc-service exxpiano restart` after changing the interface.
 
 ## Configuration
 
-Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart exxpiano exxpiano-fx`.
+Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano restart; rc-service exxpiano-fx restart`.
 
 | Setting | What it does |
 |---|---|
@@ -297,7 +300,7 @@ You do not need SSH to add a bank. Put SoundFont files (`.sf2`, `.sf3`) into the
 
 How it is kept safe: the drive is mounted read only (`ro,nosuid,nodev,noexec`) and its files are never executed; only plain files of `piano-banks/` are offered (no links, no sub-folders, no hidden files, no `mech.sf2`); the browser never sends a path, only the name of a file the drive has just listed; the copy goes to a temporary folder, is checked (the SoundFont, the size against the memory of the board, the free space) and only then published in one step, so a drive pulled out in the middle or a full card leaves no half-copied bank. One import runs at a time.
 
-**What is tested and what is not.** The logic (listing, safety of names, the transaction, errors, the API, the interface in the demo `scripts/demo-web.py`) is covered by automatic tests. **Not tried on a real Raspberry Pi:** mounting FAT32, exFAT and ext4 drives, the udev rule (`90-exxpiano.rules`) and the unit `exxpiano-usb@.service`, pulling a drive out during the copy, and what a 400 MB copy does to playing and to the power supply (watch the Monitor section; use a powered hub if it shows under-voltage). Do not play while a big bank is being copied. If a drive is not offered, look at `journalctl -u 'exxpiano-usb@*'` and check that the file system is one of the three. NTFS is not supported. `bank.json` (author and licence of a bank) is not read yet.
+**What is tested and what is not.** The logic (listing, safety of names, the transaction, errors, the API, the interface in the demo `scripts/demo-web.py`) is covered by automatic tests. **Not tried on a real Raspberry Pi:** mounting FAT32, exFAT and ext4 drives, the eudev rule (`90-exxpiano.rules`), pulling a drive out during the copy, and what a 400 MB copy does to playing and to the power supply (watch the Monitor section; use a powered hub if it shows under-voltage). Do not play while a big bank is being copied. If a drive is not offered, look at `grep exxpiano-usb /var/log/messages` and check that the file system is one of the three. NTFS is not supported. `bank.json` (author and licence of a bank) is not read yet.
 
 ### Playing MIDI files from a USB drive
 
@@ -376,12 +379,12 @@ Good to know:
   in `/etc/exxpiano.conf`; `WIFI_SETUP=0` turns the feature off. **Change the default password before you give a device to somebody**: it protects the
   Wi-Fi password typed during the setup.
 - The password of the home network is turned into a key before it is saved (as `wpa_passphrase` does) and is never logged.
-- This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the Wi-Fi section says so; use `sudo nmtui` there.
+- `exxpiano-wifi` runs `wpa_supplicant` and `udhcpc` on `wlan0` itself; the system's `ifupdown-ng` only looks after the wired port. Where another network manager owns Wi-Fi (NetworkManager, iwd or connman runs) the Wi-Fi section says so and changes nothing.
 - **QR codes.** The Wi-Fi section shows a code for the unique setup network, one for the web interface in the setup network, and one for the current address, with a **Print** button and **Download PNG / SVG** links for each (file names contain the installation ID). **The codes exist only there**: the ID is created at the first start, so the image build makes no QR codes or stickers; take them from the web interface of the device they belong to and print a sticker. The join code works whenever the setup network is on, so a sticker printed in advance stays valid. The built-in `pi/qrlib.py` creates them without internet or extra packages.
 - The setup network starts **10 s** after the Pi finds itself without a network (immediately after you remove the last saved network and no cable is plugged
   in). The **Start the setup network for 5 minutes** button in the Wi-Fi section does it by hand and the Pi comes back to its network by itself. The only network in use
   cannot be forgotten while it is the only way to reach the Pi (no cable, no other saved network).
-- Test without risk: `sudo python3 /opt/exxpiano/exxpiano-wifi.py ap-test 120` starts the setup network for 2 minutes and then returns to the normal one by itself.
+- Test without risk (as root): `python3 /opt/exxpiano/exxpiano-wifi.py ap-test 120` starts the setup network for 2 minutes and then returns to the normal one by itself.
   (An SSH session over Wi-Fi is cut for that time.)
 
 ## How it works
@@ -405,10 +408,11 @@ SF2 has no such mechanism, so:
 python3 -m unittest discover -s tests -v
 ```
 
-They check the mechanics logic (`FXCore`), the structure of the `.deb` packages, and that the SF2 builders accept the
+They check the mechanics logic (`FXCore`), the OpenRC services and the Alpine packages as files, the image builder, and that the SF2 builders accept the
 different sample packages (44.1 kHz/16 bit and 48 kHz/24 bit, WAV and FLAC, different folder layouts; this part needs
 `ffmpeg` and is skipped without it). No hardware is needed. The ALSA exchange is not covered by tests (checked on a real Pi),
-and the audio quality of a built bank was checked by hand through FluidSynth.
+and the audio quality of a built bank was checked by hand through FluidSynth. The packages, the services, an upgrade with a rollback and the image itself are checked in
+Alpine containers (Docker): `scripts/test-openrc-services.sh`, `scripts/test-apk-upgrade.sh`, `scripts/test-sd-image-pipeline.sh`.
 
 ## If something does not work
 
@@ -420,4 +424,4 @@ The repository's scripts are MIT ([LICENSE](LICENSE)). The [Salamander Grand Pia
 ([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
 attribution.
 
-The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Delete them if you use exxpiano commercially. DietPi and the Debian packages in the images keep their own licenses.
+The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Delete them if you use exxpiano commercially. Alpine Linux and its packages in the image keep their own licenses.
