@@ -5,6 +5,7 @@ Runs as root, once per event (90-exxpiano.rules starts it in a session of its ow
 nothing else: no copying (that needs the user's request). Started by udev it has no log of its own, so what it says also goes to the system log
 (tag exxpiano-usb).
 """
+
 import os
 import subprocess
 import sys
@@ -25,6 +26,7 @@ def log(text):
     print(text, file=sys.stderr)
     try:
         import syslog
+
         syslog.openlog('exxpiano-usb', 0, syslog.LOG_DAEMON)
         syslog.syslog(syslog.LOG_INFO, text)
     except (ImportError, OSError):

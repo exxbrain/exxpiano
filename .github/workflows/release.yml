@@ -18,7 +18,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
@@ -54,12 +54,31 @@ jobs:
         working-directory: dist/sd
         run: sha256sum ./*.zip manifest.json README.txt > SHA256SUMS
 
+      - name: Copy the release files to the download mirror (Cloudflare R2)
+        id: mirror
+        # only when the mirror is set up (docs/BUILD-IMAGE.md, "Download mirror"); a failed copy does not stop the release,
+        # its description then just has no mirror links
+        if: ${{ vars.R2_PUBLIC_URL != '' }}
+        continue-on-error: true
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+        run: |
+          url=$(scripts/mirror-to-r2.sh "$GITHUB_REF_NAME" dist/sd/*.zip dist/sd/manifest.json dist/sd/README.txt dist/sd/SHA256SUMS)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
       - name: Create the GitHub Release and upload the image
         env:
           GH_TOKEN: ${{ github.token }}
+          MIRROR_URL: ${{ steps.mirror.outputs.url }}
         run: |
           assets=(dist/sd/*.zip dist/sd/manifest.json dist/sd/README.txt dist/sd/SHA256SUMS)
-          python3 scripts/release-notes.py "$(tr -d '\n' < VERSION)" > build/release-notes.md
+          mirror=()
+          if [ -n "$MIRROR_URL" ]; then mirror=(--mirror "$MIRROR_URL" dist/sd/*.zip); fi
+          python3 scripts/release-notes.py "$(tr -d '\n' < VERSION)" "${mirror[@]}" > build/release-notes.md
           title="exxpiano ${GITHUB_REF_NAME} — SD card image for Raspberry Pi 3/4/5"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" --title "$title" \
@@ -70,3 +89,25 @@ jobs:
               --verify-tag --title "$title" \
               --notes-file build/release-notes.md
           fi
+
+      - name: Keep only the last two versions on the mirror
+        # the older versions are deleted from the bucket, and their mirror links come out of their release descriptions
+        if: ${{ vars.R2_PUBLIC_URL != '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+        run: |
+          removed=$(scripts/mirror-to-r2.sh --prune 2)
+          mkdir -p build
+          for t in $removed; do
+            echo "Removed $t from the mirror"
+            gh release view "$t" --repo "$GITHUB_REPOSITORY" --json body -q .body > build/old-body.md || continue
+            grep -q '^## Faster download (mirror)' build/old-body.md || continue
+            python3 scripts/release-notes.py --existing build/old-body.md --remove-mirror > build/old-notes.md
+            gh release edit "$t" --repo "$GITHUB_REPOSITORY" --notes-file build/old-notes.md
+          done

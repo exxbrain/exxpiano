@@ -3,6 +3,7 @@
 The log lines are copied from what Alpine 3.24 (busybox syslogd, util-linux logger, OpenRC supervise-daemon) really writes.
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+
 import os
 import sys
 import tempfile
@@ -54,6 +55,7 @@ class ServiceTests(unittest.TestCase):
 
         def popen(cmd, **kw):
             seen.update(cmd=cmd, **kw)
+
         oslib.restart('exxpiano', popen=popen)
         self.assertEqual(seen['cmd'], ['rc-service', 'exxpiano', 'restart'])
         self.assertTrue(seen['start_new_session'])
@@ -64,7 +66,7 @@ class ServiceTests(unittest.TestCase):
                 os.makedirs(os.path.join(proc, pid))
                 with open(os.path.join(proc, pid, 'comm'), 'w') as f:
                     f.write(comm + '\n')
-            os.makedirs(os.path.join(proc, '700'))                  # a process that ended while it was being read: no comm
+            os.makedirs(os.path.join(proc, '700'))  # a process that ended while it was being read: no comm
             self.assertEqual(oslib.synth_pid(proc), 512)
             self.assertEqual(oslib.synth_pid(proc, comm='nothing'), 0)
         self.assertEqual(oslib.synth_pid('/nonexistent'), 0)
@@ -87,8 +89,8 @@ class LogTests(unittest.TestCase):
         return oslib.read_messages((self.rotated, self.current), now=NOW)
 
     def test_only_this_boot_counts_even_across_the_rotated_file(self):
-        self.write(self.rotated, OLD_BOOT + THIS_BOOT[:THIS_BOOT.index('Oct 19 13:37:30')])
-        self.write(self.current, THIS_BOOT[THIS_BOOT.index('Oct 19 13:37:30'):])
+        self.write(self.rotated, OLD_BOOT + THIS_BOOT[: THIS_BOOT.index('Oct 19 13:37:30')])
+        self.write(self.current, THIS_BOOT[THIS_BOOT.index('Oct 19 13:37:30') :])
         texts = [e['text'] for e in self.entries()]
         self.assertNotIn('a warning of the last boot', texts)
         self.assertIn('no synthesizer port', texts)
@@ -97,11 +99,14 @@ class LogTests(unittest.TestCase):
     def test_service_messages_keep_warnings_errors_our_notes_and_exits(self):
         self.write(self.current, OLD_BOOT + THIS_BOOT)
         found = oslib.service_messages(self.entries(), UNITS)
-        self.assertEqual([(e['unit'], e['level'], e['text']) for e in found], [
-            ('exxpiano', 'info', 'exxpiano: audio output plughw:U24 (usb), period 64 x 3'),
-            ('exxpiano', 'warning', 'the process 17 exited with return code 3'),
-            ('exxpiano-fx', 'error', 'no synthesizer port'),           # listed once, with the time of the last one
-        ])
+        self.assertEqual(
+            [(e['unit'], e['level'], e['text']) for e in found],
+            [
+                ('exxpiano', 'info', 'exxpiano: audio output plughw:U24 (usb), period 64 x 3'),
+                ('exxpiano', 'warning', 'the process 17 exited with return code 3'),
+                ('exxpiano-fx', 'error', 'no synthesizer port'),  # listed once, with the time of the last one
+            ],
+        )
         self.assertEqual(found[-1]['t'], int(time.mktime((2026, 10, 19, 13, 37, 31, 0, 0, -1)) * 1000))
 
     def test_the_list_is_limited_and_long_texts_are_cut(self):

@@ -3,6 +3,7 @@
 The real build runs in Docker (scripts/build-apks.py) and the installation, the upgrade and the rollback in scripts/test-apk-upgrade.sh.
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+
 import importlib.util
 import os
 import re
@@ -52,15 +53,36 @@ class ProgramPackageTests(unittest.TestCase):
         self.assertEqual(packaged_sources(self.text), tree - NOT_PACKAGED)
 
     def test_the_services_rules_and_configuration_land_where_alpine_reads_them(self):
-        for line in ('"$pkgdir"/etc/init.d/$f', '"$pkgdir"/etc/exxpiano.conf', '"$pkgdir"/usr/lib/udev/rules.d/90-exxpiano.rules',
-                     '"$pkgdir"/etc/alsa/conf.d/60-exxpiano-tap.conf'):
+        for line in (
+            '"$pkgdir"/etc/init.d/$f',
+            '"$pkgdir"/etc/exxpiano.conf',
+            '"$pkgdir"/usr/lib/udev/rules.d/90-exxpiano.rules',
+            '"$pkgdir"/etc/alsa/conf.d/60-exxpiano-tap.conf',
+        ):
             self.assertIn(line, self.text)
         self.assertNotIn('systemd', self.text)
 
     def test_the_dependencies(self):
         depends = re.search(r'depends="([^"]*)"', self.text).group(1).split()
-        for needed in ('fluidsynth', 'python3', 'py3-mido', 'py3-python-rtmidi', 'hostapd', 'dnsmasq', 'wpa_supplicant', 'iw', 'eudev',
-                       'logger', 'util-linux-misc', 'avahi', 'alsa-utils', 'bash', 'iproute2', 'cloud-utils-growpart', 'e2fsprogs-extra'):
+        for needed in (
+            'fluidsynth',
+            'python3',
+            'py3-mido',
+            'py3-python-rtmidi',
+            'hostapd',
+            'dnsmasq',
+            'wpa_supplicant',
+            'iw',
+            'eudev',
+            'logger',
+            'util-linux-misc',
+            'avahi',
+            'alsa-utils',
+            'bash',
+            'iproute2',
+            'cloud-utils-growpart',
+            'e2fsprogs-extra',
+        ):
             self.assertIn(needed, depends)
         for graphical in ('qt', 'gtk', 'mesa', 'x11', 'wayland', 'libx11'):
             self.assertFalse([d for d in depends if graphical in d], graphical)
@@ -126,8 +148,15 @@ class BuilderTests(unittest.TestCase):
             with tarfile.open(a) as tf:
                 names = set(tf.getnames())
                 mode = tf.getmember('exxpiano-1.0/pi/exxpiano-run').mode
-        for needed in ('pi/oslib.py', 'pi/init.d/exxpiano', 'pi/web/index.html', 'VERSION', 'packaging/exxpiano-install-banks',
-                       'assets/midi/NOTICE.md', 'docs/TROUBLESHOOTING.md'):
+        for needed in (
+            'pi/oslib.py',
+            'pi/init.d/exxpiano',
+            'pi/web/index.html',
+            'VERSION',
+            'packaging/exxpiano-install-banks',
+            'assets/midi/NOTICE.md',
+            'docs/TROUBLESHOOTING.md',
+        ):
             self.assertIn('exxpiano-1.0/' + needed, names)
         self.assertFalse([n for n in names if '__pycache__' in n or n.endswith('.pyc')])
         self.assertEqual(mode, 0o755)
@@ -155,15 +184,16 @@ class BuilderTests(unittest.TestCase):
 
         class Args:
             version, banks = '1.2.3', None
+
         with tempfile.TemporaryDirectory() as out:
             Args.out, Args.work = out, os.path.join(out, 'work')
             ba.build(Args, env={'EXXPIANO_APK_KEY': secret, 'PATH': os.environ.get('PATH', '')}, runner=runner)
         self.assertFalse([a for a in seen['cmd'] if 'TOP-SECRET' in a])
-        self.assertIn('EXXPIANO_APK_KEY', seen['cmd'])                   # "-e NAME": the value comes from the environment
+        self.assertIn('EXXPIANO_APK_KEY', seen['cmd'])  # "-e NAME": the value comes from the environment
         self.assertEqual(seen['env']['EXXPIANO_APK_KEY'], secret)
         self.assertEqual(seen['env']['KEY_NAME'], 'exxpiano')
-        self.assertIn('unset EXXPIANO_APK_KEY', ba.INNER)                # the build itself does not see it
-        self.assertIn(ba.APK_CACHE + ':/var/cache/apk', seen['cmd'])        # the downloads are kept for the next build
+        self.assertIn('unset EXXPIANO_APK_KEY', ba.INNER)  # the build itself does not see it
+        self.assertIn(ba.APK_CACHE + ':/var/cache/apk', seen['cmd'])  # the downloads are kept for the next build
 
     def test_another_mirror_must_be_https(self):
         self.assertIsNone(ba.alpine_mirror({}))

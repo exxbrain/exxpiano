@@ -1,4 +1,5 @@
 """Tests for pi/deviceid.py: the current board serial and the identity recorded in an image."""
+
 import os
 import sys
 import tempfile
@@ -58,7 +59,8 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(deviceid.status(self.ME, self.ME)['ok'], True)
         self.assertEqual(deviceid.status(self.OTHER, self.ME)['ok'], False)
         self.assertIsNone(deviceid.status(self.ME, None)['ok'])
-        self.assertEqual(deviceid.status('garbage', self.ME)['bound'], False)                       # a bad value binds nothing
+        self.assertEqual(deviceid.status('garbage', self.ME)['bound'], False)  # a bad value binds nothing
+
 
 if __name__ == '__main__':
     unittest.main()

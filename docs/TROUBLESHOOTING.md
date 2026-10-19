@@ -26,7 +26,9 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 | `aplay -l` says "no soundcards found" | Onboard audio is off: `dtparam=audio=on` in `/boot/usercfg.txt` (the image sets it; `config.txt` belongs to the boot loader package and is rewritten by its upgrades), then `reboot` |
 | `exxpiano` restarts all the time (`supervise-daemon ... exited` again and again in the log) | FluidSynth exits at once when its input is closed. Always start it through `/opt/exxpiano/exxpiano-run` (the service does): it keeps a root-only pipe open as FluidSynth's input. Do not use `-s` (server mode): that opens a control port on every network interface |
 | The log shows `Out of memory`, the process is `Killed`; the Monitor section of the web interface lists "out of memory: the kernel killed fluidsynth" | The bank does not fit into memory (a Pi 3 A+ has 512 MB). In the **Piano bank** section of the web interface choose `piano-lite.sf2` (the image carries it and selects it by itself on such a board), or build the `lite` preset. Full detail: `dmesg \| grep -i oom` |
-| `aconnect -l` does not show "FLUID Synth" | `exxpiano` is not running or is still loading the banks (tens of seconds after boot) |
+| Right after power-on the keys are silent | The bank is still loading: about 1.5 minutes on the first start, about 55 s later (measured on a Pi 3 Model B with the full bank on the DietPi image; not measured on Alpine yet). Press a key now and then until the piano answers; the web interface may open before the bank has loaded |
+| The piano sounds when a key is released, not when it is pressed | The mechanics channels lost their presets (a keyboard reset or a key played while the synthesizer was starting) and played the piano itself. Since 1.10.22 the bridge ignores such messages and selects the presets again every 2 seconds; on an older version run `sudo systemctl restart exxpiano-fx` |
+| `aconnect -l` does not show "FLUID Synth" | `exxpiano` is not running or is still loading the banks (about 50 s after power-on on a Pi 3 with the full bank, about 1.5 minutes on the first start; measured on the DietPi image) |
 | The keyboard plays but there are no mechanics | `mech.sf2` is not loaded (check `MECH_SF2` in `/etc/exxpiano.conf`) or `exxpiano-fx` is not running |
 | There is sound but it is very quiet | Raise `GAIN` (1.0 for these banks) and the ALSA volume (`alsamixer`, F6, Headphones ~90%) |
 | Chords sound harsh or distorted | `GAIN` is too high, lower it |
@@ -35,7 +37,7 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 
 ## Clicks and latency
 
-- First check `vcgencmd get_throttled`. If it is not `0x0`, it is the power supply, not the settings (see the README).
+- First check `vcgencmd get_throttled`. If it is not `0x0`, it is the power supply, not the settings (see [Power supply](../README.md#power-supply-read-this) in the README).
 - Clicks: raise `PERIODS` to 3-4 (or `PERIOD_SIZE`).
 - Latency: `PERIODS=2` on the onboard output, or better a USB sound card.
 - Load: `htop` (if the `fluidsynth` thread sits at 100%, use `lite`, lower `POLYPHONY`, keep `REVERB=0`; on a Pi with 4 cores `CPU_CORES=3` shares the voices between the cores).

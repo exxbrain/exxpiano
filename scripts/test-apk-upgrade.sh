@@ -22,7 +22,7 @@ TEST="$ROOT/build/apk-upgrade-test"
 for v in 9.9.8 9.9.9; do
   if [ ! -s "$TEST/$v/exxpiano/aarch64/exxpiano-$v-r0.apk" ]; then
     # the libraries of the base repository: abuild finds the dependencies of the test version there
-    rm -rf "$TEST/$v"; mkdir -p "$TEST"; cp -R "$BASE" "$TEST/$v"; rm -f "$TEST/$v"/exxpiano/aarch64/exxpiano-[0-9]*.apk
+    rm -rf "${TEST:?}/${v:?}"; mkdir -p "$TEST"; cp -R "$BASE" "$TEST/$v"; rm -f "$TEST/$v"/exxpiano/aarch64/exxpiano-[0-9]*.apk
     python3 -I "$ROOT/scripts/build-apks.py" --out "$TEST/$v" --version "$v" --packages exxpiano
   fi
 done

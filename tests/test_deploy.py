@@ -1,4 +1,5 @@
 """scripts/deploy-to-pi.sh: sends the packages to the Pi over ssh (a fake ssh stands in for the Pi, ready-made files for the Docker build)."""
+
 import io
 import os
 import subprocess
@@ -9,7 +10,9 @@ import unittest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 with open(os.path.join(ROOT, 'VERSION')) as _f:
     VERSION = _f.read().strip().replace('-', '_')
-SENT = sorted(['exxpiano-%s-r0.apk' % VERSION, 'py3-mido-1.3.3-r0.apk', 'py3-python-rtmidi-1.5.8-r0.apk', 'check-on-pi.sh', 'rollback-on-pi.sh', 'upgrade-on-pi.sh'])
+SENT = sorted(
+    ['exxpiano-%s-r0.apk' % VERSION, 'py3-mido-1.3.3-r0.apk', 'py3-python-rtmidi-1.5.8-r0.apk', 'check-on-pi.sh', 'rollback-on-pi.sh', 'upgrade-on-pi.sh']
+)
 
 
 class DeployTests(unittest.TestCase):
@@ -25,13 +28,17 @@ class DeployTests(unittest.TestCase):
         self.copy_id_log = os.path.join(self.tmp.name, 'copy-id.txt')
         # the fake ssh: `ssh ... true` is the key-login probe (it works once the key is installed, or always when FAKE_KEY=1); anything else is the upgrade stream
         with open(os.path.join(self.bin, 'ssh'), 'w') as f:
-            f.write('#!/bin/bash\nif [ "${@: -1}" = true ]; then\n  printf "%%s\\n" "$*" >> "%s"\n  [ "${FAKE_KEY:-0}" = 1 ] || [ -e "%s" ] && exit 0\n  exit 255\nfi\nprintf "%%s\\n" "$@" > "%s"\ncat > "%s"\n'
-                    % (self.probe_log, self.key_marker, self.args_file, self.stdin_file))
+            f.write(
+                '#!/bin/bash\nif [ "${@: -1}" = true ]; then\n  printf "%%s\\n" "$*" >> "%s"\n  [ "${FAKE_KEY:-0}" = 1 ] || [ -e "%s" ] && exit 0\n  exit 255\nfi\nprintf "%%s\\n" "$@" > "%s"\ncat > "%s"\n'
+                % (self.probe_log, self.key_marker, self.args_file, self.stdin_file)
+            )
         os.chmod(os.path.join(self.bin, 'ssh'), 0o755)
         with open(os.path.join(self.bin, 'ssh-copy-id'), 'w') as f:
-            f.write('#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s"\n[ "${FAKE_COPY_ID_FAILS:-0}" = 1 ] && exit 1\ntouch "%s"\n' % (self.copy_id_log, self.key_marker))
+            f.write(
+                '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s"\n[ "${FAKE_COPY_ID_FAILS:-0}" = 1 ] && exit 1\ntouch "%s"\n' % (self.copy_id_log, self.key_marker)
+            )
         os.chmod(os.path.join(self.bin, 'ssh-copy-id'), 0o755)
-        self.apk_dir = os.path.join(self.tmp.name, 'apk')                     # what scripts/build-apks.py leaves in dist/apk/exxpiano/aarch64
+        self.apk_dir = os.path.join(self.tmp.name, 'apk')  # what scripts/build-apks.py leaves in dist/apk/exxpiano/aarch64
         os.makedirs(self.apk_dir)
         for name in ('exxpiano-%s-r0.apk' % VERSION, 'exxpiano-0.9.0-r0.apk', 'py3-mido-1.3.3-r0.apk', 'py3-python-rtmidi-1.5.8-r0.apk'):
             with open(os.path.join(self.apk_dir, name), 'w') as f:
@@ -42,8 +49,7 @@ class DeployTests(unittest.TestCase):
         env['FAKE_KEY'] = '1'
         env.update(EXXPIANO_SKIP_BUILD='1', EXXPIANO_APK_DIR=self.apk_dir)
         env.update(extra_env)
-        return subprocess.run(['bash', os.path.join(ROOT, 'scripts', 'deploy-to-pi.sh')] + list(args),
-                              env=env, capture_output=True, text=True)
+        return subprocess.run(['bash', os.path.join(ROOT, 'scripts', 'deploy-to-pi.sh')] + list(args), env=env, capture_output=True, text=True)
 
     def ssh_args(self):
         with open(self.args_file) as f:
@@ -70,9 +76,9 @@ class DeployTests(unittest.TestCase):
     def test_the_upgrade_never_asks_for_a_password_or_a_host_key(self):
         self.run_deploy('192.168.1.95')
         args = self.ssh_args()
-        self.assertIn('BatchMode=yes', args)                                     # a password prompt is impossible: key login or nothing
-        self.assertIn('StrictHostKeyChecking=accept-new', args)                  # no yes/no question for a new host (a changed key still stops it)
-        self.assertFalse(os.path.exists(self.copy_id_log))                      # the key was already there: nothing is installed
+        self.assertIn('BatchMode=yes', args)  # a password prompt is impossible: key login or nothing
+        self.assertIn('StrictHostKeyChecking=accept-new', args)  # no yes/no question for a new host (a changed key still stops it)
+        self.assertFalse(os.path.exists(self.copy_id_log))  # the key was already there: nothing is installed
 
     def test_a_device_without_your_key_gets_it_once_and_then_the_upgrade_runs(self):
         r = self.run_deploy('192.168.1.95', FAKE_KEY='0')
@@ -83,7 +89,7 @@ class DeployTests(unittest.TestCase):
         with open(self.copy_id_log) as f:
             self.assertIn('root@192.168.1.95', f.read())
         self.assertEqual(self.sent_files(), SENT)
-        r = self.run_deploy('192.168.1.95', FAKE_KEY='0')                         # the second upgrade: the key is installed, no second prompt
+        r = self.run_deploy('192.168.1.95', FAKE_KEY='0')  # the second upgrade: the key is installed, no second prompt
         self.assertNotIn('installing your SSH key', r.stdout)
         with open(self.copy_id_log) as f:
             self.assertEqual(len(f.read().strip().split('\n')), 1)
@@ -93,7 +99,7 @@ class DeployTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('logging in with the password instead', r.stderr)
         args = self.ssh_args()
-        self.assertNotIn('BatchMode=yes', args)                                   # plain ssh: the password is asked once
+        self.assertNotIn('BatchMode=yes', args)  # plain ssh: the password is asked once
         self.assertIn('upgrade-on-pi.sh', args[args.index('root@192.168.1.95') + 1])
         self.assertEqual(self.sent_files(), SENT)
 
@@ -108,8 +114,10 @@ class DeployTests(unittest.TestCase):
             text = f.read()
         self.assertIn("grep -q '^BANK_DIR=' /etc/exxpiano.conf", text)
         expr = text.split('cur="$(sed -n \'')[1].split("' /etc/exxpiano.conf")[0]
-        for line, expected in (('PIANO_SF2=/root/soundfonts/v5.sf2', '/root/soundfonts/v5.sf2'),
-                               ('PIANO_SF2="/root/sound fonts/v 5.sf2"', '/root/sound fonts/v 5.sf2')):
+        for line, expected in (
+            ('PIANO_SF2=/root/soundfonts/v5.sf2', '/root/soundfonts/v5.sf2'),
+            ('PIANO_SF2="/root/sound fonts/v 5.sf2"', '/root/sound fonts/v 5.sf2'),
+        ):
             r = subprocess.run(['sed', '-n', expr], input=line + '\n', capture_output=True, text=True)
             self.assertEqual(r.stdout.strip(), expected)
 

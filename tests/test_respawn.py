@@ -1,4 +1,5 @@
 """pi/exxpiano-respawn: a program that fails is started again, one that ends well is not (Restart=on-failure under OpenRC)."""
+
 import os
 import signal
 import subprocess
@@ -30,8 +31,7 @@ class RespawnTests(unittest.TestCase):
         self.assertEqual(self.starts(), 1)
 
     def test_a_failure_is_restarted_until_it_ends_well(self):
-        r = subprocess.run(['bash', WRAPPER, '--delay', '0', '--', sys.executable, '-c', PROGRAM, self.count, '3'],
-                           capture_output=True, text=True, timeout=20)
+        r = subprocess.run(['bash', WRAPPER, '--delay', '0', '--', sys.executable, '-c', PROGRAM, self.count, '3'], capture_output=True, text=True, timeout=20)
         self.assertEqual(r.returncode, 0)
         self.assertEqual(self.starts(), 3)
         self.assertEqual(r.stderr.count('ended with code 1'), 2)

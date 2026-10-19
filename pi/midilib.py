@@ -5,6 +5,7 @@ only what the piano plays (notes and the sustain pedal, no drums) and never turn
 
 The library is /var/lib/exxpiano/midi/<id>/song.mid + meta.json, with id m-<16 hex of the SHA-256>, like the imported banks.
 """
+
 import json
 import os
 import re
@@ -14,14 +15,14 @@ import struct
 import bankimport
 
 LIBRARY_DIR = '/var/lib/exxpiano/midi'
-MAX_BYTES = 4 << 20                      # a piece of ten minutes is tens of kilobytes
+MAX_BYTES = 4 << 20  # a piece of ten minutes is tens of kilobytes
 MAX_SECONDS = 30 * 60
-MAX_EVENTS = 200000                      # every event of the file, also the ones that are dropped: the memory of a Raspberry Pi 3 is the limit
+MAX_EVENTS = 200000  # every event of the file, also the ones that are dropped: the memory of a Raspberry Pi 3 is the limit
 MAX_TRACKS = 64
 ID_RE = re.compile(r'^m-[0-9a-f]{16}$')
 ID_PREFIX = 'm-'
 EXT = ('.mid', '.midi')
-DRUM_CHANNEL = 9                         # channel 10 for people
+DRUM_CHANNEL = 9  # channel 10 for people
 TITLE_MAX = 80
 
 
@@ -42,7 +43,9 @@ def _vlq(data, pos):
     raise MidiError('a time value is too long')
 
 
-GENERIC_TITLE_RE = re.compile(r'^(control track|conductor|tempo(?: track)?|track[ _-]?\d*|untitled|unnamed|midi)$', re.I)     # what sequencers write instead of a name
+GENERIC_TITLE_RE = re.compile(
+    r'^(control track|conductor|tempo(?: track)?|track[ _-]?\d*|untitled|unnamed|midi)$', re.I
+)  # what sequencers write instead of a name
 
 
 def _title(raw):
@@ -70,9 +73,9 @@ def parse(data):
     pos = 8 + header_len
     note_events, tempos, title, seen = [], [], '', 0
     for _ in range(ntracks):
-        if pos + 8 > len(data) or data[pos:pos + 4] != b'MTrk':
-            break                                              # a short file: what was read so far is played
-        size = struct.unpack('>I', data[pos + 4:pos + 8])[0]
+        if pos + 8 > len(data) or data[pos : pos + 4] != b'MTrk':
+            break  # a short file: what was read so far is played
+        size = struct.unpack('>I', data[pos + 4 : pos + 8])[0]
         end = min(pos + 8 + size, len(data))
         p, tick, running = pos + 8, 0, None
         while p < end:
@@ -84,12 +87,12 @@ def parse(data):
             if p >= end:
                 break
             status = data[p]
-            if status == 0xFF:                                # meta event
+            if status == 0xFF:  # meta event
                 if p + 1 >= end:
                     break
                 mtype = data[p + 1]
                 length, p = _vlq(data, p + 2)
-                body = data[p:p + length]
+                body = data[p : p + length]
                 p += length
                 if mtype == 0x51 and length == 3:
                     tempos.append((tick, int.from_bytes(body, 'big')))
@@ -98,7 +101,7 @@ def parse(data):
                 elif mtype == 0x2F:
                     break
                 continue
-            if status in (0xF0, 0xF7):                         # system exclusive: skipped
+            if status in (0xF0, 0xF7):  # system exclusive: skipped
                 length, p = _vlq(data, p + 1)
                 p += length
                 continue
@@ -190,8 +193,16 @@ def list_library(library_dir):
     for name in names:
         path, meta = _entry(library_dir, name)
         if path:
-            out.append(dict(id=name, name=meta.get('name') or meta.get('original_name') or name, original_name=meta.get('original_name'),
-                            size=meta['size'], length=meta.get('length'), notes=meta.get('notes')))
+            out.append(
+                dict(
+                    id=name,
+                    name=meta.get('name') or meta.get('original_name') or name,
+                    original_name=meta.get('original_name'),
+                    size=meta['size'],
+                    length=meta.get('length'),
+                    notes=meta.get('notes'),
+                )
+            )
     return sorted(out, key=lambda e: e['name'].lower())
 
 
@@ -215,6 +226,7 @@ def delete_file(library_dir, midi_id, keep_ids=()):
 
 def import_midi(src_path, display_name, library_dir, progress=None, statvfs=os.statvfs, opener=open, title=None):
     """Copy a MIDI file into the library as one transaction. -> (id, already_there). `title` is the name to show instead of the file's own."""
+
     def validate(path):
         try:
             info = inspect(path)
@@ -223,5 +235,16 @@ def import_midi(src_path, display_name, library_dir, progress=None, statvfs=os.s
         stem = re.sub(r'\s+', ' ', re.sub(r'[_-]+', ' ', os.path.splitext(display_name)[0])).strip()[:TITLE_MAX]
         own = info['title'] if info['title'] and not GENERIC_TITLE_RE.match(info['title'].strip()) else ''
         return dict(name=(title or '')[:TITLE_MAX] or own or stem, length=round(info['length'], 1), notes=info['notes'])
-    return bankimport.import_file(src_path, display_name, library_dir, prefix=ID_PREFIX, data_name='song.mid', validate=validate,
-                                  max_bytes=MAX_BYTES, progress=progress, statvfs=statvfs, opener=opener)
+
+    return bankimport.import_file(
+        src_path,
+        display_name,
+        library_dir,
+        prefix=ID_PREFIX,
+        data_name='song.mid',
+        validate=validate,
+        max_bytes=MAX_BYTES,
+        progress=progress,
+        statvfs=statvfs,
+        opener=opener,
+    )

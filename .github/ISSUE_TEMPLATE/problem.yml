@@ -1,0 +1,76 @@
+name: Something does not work / Что-то не работает
+description: No sound, clicks, the keyboard is not found, the web interface does not open… / Нет звука, щелчки, клавиатура не находится, web-интерфейс не открывается…
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please look at [Troubleshooting](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.md) first ([по-русски](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.ru.md)): most problems are there. You can write in English or in Russian.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens / Что происходит
+      description: What you did, what you expected and what happened instead. / Что вы сделали, чего ждали и что получилось.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: exxpiano version / Версия exxpiano
+      description: At the bottom of every section of the web interface ("exxpiano 1.10.20"), or `cat /opt/exxpiano/VERSION`. / Внизу каждого раздела web-интерфейса или `cat /opt/exxpiano/VERSION`.
+      placeholder: "1.10.20"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it was installed / Как установлен
+      options:
+        - Card written from a release ZIP / Карта записана из ZIP релиза
+        - Upgraded on a running Pi / Обновлён на работающей Pi
+        - Image or banks built myself / Образ или банки собраны самостоятельно
+    validations:
+      required: true
+  - type: input
+    id: board
+    attributes:
+      label: Board / Плата
+      description: Model and memory. / Модель и объём памяти.
+      placeholder: "Raspberry Pi 3 Model B, 1 GB"
+    validations:
+      required: true
+  - type: input
+    id: keyboard
+    attributes:
+      label: MIDI keyboard / MIDI-клавиатура
+      placeholder: "Arturia KeyLab Essential 49 mk3"
+    validations:
+      required: true
+  - type: input
+    id: audio
+    attributes:
+      label: Sound output / Звуковой выход
+      description: The 3.5 mm jack, or the model of the USB sound card or audio interface. / Разъём 3.5 мм или модель USB-звуковой карты.
+      placeholder: "3.5 mm jack"
+    validations:
+      required: true
+  - type: input
+    id: power
+    attributes:
+      label: Power supply / Блок питания
+      description: Its rating, and whether the Monitor section shows undervoltage. / Его параметры и есть ли в разделе «Монитор» недостаточное напряжение.
+      placeholder: "official 5.1 V / 2.5 A, no undervoltage"
+  - type: input
+    id: bank
+    attributes:
+      label: Piano bank / Банк рояля
+      description: From the Piano bank section. / Из раздела «Банк рояля».
+      placeholder: "piano.sf2 (full)"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Логи
+      description: |
+        If you can log in over SSH (user root), paste the output of / Если можете зайти по SSH (пользователь root), вставьте вывод:
+        `systemctl status exxpiano exxpiano-fx; journalctl -u exxpiano -u exxpiano-fx -b -n 80 --no-pager; vcgencmd get_throttled; free -m`
+      render: text

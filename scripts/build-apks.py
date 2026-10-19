@@ -16,6 +16,7 @@ slow from where you are: the branch stays, and apk still checks every package wi
 build/apk-cache for the next builds.
 Needs Docker (Docker Desktop on a Mac runs arm64 natively).
 """
+
 import argparse
 import gzip
 import io
@@ -29,8 +30,8 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 ALPINE_IMAGE = 'alpine:3.24'
-BUILDER_IMAGE = 'exxpiano-apk-builder'                     # alpine:3.24 with alpine-sdk (scripts/apk-builder.Dockerfile)
-REPO = 'exxpiano'                                          # abuild names the repository after the folder of the APKBUILD folders
+BUILDER_IMAGE = 'exxpiano-apk-builder'  # alpine:3.24 with alpine-sdk (scripts/apk-builder.Dockerfile)
+REPO = 'exxpiano'  # abuild names the repository after the folder of the APKBUILD folders
 # in the order abuild must build them: the bridge's libraries before the program that depends on them
 PACKAGES = ('py3-mido', 'py3-python-rtmidi', 'exxpiano')
 # what the source archive of the exxpiano package holds (paths in this repository)
@@ -85,16 +86,18 @@ def source_members():
                     continue
                 full = os.path.join(dirpath, name)
                 found.append((os.path.relpath(full, ROOT), full))
-    for rel in SOURCE_FILES:
-        found.append((rel, os.path.join(ROOT, rel)))
+    found.extend((rel, os.path.join(ROOT, rel)) for rel in SOURCE_FILES)
     return sorted(found)
 
 
 def write_source_archive(path, top, mtime, version_text=None):
     """A reproducible .tar.gz of the sources: the same files give the same bytes (fixed times, owners and order). `version_text` is the
     content of VERSION in the archive (the version the package is built as; by default the VERSION file of the repository)."""
-    with open(path, 'wb') as raw, gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=mtime) as gz, \
-            tarfile.open(fileobj=gz, mode='w', format=tarfile.PAX_FORMAT) as tf:
+    with (
+        open(path, 'wb') as raw,
+        gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=mtime) as gz,
+        tarfile.open(fileobj=gz, mode='w', format=tarfile.PAX_FORMAT) as tf,
+    ):
         for rel, full in source_members():
             if rel == 'VERSION' and version_text is not None:
                 data = (version_text.strip() + '\n').encode('utf-8')
@@ -145,8 +148,14 @@ def signing_key(env):
         if 'PRIVATE KEY' not in pem:
             raise BuildError('EXXPIANO_APK_KEY does not hold a private key in PEM')
         return name, pem, None
-    return DEV_KEY_NAME, None, ('WARNING: no EXXPIANO_APK_KEY: the packages are signed with the development key in %s. '
-                                'Use them on your own devices only; a release needs the project key.' % os.path.relpath(DEV_KEY_DIR, ROOT))
+    return (
+        DEV_KEY_NAME,
+        None,
+        (
+            'WARNING: no EXXPIANO_APK_KEY: the packages are signed with the development key in %s. '
+            'Use them on your own devices only; a release needs the project key.' % os.path.relpath(DEV_KEY_DIR, ROOT)
+        ),
+    )
 
 
 # Runs in the container as root, then builds as the user "builder" (abuild does not build as root).
@@ -206,10 +215,11 @@ def build(args, env=None, runner=subprocess.run):
             raise BuildError('unknown package: ' + ', '.join(sorted(unknown)))
     names = stage(work, version, banks, mtime, only, version_text)
     if not only:
-        shutil.rmtree(os.path.join(out, REPO), ignore_errors=True)       # a full build replaces the repository; --packages adds to it
+        shutil.rmtree(os.path.join(out, REPO), ignore_errors=True)  # a full build replaces the repository; --packages adds to it
     os.makedirs(out, exist_ok=True)
-    r = runner(['docker', 'build', '-q', '-t', BUILDER_IMAGE, '-f', os.path.join(ROOT, 'scripts', 'apk-builder.Dockerfile'),
-                os.path.join(ROOT, 'scripts')], env=env)
+    r = runner(
+        ['docker', 'build', '-q', '-t', BUILDER_IMAGE, '-f', os.path.join(ROOT, 'scripts', 'apk-builder.Dockerfile'), os.path.join(ROOT, 'scripts')], env=env
+    )
     if r.returncode != 0:
         raise BuildError('the builder image could not be made (is Docker running?)')
     os.makedirs(DEV_KEY_DIR, exist_ok=True)
@@ -218,9 +228,33 @@ def build(args, env=None, runner=subprocess.run):
     child_env.pop('EXXPIANO_APK_KEY', None)
     if pem:
         child_env['EXXPIANO_APK_KEY'] = pem
-    cmd = ['docker', 'run', '--rm', '--platform', 'linux/arm64', '-e', 'KEY_NAME', '-e', 'PACKAGES', '-e', 'EXXPIANO_APK_KEY', '-e', 'ALPINE_MIRROR',
-           '-v', APK_CACHE + ':/var/cache/apk',
-           '-v', work + ':/work:ro', '-v', out + ':/out', '-v', DEV_KEY_DIR + ':/devkey', BUILDER_IMAGE, 'sh', '-c', INNER]
+    cmd = [
+        'docker',
+        'run',
+        '--rm',
+        '--platform',
+        'linux/arm64',
+        '-e',
+        'KEY_NAME',
+        '-e',
+        'PACKAGES',
+        '-e',
+        'EXXPIANO_APK_KEY',
+        '-e',
+        'ALPINE_MIRROR',
+        '-v',
+        APK_CACHE + ':/var/cache/apk',
+        '-v',
+        work + ':/work:ro',
+        '-v',
+        out + ':/out',
+        '-v',
+        DEV_KEY_DIR + ':/devkey',
+        BUILDER_IMAGE,
+        'sh',
+        '-c',
+        INNER,
+    ]
     r = runner(cmd, env=child_env)
     if r.returncode != 0:
         raise BuildError('the package build failed (see above)')

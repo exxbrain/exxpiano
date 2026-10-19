@@ -1,4 +1,5 @@
 """Tests for pi/exxpiano-wifi.py: the supervisor's state machine on a fake system (no radio, no root), the system wrapper with a fake command runner."""
+
 import contextlib
 import importlib.util
 import io
@@ -13,6 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PI = os.path.join(HERE, '..', 'pi')
 sys.path.insert(0, PI)
 import wifilib  # noqa: E402
+
 spec = importlib.util.spec_from_file_location('piano_wifi', os.path.join(PI, 'exxpiano-wifi.py'))
 pw = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pw)
@@ -41,8 +43,8 @@ class FakeSystem:
         self.reachable = {}
         self.cable = False
         self.calls = []
-        self.state = 'down'                    # down | client | ap
-        self.connected = None                  # ssid when the Wi-Fi is up
+        self.state = 'down'  # down | client | ap
+        self.connected = None  # ssid when the Wi-Fi is up
         self.visible = [dict(ssid='Home', signal=-50, secure=True, freq=2437), dict(ssid='Cafe', signal=-70, secure=False, freq=2412)]
         self.station_count = 0
         self.ap_args = None
@@ -142,8 +144,9 @@ class SupervisorCase(unittest.TestCase):
         self.system = FakeSystem(self.wpa, self.clock)
         self.portal = FakePortal()
         self.cfg = pw.config_from_env({})
-        self.sup = pw.Supervisor(self.system, self.cfg, self.run_dir, self.wpa, self.clock, lambda: 1_700_000_000 + self.clock.t, self.clock.sleep,
-                                 self.portal, install_id='012ABC')
+        self.sup = pw.Supervisor(
+            self.system, self.cfg, self.run_dir, self.wpa, self.clock, lambda: 1_700_000_000 + self.clock.t, self.clock.sleep, self.portal, install_id='012ABC'
+        )
 
     def write_wpa(self, text):
         with open(self.wpa, 'w') as f:
@@ -178,17 +181,17 @@ class WhenToStartTests(SupervisorCase):
         self.advance(6)
         self.assertEqual(self.sup.mode, 'client')
         self.advance(10)
-        self.assertEqual(self.sup.mode, 'ap')                                          # 10 s of grace by default
+        self.assertEqual(self.sup.mode, 'ap')  # 10 s of grace by default
         self.assertEqual(self.system.ap_args, ('exxpiano-Setup-012ABC', 'exxpianosetup', 6, 'GB'))
         self.assertTrue(self.portal.running)
         st = self.status()
         self.assertEqual((st['mode'], st['ap']['ssid']), ('ap', 'exxpiano-Setup-012ABC'))
-        self.assertEqual([n['ssid'] for n in st['scan']], ['Home', 'Cafe'])             # scanned before the radio became an access point
+        self.assertEqual([n['ssid'] for n in st['scan']], ['Home', 'Cafe'])  # scanned before the radio became an access point
         self.assertLess(self.system.calls.index('scan'), self.system.calls.index('ap_start'))
 
     def test_with_a_saved_network_the_pi_waits_much_longer_for_a_slow_router(self):
         self.with_home()
-        self.system.reachable = {}                                                     # the router is still booting
+        self.system.reachable = {}  # the router is still booting
         self.advance(100)
         self.assertEqual(self.sup.mode, 'client')
         self.advance(70)
@@ -211,14 +214,14 @@ class WhenToStartTests(SupervisorCase):
         self.assertEqual(self.system.calls.count('ap_start'), 1)
         r = self.status()['last_result']
         self.assertFalse(r['ok'])
-        self.assertIn('hostapd stopped', r['error'])                                    # the reason reaches the page
+        self.assertIn('hostapd stopped', r['error'])  # the reason reaches the page
         self.assertIn('client_up', self.system.calls)
         self.advance(45)
         self.assertEqual(self.system.calls.count('ap_start'), 1)
         self.advance(40)
-        self.assertEqual(self.system.calls.count('ap_start'), 2)                        # soon at first ...
+        self.assertEqual(self.system.calls.count('ap_start'), 2)  # soon at first ...
         self.advance(700)
-        self.assertLessEqual(self.system.calls.count('ap_start'), 6)                    # ... then not hammering a broken radio
+        self.assertLessEqual(self.system.calls.count('ap_start'), 6)  # ... then not hammering a broken radio
 
 
 class ConnectTests(SupervisorCase):
@@ -259,7 +262,7 @@ class ConnectTests(SupervisorCase):
         self.system.client_up()
         self.request(action='connect', ssid='Studio', psk=OTHER_PSK)
         self.advance(3)
-        self.assertEqual(self.system.connected, 'Studio')                              # the new one is preferred
+        self.assertEqual(self.system.connected, 'Studio')  # the new one is preferred
         self.assertEqual(sorted(n['ssid'] for n in wifilib.networks(self.system.read_wpa())), ['Home', 'Studio'])
 
     def test_a_failed_new_network_leaves_the_old_one_connected_and_the_file_unchanged(self):
@@ -284,8 +287,13 @@ class ConnectTests(SupervisorCase):
     def test_a_bad_request_changes_nothing(self):
         self.to_ap()
         before = self.system.read_wpa()
-        for req in (dict(action='connect', ssid='', psk=HOME_PSK), dict(action='connect', ssid='x', psk='short'), dict(action='explode'),
-                    dict(action='connect', ssid=5, psk=HOME_PSK), dict(action='connect')):
+        for req in (
+            dict(action='connect', ssid='', psk=HOME_PSK),
+            dict(action='connect', ssid='x', psk='short'),
+            dict(action='explode'),
+            dict(action='connect', ssid=5, psk=HOME_PSK),
+            dict(action='connect'),
+        ):
             with self.subTest(req):
                 self.request(**req)
                 self.advance(3)
@@ -303,7 +311,7 @@ class ConnectTests(SupervisorCase):
         r = self.status()['last_result']
         self.assertEqual((r['ok'], r['kind']), (False, 'forget'))
         self.assertIn('only way', r['error'])
-        self.system.cable = True                                                           # with a cable it is safe
+        self.system.cable = True  # with a cable it is safe
         self.request(action='forget', ssid='Home')
         self.advance(3)
         self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
@@ -319,9 +327,9 @@ class ConnectTests(SupervisorCase):
         self.assertNotIn('ap_start', self.system.calls)
 
     def test_with_no_cable_and_nothing_left_the_setup_network_starts_at_once(self):
-        self.write_wpa(wifilib.add_network(WPA_EMPTY, 'Gone', OTHER_PSK))                 # saved, but not in reach: no link
+        self.write_wpa(wifilib.add_network(WPA_EMPTY, 'Gone', OTHER_PSK))  # saved, but not in reach: no link
         self.request(action='forget', ssid='Gone')
-        self.sup.step()                                                                    # the very step that handles the request
+        self.sup.step()  # the very step that handles the request
         self.assertEqual(self.sup.mode, 'ap')
         self.assertTrue(self.portal.running)
         self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
@@ -337,7 +345,7 @@ class ConnectTests(SupervisorCase):
         self.assertIn('reload_wpa', self.system.calls)
         self.assertEqual(self.system.connected, 'Home')
         calls = len(self.system.calls)
-        self.write_wpa(wifilib.add_network(self.system.read_wpa(), 'Spare', OTHER_PSK))   # another network exists: the one in use may go
+        self.write_wpa(wifilib.add_network(self.system.read_wpa(), 'Spare', OTHER_PSK))  # another network exists: the one in use may go
         self.request(action='forget', ssid='Home')
         self.advance(3)
         self.assertEqual([n['ssid'] for n in wifilib.networks(self.system.read_wpa())], ['Spare'])
@@ -351,7 +359,7 @@ class ConnectTests(SupervisorCase):
         self.advance(3)
         with open(os.path.join(self.run_dir, 'status.json')) as f:
             self.assertNotIn(HOME_PSK, f.read())
-        self.assertFalse(os.path.exists(os.path.join(self.run_dir, 'request.json')))     # consumed
+        self.assertFalse(os.path.exists(os.path.join(self.run_dir, 'request.json')))  # consumed
 
 
 class AccessPointLifeTests(SupervisorCase):
@@ -366,7 +374,7 @@ class AccessPointLifeTests(SupervisorCase):
         self.system.reachable = {}
         self.advance(160)
         self.assertEqual(self.sup.mode, 'ap')
-        self.system.reachable = {'Home': HOME_PSK}                                       # the router is back
+        self.system.reachable = {'Home': HOME_PSK}  # the router is back
         self.advance(130)
         self.assertEqual(self.sup.mode, 'client')
         self.assertEqual(self.system.connected, 'Home')
@@ -403,7 +411,7 @@ class AccessPointLifeTests(SupervisorCase):
         self.request(action='ap', seconds=60)
         self.advance(3)
         self.assertEqual(self.sup.mode, 'ap')
-        self.system.cable = True                                                         # a test is not cut short by a cable
+        self.system.cable = True  # a test is not cut short by a cable
         self.advance(40)
         self.assertEqual(self.sup.mode, 'ap')
         self.system.cable = False
@@ -412,7 +420,7 @@ class AccessPointLifeTests(SupervisorCase):
         self.assertEqual(self.system.connected, 'Home')
 
     def test_the_test_time_is_bounded(self):
-        self.request(action='ap', seconds=10 ** 6)
+        self.request(action='ap', seconds=10**6)
         self.advance(3)
         self.assertLessEqual(self.sup.ap_until - self.clock.t, 600)
         self.request(action='ap', seconds=1)
@@ -436,6 +444,7 @@ class PortalTests(unittest.TestCase):
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *a, **kw):
                 return None
+
         opener = urllib.request.build_opener(NoRedirect)
         for path in ('/', '/generate_204', '/hotspot-detect.html', '/anything/at/all'):
             with self.subTest(path):
@@ -456,6 +465,7 @@ class SystemTests(unittest.TestCase):
                 if key in ' '.join(cmd):
                     return value
             return (1, '')
+
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.net = os.path.join(self.tmp.name, 'network')
@@ -463,12 +473,13 @@ class SystemTests(unittest.TestCase):
         self.run_dir = os.path.join(self.tmp.name, 'run')
         self.proc = os.path.join(self.tmp.name, 'proc')
         self.killed = []
-        s = pw.System('wlan0', self.run_dir, self.wpa, run, net_dir=self.net, country=country, proc=self.proc,
-                      kill=lambda pid, sig: self.killed.append(pid))
+        s = pw.System('wlan0', self.run_dir, self.wpa, run, net_dir=self.net, country=country, proc=self.proc, kill=lambda pid, sig: self.killed.append(pid))
         return s, calls
 
     def test_the_link_comes_from_the_supplicant(self):
-        s, _ = self.make({'wpa_cli': (0, 'bssid=aa\nssid=Home\nip_address=192.168.1.95\nwpa_state=COMPLETED\n'), 'iw dev': (0, 'Connected to aa\n\tsignal: -52 dBm\n')})
+        s, _ = self.make(
+            {'wpa_cli': (0, 'bssid=aa\nssid=Home\nip_address=192.168.1.95\nwpa_state=COMPLETED\n'), 'iw dev': (0, 'Connected to aa\n\tsignal: -52 dBm\n')}
+        )
         self.assertEqual(s.link(), dict(ssid='Home', ip='192.168.1.95', signal=-52))
         s, _ = self.make({'wpa_cli': (0, 'wpa_state=SCANNING\n')})
         self.assertIsNone(s.link())
@@ -500,30 +511,31 @@ class SystemTests(unittest.TestCase):
             os.makedirs(os.path.join(s.sys_net, name, 'device' if physical else 'virtual'), exist_ok=True)
             with open(os.path.join(s.sys_net, name, 'carrier'), 'w') as f:
                 f.write('%d\n' % carrier)
+
         return s, calls, nic
 
     def test_a_usb_ethernet_adapter_with_a_cable_gets_an_address_once_per_cable(self):
         s, calls, nic = self.wired()
         self.write(os.path.join(self.net, 'interfaces'), 'source interfaces.d/*\n')
-        self.write(os.path.join(self.net, 'interfaces.d', 'eth0'), 'auto eth0\niface eth0 inet dhcp\n')       # the board's own port: ifupdown-ng does it
+        self.write(os.path.join(self.net, 'interfaces.d', 'eth0'), 'auto eth0\niface eth0 inet dhcp\n')  # the board's own port: ifupdown-ng does it
         nic('eth0', 1)
-        nic('eth1', 0)                                                                       # the adapter, no cable yet
+        nic('eth1', 0)  # the adapter, no cable yet
         nic('lo', 1, physical=False)
         nic('wlan0', 1)
         s.ensure_wired()
-        self.assertFalse([c for c in calls if c[0] == 'udhcpc'])                             # nothing to do without a cable
+        self.assertFalse([c for c in calls if c[0] == 'udhcpc'])  # nothing to do without a cable
         self.assertIn(['ip', 'link', 'set', 'eth1', 'up'], calls)
-        nic('eth1', 1)                                                                       # the cable is plugged in
+        nic('eth1', 1)  # the cable is plugged in
         s.ensure_wired()
         s.ensure_wired()
         dh = [c for c in calls if c[0] == 'udhcpc']
         self.assertEqual(len(dh), 1)
         self.assertEqual(dh[0][:4], ['udhcpc', '-i', 'eth1', '-b'])
-        self.assertNotIn('eth0', ' '.join(' '.join(c) for c in dh))                          # an interface with a stanza is left alone
+        self.assertNotIn('eth0', ' '.join(' '.join(c) for c in dh))  # an interface with a stanza is left alone
         nic('eth1', 0)
-        s.ensure_wired()                                                                     # unplugged
+        s.ensure_wired()  # unplugged
         nic('eth1', 1)
-        s.ensure_wired()                                                                     # plugged again: a new request
+        s.ensure_wired()  # plugged again: a new request
         self.assertEqual(len([c for c in calls if c[0] == 'udhcpc']), 2)
 
     def test_an_interface_that_already_has_an_address_is_not_touched(self):
@@ -533,7 +545,7 @@ class SystemTests(unittest.TestCase):
         self.assertFalse([c for c in calls if c[0] == 'udhcpc'])
 
     def test_a_missing_udhcpc_or_sysfs_does_not_break_anything(self):
-        s, calls, nic = self.wired({'udhcpc': (127, 'no such file')})
+        s, _calls, nic = self.wired({'udhcpc': (127, 'no such file')})
         nic('eth1', 1)
         s.ensure_wired()
         s.sys_net = os.path.join(self.tmp.name, 'nowhere')
@@ -553,7 +565,7 @@ class SystemTests(unittest.TestCase):
         self.assertIn(['rfkill', 'unblock', 'wifi'], calls)
         self.assertIn(['iw', 'reg', 'set', 'RU'], calls)
         self.assertEqual(os.stat(self.wpa).st_mode & 0o777, 0o600)
-        self.assertFalse(os.path.exists(os.path.join(self.net, 'interfaces.d')))           # no stanza: ifupdown-ng never touches wlan0
+        self.assertFalse(os.path.exists(os.path.join(self.net, 'interfaces.d')))  # no stanza: ifupdown-ng never touches wlan0
 
     def test_what_is_already_set_up_is_left_alone(self):
         s, calls = self.make({'wpa_supplicant': (0, ''), 'udhcpc': (0, '')}, country='RU')
@@ -562,10 +574,10 @@ class SystemTests(unittest.TestCase):
         s.client_up()
         with open(self.wpa) as f:
             self.assertEqual(f.read(), own)
-        self.assertIn(['iw', 'reg', 'set', 'GB'], calls)                                    # the file's own country wins
+        self.assertIn(['iw', 'reg', 'set', 'GB'], calls)  # the file's own country wins
 
     def test_saved_networks_survive_when_only_the_header_is_added(self):
-        s, calls = self.make({'wpa_supplicant': (0, '')}, country='GB')
+        s, _calls = self.make({'wpa_supplicant': (0, '')}, country='GB')
         self.write(self.wpa, 'network={\n\tssid="Home"\n\tpsk="secret123"\n}\n')
         s.client_up()
         with open(self.wpa) as f:
@@ -574,7 +586,7 @@ class SystemTests(unittest.TestCase):
         self.assertIn('psk="secret123"', conf)
 
     def test_a_file_from_dietpi_loses_the_group_alpine_does_not_have(self):
-        s, calls = self.make({'wpa_supplicant': (0, '')})
+        s, _calls = self.make({'wpa_supplicant': (0, '')})
         self.write(self.wpa, 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev\ncountry=GB\nnetwork={\n\tssid="Home"\n\tpsk=abc\n}\n')
         s.client_up()
         with open(self.wpa) as f:
@@ -593,7 +605,7 @@ class SystemTests(unittest.TestCase):
     def test_client_down_ends_only_its_own_programs(self):
         s, calls = self.make({})
         os.makedirs(self.run_dir)
-        for program, pid, comm in (('wpa_supplicant', 401, 'wpa_supplicant'), ('udhcpc', 402, 'sshd')):     # 402 now belongs to another program
+        for program, pid, comm in (('wpa_supplicant', 401, 'wpa_supplicant'), ('udhcpc', 402, 'sshd')):  # 402 now belongs to another program
             self.write(os.path.join(self.run_dir, '%s-wlan0.pid' % program), '%d\n' % pid)
             self.write(os.path.join(self.proc, str(pid), 'comm'), comm + '\n')
         s.client_down()
@@ -622,7 +634,6 @@ class SystemTests(unittest.TestCase):
         self.addCleanup(setattr, pw.time, 'sleep', real)
         self.assertEqual([n['ssid'] for n in s.scan()], ['Home'])
 
-
     def test_scan_falls_back_to_wpa_cli_and_explains_a_failure(self):
         calls = []
 
@@ -632,7 +643,11 @@ class SystemTests(unittest.TestCase):
                 return 1, 'command failed: Device or resource busy (-16)'
             if cmd[:4] == ['wpa_cli', '-i', 'wlan0', 'scan']:
                 return 0, 'OK'
-            return 0, 'bssid / frequency / signal level / flags / ssid\naa:bb:cc:dd:ee:ff\t2437\t-45\t[WPA2-PSK-CCMP][ESS]\tHome\n11:22:33:44:55:66\t2412\t-70\t[ESS]\tCafe\n'
+            return (
+                0,
+                'bssid / frequency / signal level / flags / ssid\naa:bb:cc:dd:ee:ff\t2437\t-45\t[WPA2-PSK-CCMP][ESS]\tHome\n11:22:33:44:55:66\t2412\t-70\t[ESS]\tCafe\n',
+            )
+
         s = pw.System('wlan0', '/tmp/none', '/tmp/none.conf', run)
         real = pw.time.sleep
         pw.time.sleep = lambda x: None
@@ -661,20 +676,23 @@ class SystemTests(unittest.TestCase):
                     return 0, 'BSS aa:bb:cc:dd:ee:ff(on wlan0)\n\tsignal: -40.0 dBm\n\tSSID: Home\n\tRSN:\t * x\n'
                 return 240, 'command failed: Network is down (-100)'
             return 1, ''
+
         found, error = pw.wifilib.scan_networks(run, 'wlan0', sleep=lambda x: None)
         self.assertEqual(([n['ssid'] for n in found], error), (['Home'], None))
         self.assertIn(['ip', 'link', 'set'], calls)
-        stuck = lambda cmd, timeout: (240, 'command failed: Network is down (-100)') if cmd[0] == 'iw' else (1, 'RF-kill')   # noqa: E731
+        stuck = lambda cmd, timeout: (240, 'command failed: Network is down (-100)') if cmd[0] == 'iw' else (1, 'RF-kill')  # noqa: E731
         found, error = pw.wifilib.scan_networks(stuck, 'wlan0', sleep=lambda x: None)
         self.assertIsNone(found)
         self.assertIn('interface is down', error)
 
     def test_failure_reasons_are_short_and_readable(self):
-        for rc, out, word in ((1, 'command failed: Operation not possible due to RF-kill (-132)', 'rfkill'),
-                              (1, 'command failed: Device or resource busy (-16)', 'busy'),
-                              (1, 'command failed: Operation not permitted (-1)', 'root'),
-                              (1, 'command failed: No such device (-19)', 'adapter'),
-                              (1, 'weird', 'weird')):
+        for rc, out, word in (
+            (1, 'command failed: Operation not possible due to RF-kill (-132)', 'rfkill'),
+            (1, 'command failed: Device or resource busy (-16)', 'busy'),
+            (1, 'command failed: Operation not permitted (-1)', 'root'),
+            (1, 'command failed: No such device (-19)', 'adapter'),
+            (1, 'weird', 'weird'),
+        ):
             self.assertIn(word, pw.wifilib.scan_failure_reason(rc, out))
         self.assertEqual(pw.wifilib.parse_wpa_scan('junk\n'), [])
 
@@ -682,16 +700,29 @@ class SystemTests(unittest.TestCase):
 class ConfigTests(unittest.TestCase):
     def test_defaults(self):
         c = pw.config_from_env({})
-        self.assertEqual((c['ap_prefix'], c['ap_password'], c['channel'], c['grace_new'], c['grace_known'], c['enabled']),
-                         ('exxpiano-Setup', 'exxpianosetup', 6, 10, 150, True))
+        self.assertEqual(
+            (c['ap_prefix'], c['ap_password'], c['channel'], c['grace_new'], c['grace_known'], c['enabled']),
+            ('exxpiano-Setup', 'exxpianosetup', 6, 10, 150, True),
+        )
 
     def test_values_are_read_clamped_and_checked(self):
-        c = pw.config_from_env({'WIFI_AP_SSID': 'My-Piano', 'WIFI_AP_PASSWORD': 'much-better-secret', 'WIFI_AP_CHANNEL': '11', 'WIFI_GRACE_NEW': '1',
-                                'WIFI_GRACE_KNOWN': 'abc', 'WIFI_SETUP': '0', 'WEB_PORT': '9090'})
-        self.assertEqual((c['ap_prefix'], c['ap_password'], c['channel'], c['grace_new'], c['grace_known'], c['enabled'], c['web_port']),
-                         ('My-Piano', 'much-better-secret', 11, 5, 150, False, 9090))
-        self.assertEqual(pw.config_from_env({'WIFI_AP_PASSWORD': 'short'})['ap_password'], 'exxpianosetup')    # an unusable password is not used
-        self.assertEqual(pw.config_from_env({'WIFI_AP_CHANNEL': '3'})['channel'], 6)                       # only 1, 6, 11
+        c = pw.config_from_env(
+            {
+                'WIFI_AP_SSID': 'My-Piano',
+                'WIFI_AP_PASSWORD': 'much-better-secret',
+                'WIFI_AP_CHANNEL': '11',
+                'WIFI_GRACE_NEW': '1',
+                'WIFI_GRACE_KNOWN': 'abc',
+                'WIFI_SETUP': '0',
+                'WEB_PORT': '9090',
+            }
+        )
+        self.assertEqual(
+            (c['ap_prefix'], c['ap_password'], c['channel'], c['grace_new'], c['grace_known'], c['enabled'], c['web_port']),
+            ('My-Piano', 'much-better-secret', 11, 5, 150, False, 9090),
+        )
+        self.assertEqual(pw.config_from_env({'WIFI_AP_PASSWORD': 'short'})['ap_password'], 'exxpianosetup')  # an unusable password is not used
+        self.assertEqual(pw.config_from_env({'WIFI_AP_CHANNEL': '3'})['channel'], 6)  # only 1, 6, 11
 
 
 class EnsureNameTests(unittest.TestCase):
@@ -707,6 +738,7 @@ class EnsureNameTests(unittest.TestCase):
 
             def mac(self):
                 return mac
+
         real = pw.System
         real_installation_id = pw.wifilib.installation_id
         pw.System = FakeSystem
@@ -733,7 +765,7 @@ class EnsureNameTests(unittest.TestCase):
             self.assertIn('exxpiano-012abc', out)
 
     def test_the_installation_id_names_the_device_even_without_an_adapter(self):
-        code, out, calls = self.run_cli('dietpi', mac='')
+        code, _out, calls = self.run_cli('dietpi', mac='')
         self.assertEqual(code, 0)
         self.assertIn(['hostname', '-F', pw.wifilib.HOSTNAME_PATH], calls)
 
@@ -742,14 +774,15 @@ class EnsureNameTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(['hostname', '-F', pw.wifilib.HOSTNAME_PATH], calls)
         self.assertIn('exxpiano-012abc', out)
-        code, out, calls = self.run_cli('kitchen-piano', extra=['exxpiano'])           # a name chosen by the owner stays
+        code, out, calls = self.run_cli('kitchen-piano', extra=['exxpiano'])  # a name chosen by the owner stays
         self.assertEqual(calls, [])
 
     def test_a_chosen_name_is_kept(self):
         for chosen in ('exxpiano', 'kitchen-piano', 'exxpiano-81de'):
-            code, out, calls = self.run_cli(chosen)
+            _code, out, calls = self.run_cli(chosen)
             self.assertEqual(calls, [])
             self.assertIn('kept', out)
+
 
 class ExchangeTests(unittest.TestCase):
     def test_requests_are_private_one_shot_and_junk_is_dropped(self):
@@ -761,7 +794,7 @@ class ExchangeTests(unittest.TestCase):
             self.assertEqual(oct(os.stat(run_dir).st_mode & 0o777), oct(0o700))
             req = wifilib.take_request(run_dir)
             self.assertEqual((req['action'], req['id']), ('connect', rid))
-            self.assertIsNone(wifilib.take_request(run_dir))                      # taken: gone
+            self.assertIsNone(wifilib.take_request(run_dir))  # taken: gone
             with open(os.path.join(run_dir, 'request.json'), 'w') as f:
                 f.write('not json')
             self.assertIsNone(wifilib.take_request(run_dir))

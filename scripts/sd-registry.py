@@ -11,6 +11,7 @@ The file is `registry/devices.csv` (override: --registry or EXXPIANO_REGISTRY). 
 only list of what was handed out (it is kept out of git because the notes may name customers). build-sd-image.py reads and writes it: it
 refuses a board-derived identifier that is already used unless the build explicitly replaces it.
 """
+
 import argparse
 import csv
 import datetime
@@ -83,8 +84,9 @@ def add(record, path=DEFAULT_PATH, replace=False):
     rows = load(path)
     clash = [r for r in rows if r['number'] == number]
     if clash and not replace:
-        raise RegistryError('the number %s is already registered (version %s, built %s). Choose another or use --force' %
-                            (number, clash[0]['version'], clash[0]['built_at']))
+        raise RegistryError(
+            'the number %s is already registered (version %s, built %s). Choose another or use --force' % (number, clash[0]['version'], clash[0]['built_at'])
+        )
     for r in clash:
         r['number'] = number + '~'
         r['note'] = (r['note'] + ' ' if r['note'] else '') + 'replaced by a newer image'

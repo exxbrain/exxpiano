@@ -1,5 +1,5 @@
 """Tests for pi/sf2info.py (the SoundFont reader) and pi/banklib.py (the bank library)."""
-import importlib.util
+
 import os
 import struct
 import sys
@@ -30,8 +30,7 @@ class Sf2InfoTests(unittest.TestCase):
         self.assertEqual((info['name'], info['version']), ('My Piano', '2.1'))
         self.assertEqual(info['sample_bytes'], 4000)
         self.assertEqual(info['size'], os.path.getsize(self.path()))
-        self.assertEqual([(p['bank'], p['program'], p['name']) for p in info['presets']],
-                         [(0, 0, 'Grand'), (0, 1, 'Bright'), (128, 0, 'Drums')])
+        self.assertEqual([(p['bank'], p['program'], p['name']) for p in info['presets']], [(0, 0, 'Grand'), (0, 1, 'Bright'), (128, 0, 'Drums')])
 
     def test_sf3_version_is_accepted(self):
         make_sf2(self.path('b.sf3'), version=(3, 0))
@@ -45,7 +44,7 @@ class Sf2InfoTests(unittest.TestCase):
             with self.subTest(name), self.assertRaises(sf2info.Sf2Error):
                 sf2info.read_info(self.path(name))
         with self.assertRaises(sf2info.Sf2Error):
-            sf2info.read_info(self.dir)                              # a folder
+            sf2info.read_info(self.dir)  # a folder
 
     def test_truncated_file_is_rejected(self):
         make_sf2(self.path(), sample_bytes=5000)
@@ -63,13 +62,13 @@ class Sf2InfoTests(unittest.TestCase):
             data = bytearray(f.read())
         first_list = 12
         lying = bytearray(data)
-        struct.pack_into('<I', lying, first_list + 4, 0x7FFFFFF0)      # the INFO list claims 2 GB
+        struct.pack_into('<I', lying, first_list + 4, 0x7FFFFFF0)  # the INFO list claims 2 GB
         with open(self.path('lie.sf2'), 'wb') as f:
             f.write(lying)
         with self.assertRaises(sf2info.Sf2Error):
             sf2info.read_info(self.path('lie.sf2'))
         huge = bytearray(data)
-        struct.pack_into('<I', huge, 4, 0xFFFFFFF0)                    # the RIFF size claims 4 GB
+        struct.pack_into('<I', huge, 4, 0xFFFFFFF0)  # the RIFF size claims 4 GB
         with open(self.path('huge.sf2'), 'wb') as f:
             f.write(huge)
         with self.assertRaises(sf2info.Sf2Error):
@@ -131,7 +130,7 @@ class BankLibTests(unittest.TestCase):
     def test_size_limit_marks_banks_that_do_not_fit(self):
         self.make('big.sf2', sample_bytes=3 << 20)
         self.make('small.sf2', sample_bytes=1000)
-        mem = (800 << 20) + (2 << 20)                       # 802 MB with an explicit reserve of 800 MB leaves 2 MB
+        mem = (800 << 20) + (2 << 20)  # 802 MB with an explicit reserve of 800 MB leaves 2 MB
         banks = {b['id']: b for b in banklib.list_banks(self.dir, mem_total=mem, reserve_mb=800)}
         self.assertTrue(banks['small.sf2']['fits'])
         self.assertFalse(banks['big.sf2']['fits'])
@@ -140,19 +139,18 @@ class BankLibTests(unittest.TestCase):
         self.assertEqual(banklib.size_limit(100 << 20, reserve_mb=400), 0)
 
     def test_a_board_with_512_mb_keeps_less_for_the_system(self):
-        mem = 414 << 20                                     # what a Pi 3 A+ reports
+        mem = 414 << 20  # what a Pi 3 A+ reports
         mech = 36 << 20
         limit = banklib.size_limit(mem, mech)
-        self.assertGreater(limit, 248325370)                # the smaller bank fits ...
-        self.assertLess(limit, 387396570)                   # ... a 390 MB bank does not
-        self.assertEqual(banklib.size_limit(954 << 20, mech), (954 << 20) - (200 << 20) - mech)    # a 1 GB board keeps 200 MB
-        self.assertGreater(banklib.size_limit(954 << 20, mech), 700 << 20)         # the 695 MB bank `full` fits
+        self.assertGreater(limit, 248325370)  # the smaller bank fits ...
+        self.assertLess(limit, 387396570)  # ... a 390 MB bank does not
+        self.assertEqual(banklib.size_limit(954 << 20, mech), (954 << 20) - (200 << 20) - mech)  # a 1 GB board keeps 200 MB
+        self.assertGreater(banklib.size_limit(954 << 20, mech), 700 << 20)  # the 695 MB bank `full` fits
 
     def test_resolve_accepts_only_listed_plain_files(self):
         self.make('ok.sf2')
         self.assertEqual(banklib.resolve(self.dir, 'ok.sf2'), os.path.join(self.dir, 'ok.sf2'))
-        for bad in ('../ok.sf2', '/etc/passwd', 'ok.sf2/../ok.sf2', 'missing.sf2', 'ok.txt', '', '.hidden.sf2', None, 5, 'a\x00.sf2',
-                    'sub\\ok.sf2'):
+        for bad in ('../ok.sf2', '/etc/passwd', 'ok.sf2/../ok.sf2', 'missing.sf2', 'ok.txt', '', '.hidden.sf2', None, 5, 'a\x00.sf2', 'sub\\ok.sf2'):
             with self.subTest(bad), self.assertRaises(ValueError):
                 banklib.resolve(self.dir, bad)
         os.symlink(os.path.join(self.dir, 'ok.sf2'), os.path.join(self.dir, 'link.sf2'))
@@ -176,7 +174,7 @@ class BankLibTests(unittest.TestCase):
     def test_the_cache_follows_changes_of_the_file(self):
         path = self.make('x.sf2', name='Old')
         self.assertEqual(banklib.list_banks(self.dir)[0]['name'], 'Old')
-        make_sf2(path, name='New name', sample_bytes=3000)        # different size: the cache entry no longer matches
+        make_sf2(path, name='New name', sample_bytes=3000)  # different size: the cache entry no longer matches
         self.assertEqual(banklib.list_banks(self.dir)[0]['name'], 'New name')
 
     def test_unreadable_folder_gives_an_empty_list(self):
@@ -189,7 +187,7 @@ class MemoryInfoTests(unittest.TestCase):
             cur = os.path.join(d, 'cur.sf2')
             with open(cur, 'wb') as f:
                 f.write(b'x' * 1000)
-            fake = lambda path: type('S', (), dict(f_bavail=10, f_frsize=4096))()          # noqa: E731
+            fake = lambda path: type('S', (), dict(f_bavail=10, f_frsize=4096))()  # noqa: E731
             m = banklib.memory_info(d, 1000 << 20, 40 << 20, cur, statvfs=fake)
             self.assertEqual((m['total'], m['mech'], m['current'], m['disk_free']), (1000 << 20, 40 << 20, 1000, 40960))
             self.assertEqual((m['reserve'], m['limit']), (200 << 20, (1000 - 200 - 40) << 20))

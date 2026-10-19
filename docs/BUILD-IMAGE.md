@@ -71,6 +71,16 @@ The release has no separate `.apk` files: a device is upgraded by `scripts/deplo
 
 Ordinary pushes and pull requests run only the fast tests. `.github/workflows/image-pipeline.yml` runs when packaging, the services or the image builder change (or by hand): it builds the packages, starts the OpenRC services in a container (`scripts/test-openrc-services.sh`), installs, upgrades, rolls back and removes the packages (`scripts/test-apk-upgrade.sh`), and builds a complete image with stand-in banks (`scripts/test-sd-image-pipeline.sh`).
 
+### Download mirror
+
+The images are close to 1 GB, and GitHub can be slow to download them from. The release workflow therefore also copies the release files to a public Cloudflare R2 bucket (`scripts/mirror-to-r2.sh`, into `<bucket>/<tag>/`) and adds a **Faster download (mirror)** section with links to the ZIP files to the release description. R2 does not charge for downloads, and 10 GB of storage is free. Set it up once:
+
+1. In Cloudflare create an R2 bucket and make it public: connect a custom domain to it (recommended) or turn on its `r2.dev` address (Cloudflare limits its rate).
+2. Create an R2 API token with **Object Read & Write** on that bucket.
+3. In the repository settings add the secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and the variable (not a secret) `R2_PUBLIC_URL`, the bucket's public address without a trailing slash: the custom domain or `https://pub-….r2.dev` from the bucket's **Settings → Public access**, not the S3 API address `https://<account>.r2.cloudflarestorage.com` (it asks for authorization; the copy stops with an error when it is set).
+
+Only the two newest versions stay on the mirror: after each release (and each **release-mirror** run) the older `v*` folders are deleted from the bucket and their mirror links are taken out of those releases' descriptions; the files stay in the GitHub Releases. Without `R2_PUBLIC_URL` these steps are skipped. A failed copy does not stop the release: it is published without the mirror links, and the copy can be repeated. For a release published before the mirror existed, or whose copy failed, run the workflow **release-mirror** from the **Actions** tab with its tag: it downloads the release files, checks them against `SHA256SUMS`, copies them to the bucket and adds the mirror links to the published description, leaving the rest of it as it is.
+
 ## Flashing and first boot
 
 1. In Raspberry Pi Imager choose “Choose OS” → “Use custom” and select the ZIP, or select it in balenaEtcher.
@@ -83,7 +93,7 @@ Cards cloned from the same ZIP receive different IDs on their own first boot. ID
 
 ## Moving a device from DietPi
 
-A card made from a DietPi image (version 1.10.20 or older) cannot be upgraded to Alpine in place: write the new image. To keep what the device has learned, copy it first (the device is reachable as before):
+A card made from a DietPi image (version 1.10.22 or older) cannot be upgraded to Alpine in place: write the new image. To keep what the device has learned, copy it first (the device is reachable as before):
 
 ```bash
 scp -r root@<device>:/var/lib/exxpiano ./exxpiano-data          # installation ID, imported banks, profiles, MIDI library
@@ -116,4 +126,4 @@ scripts/test-apk-upgrade.sh
 scripts/test-sd-image-pipeline.sh
 ```
 
-A container is not a Raspberry Pi. **The Alpine image has not been started on real hardware yet.** On a Pi 3, 4 and 5 check `/var/log/exxpiano-firstboot.log`, the grown root partition, the console screen, the unique setup network and joining a Wi-Fi network, the web UI, the sound through the 3.5 mm jack and a USB card, plugging a USB sound card, drive and MIDI keyboard in and out, the latency of FluidSynth compared with DietPi, an upgrade and a rollback with `scripts/deploy-to-pi.sh`, and an offline reboot.
+A container is not a Raspberry Pi. **The Alpine image has been started on a Raspberry Pi 3 Model B only** (`deploy/check-on-pi.sh` runs the device checks over SSH: `ssh root@<device> sh -s < deploy/check-on-pi.sh`). On a Pi 3, 4 and 5 check `/var/log/exxpiano-firstboot.log`, the grown root partition, the console screen, the unique setup network and joining a Wi-Fi network, the web UI, the sound through the 3.5 mm jack and a USB card, plugging a USB sound card, drive and MIDI keyboard in and out, the latency of FluidSynth compared with DietPi, an upgrade and a rollback with `scripts/deploy-to-pi.sh`, and an offline reboot.

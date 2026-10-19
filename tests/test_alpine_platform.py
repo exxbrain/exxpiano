@@ -2,6 +2,7 @@
 
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+
 import hashlib
 import os
 import unittest
@@ -12,8 +13,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 def read_env(path):
     out = {}
     with open(path, encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
+        for raw in f:
+            line = raw.strip()
             if line and not line.startswith('#'):
                 key, _, value = line.partition('=')
                 out[key] = value

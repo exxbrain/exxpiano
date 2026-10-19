@@ -10,8 +10,8 @@ Keeps only the chosen velocity layers, trims every sample to --tail seconds
 with a 2 s fade-out, optionally downmixes to mono, and writes a plain SF2
 (no loops, release/pedal/resonance noise samples are skipped).
 """
+
 import argparse
-import json
 import os
 import re
 import struct
@@ -20,13 +20,34 @@ import sys
 
 NOTE_RE = re.compile(r'^([A-G]#?\d)v(\d+)\.(?:wav|flac)$')
 
+# Release time (s) after the key or the pedal lets go, by key: the dampers stop the thick bass strings more slowly than the treble.
+# One 0.7 s for every key cut the bass off abruptly when a pedal was lifted (heard on La Campanella). Between the points the time is
+# interpolated on a log scale.
+RELEASE_BY_KEY = ((21, 2.6), (48, 1.5), (72, 0.95), (108, 0.7))
+
+
+def key_release(key):
+    """Release time in seconds for a MIDI key (RELEASE_BY_KEY, log interpolation, held flat outside it)."""
+    import math
+
+    pts = RELEASE_BY_KEY
+    if key <= pts[0][0]:
+        return pts[0][1]
+    for (k0, r0), (k1, r1) in zip(pts, pts[1:]):
+        if key <= k1:
+            f = (key - k0) / float(k1 - k0)
+            return math.exp(math.log(r0) + f * (math.log(r1) - math.log(r0)))
+    return pts[-1][1]
+
 
 def parse_sfz(path):
     """Return {note_name: {layer: dict(lokey, hikey, root, tune, release)}}."""
     release = 1.0
     skip = False
     notes = {}
-    for raw in open(path, encoding='utf-8', errors='replace'):
+    with open(path, encoding='utf-8', errors='replace') as f:
+        lines = f.readlines()
+    for raw in lines:
         line = raw.strip()
         if not line or line.startswith('//'):
             continue
@@ -64,7 +85,7 @@ def layer_ranges(chosen, centers, gamma=1.0):
     chosen = sorted(chosen)
     cs = [centers[l] for l in chosen]
     mids = [(cs[i] + cs[i + 1]) / 2 for i in range(len(cs) - 1)]
-    bounds = [0] + [int(round(127 * (m / 127) ** (1 / gamma))) for m in mids] + [127]
+    bounds = [0] + [round(127 * (m / 127) ** (1 / gamma)) for m in mids] + [127]
     out = {}
     for i, l in enumerate(chosen):
         lo = 1 if i == 0 else bounds[i] + 1
@@ -112,7 +133,7 @@ def decode(path, tail, mono, dur, gain_db=0.0, rate=44100):
 
 
 def pad_str(s, n):
-    b = s.encode('ascii', 'replace')[:n - 1]
+    b = s.encode('ascii', 'replace')[: n - 1]
     return b + b'\0' * (n - len(b))
 
 
@@ -142,11 +163,19 @@ def main():
     ap.add_argument('--peak-first', type=float, default=None, help='override target peak of the softest layer')
     ap.add_argument('--stretch', type=float, default=1.0, help='scale distance of every layer target below peak-hi')
     ap.add_argument('--veltrack', type=int, default=100, help='velocity->attenuation amount, cB')
-    ap.add_argument('--subzones', type=int, default=1,
-                    help='cut the velocity range of every layer into this many zones that share the same samples (no extra memory) and make the lower zones '
-                         'quieter by up to --subzone-db, so loudness rises smoothly inside a layer instead of one step per layer')
-    ap.add_argument('--subzone-db', type=float, default=None,
-                    help='attenuation of the quietest zone of a layer, dB; default: the distance between the targets of neighbouring layers')
+    ap.add_argument(
+        '--subzones',
+        type=int,
+        default=1,
+        help='cut the velocity range of every layer into this many zones that share the same samples (no extra memory) and make the lower zones '
+        'quieter by up to --subzone-db, so loudness rises smoothly inside a layer instead of one step per layer',
+    )
+    ap.add_argument(
+        '--subzone-db',
+        type=float,
+        default=None,
+        help='attenuation of the quietest zone of a layer, dB; default: the distance between the targets of neighbouring layers',
+    )
     args = ap.parse_args()
 
     chosen = [int(x) for x in args.layers.split(',')]
@@ -166,8 +195,8 @@ def main():
 
     # ---- samples ----
     pcm = bytearray()
-    shdr = []          # tuples
-    zones = []         # (key, vel, release, tune, pan, sample_id, attenuation in centibels)
+    shdr = []  # tuples
+    zones = []  # (key, vel, release, tune, pan, sample_id, attenuation in centibels)
     n_points = 0
 
     def add_sample(name, data, rate, root, ctype, link):
@@ -176,14 +205,14 @@ def main():
         pts = len(data) // 2
         end = start + pts
         pcm.extend(data)
-        pcm.extend(b'\0' * 92)         # 46 zero points of padding
+        pcm.extend(b'\0' * 92)  # 46 zero points of padding
         n_points = end + 46
         shdr.append([name, start, end, start + pts // 2, end - 8, rate, root, 0, link, ctype])
         return len(shdr) - 1
 
     durs = {}
     peaks = {}
-    layer_gain = {l: 0.0 for l in chosen}
+    layer_gain = dict.fromkeys(chosen, 0.0)
     if args.peak_lo is not None and args.peak_hi is not None:
         ordered = sorted(chosen)
         for note in notes:
@@ -192,9 +221,11 @@ def main():
                 if not info:
                     continue
                 path = os.path.join(wavdir, *info['file'].split('/'))
-                d = float(subprocess.run(
-                    ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path],
-                    capture_output=True, text=True, check=True).stdout.strip())
+                d = float(
+                    subprocess.run(
+                        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path], capture_output=True, text=True, check=True
+                    ).stdout.strip()
+                )
                 durs[path] = d
                 peaks[(note, layer)] = measure_peak(path, args.tail, args.mono, d, args.rate)
         for i, l in enumerate(ordered):
@@ -216,7 +247,7 @@ def main():
         """One zone per sub-range of the layer; all of them point to the same sample, only the attenuation differs (centibels)."""
         ranges = split_range(vel[layer][0], vel[layer][1], args.subzones)
         for i, vr in enumerate(ranges):
-            att = 0 if len(ranges) == 1 else int(round(sub_db * 10 * (len(ranges) - 1 - i) / (len(ranges) - 1)))
+            att = 0 if len(ranges) == 1 else round(sub_db * 10 * (len(ranges) - 1 - i) / (len(ranges) - 1))
             zones.append((key, vr, rel, tune, pan, sid, att))
 
     for note in sorted(notes, key=lambda n: notes[n][min(notes[n])]['root']):
@@ -228,9 +259,11 @@ def main():
             path = os.path.join(wavdir, *info['file'].split('/'))
             dur = durs.get(path)
             if dur is None:
-                dur = float(subprocess.run(
-                    ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path],
-                    capture_output=True, text=True, check=True).stdout.strip())
+                dur = float(
+                    subprocess.run(
+                        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path], capture_output=True, text=True, check=True
+                    ).stdout.strip()
+                )
             raw = decode(path, args.tail, args.mono, dur, layer_gain[layer], args.rate)
             key = (info['lokey'], info['hikey'])
             rel = info['release']
@@ -242,8 +275,8 @@ def main():
                 left = bytearray()
                 right = bytearray()
                 for i in range(0, len(raw) - 3, 4):
-                    left += raw[i:i + 2]
-                    right += raw[i + 2:i + 4]
+                    left += raw[i : i + 2]
+                    right += raw[i + 2 : i + 4]
                 lid = len(shdr)
                 add_sample('%sv%dL' % (note, layer), bytes(left), args.rate, info['root'], 4, lid + 1)
                 rid = add_sample('%sv%dR' % (note, layer), bytes(right), args.rate, info['root'], 2, lid)
@@ -263,7 +296,8 @@ def main():
 
     def tc(seconds):
         import math
-        return int(round(1200 * math.log2(seconds)))
+
+        return round(1200 * math.log2(seconds))
 
     ibag = b''
     igen = b''
@@ -273,29 +307,37 @@ def main():
 
     # global zone: modulators + default release
     ibag += struct.pack('<HH', n_gen, n_mod)
-    igen += g(GEN_REL, tc(0.7)); n_gen += 1
+    igen += g(GEN_REL, tc(0.7))
+    n_gen += 1
     mods = [
-        (0x0502, 48, 0),     # disable default velocity->attenuation
-        (0x0102, 8, 0),      # disable default velocity->filter cutoff
-        (0x0102, 48, args.veltrack),   # gentle linear velocity->attenuation
+        (0x0502, 48, 0),  # disable default velocity->attenuation
+        (0x0102, 8, 0),  # disable default velocity->filter cutoff
+        (0x0102, 48, args.veltrack),  # gentle linear velocity->attenuation
     ]
     for src, dest, amt in mods:
-        imod += struct.pack('<HHhHH', src, dest, amt, 0, 0); n_mod += 1
+        imod += struct.pack('<HHhHH', src, dest, amt, 0, 0)
+        n_mod += 1
 
     for key, vr, rel, tune, pan, sid, att in zones:
         ibag += struct.pack('<HH', n_gen, n_mod)
-        igen += g(GEN_KEY, key); igen += g(GEN_VEL, vr)
+        igen += g(GEN_KEY, key)
+        igen += g(GEN_VEL, vr)
         n_gen += 2
         if pan:
-            igen += g(GEN_PAN, pan); n_gen += 1
-        if rel >= 5:
-            igen += g(GEN_REL, tc(rel)); n_gen += 1
+            igen += g(GEN_PAN, pan)
+            n_gen += 1
+        # an SFZ release of 5 s or more is kept; otherwise the release follows the key (RELEASE_BY_KEY)
+        igen += g(GEN_REL, tc(rel if rel >= 5 else key_release((key[0] + key[1]) / 2.0)))
+        n_gen += 1
         if tune:
-            igen += g(GEN_FINE, tune); n_gen += 1
+            igen += g(GEN_FINE, tune)
+            n_gen += 1
         if att:
-            igen += g(GEN_ATT, att); n_gen += 1
-        igen += g(GEN_SAMPLEID, sid); n_gen += 1
-    ibag += struct.pack('<HH', n_gen, n_mod)       # terminal
+            igen += g(GEN_ATT, att)
+            n_gen += 1
+        igen += g(GEN_SAMPLEID, sid)
+        n_gen += 1
+    ibag += struct.pack('<HH', n_gen, n_mod)  # terminal
     igen += struct.pack('<HH', 0, 0)
     imod += b'\0' * 10
 
@@ -319,15 +361,22 @@ def main():
     info_blk += chunk(b'ICMT', b'Reduced from Salamander Grand Piano V3 by Alexander Holm (CC-BY)\0')
 
     sdta = lst(b'sdta', chunk(b'smpl', bytes(pcm)))
-    pdta = lst(b'pdta',
-               chunk(b'phdr', phdr) + chunk(b'pbag', pbag) + chunk(b'pmod', pmod) + chunk(b'pgen', pgen) +
-               chunk(b'inst', inst) + chunk(b'ibag', ibag) + chunk(b'imod', imod) + chunk(b'igen', igen) +
-               chunk(b'shdr', sh))
+    pdta = lst(
+        b'pdta',
+        chunk(b'phdr', phdr)
+        + chunk(b'pbag', pbag)
+        + chunk(b'pmod', pmod)
+        + chunk(b'pgen', pgen)
+        + chunk(b'inst', inst)
+        + chunk(b'ibag', ibag)
+        + chunk(b'imod', imod)
+        + chunk(b'igen', igen)
+        + chunk(b'shdr', sh),
+    )
     body = b'sfbk' + lst(b'INFO', info_blk) + sdta + pdta
     with open(args.out, 'wb') as f:
         f.write(b'RIFF' + struct.pack('<I', len(body)) + body)
-    print('samples: %d  zones: %d  sf2: %.1f MB (sample data %.1f MB)' % (
-        len(shdr), len(zones), os.path.getsize(args.out) / 1e6, len(pcm) / 1e6))
+    print('samples: %d  zones: %d  sf2: %.1f MB (sample data %.1f MB)' % (len(shdr), len(zones), os.path.getsize(args.out) / 1e6, len(pcm) / 1e6))
 
 
 if __name__ == '__main__':

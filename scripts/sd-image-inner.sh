@@ -168,6 +168,7 @@ WEB_PID=$!
 get() { python3 -c "import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())" "$1" 2>/dev/null; }
 for _ in $(seq 1 20); do get http://127.0.0.1:8080/api/ping >/dev/null && break; sleep 0.5; done
 smoke "the web service answers" "get http://127.0.0.1:8080/api/ping | grep -q '\"ok\": true'"
+# shellcheck disable=SC2034  # QR is read by the check below, inside its eval
 QR="$(get 'http://127.0.0.1:8080/api/qr?kind=join' || true)"; SMOKE_ID="$(cat "$ROOTFS/tmp/smoke-installation-id" 2>/dev/null || true)"
 smoke "the page makes the setup QR code from the generated installation ID" "[ -n \"$SMOKE_ID\" ] && echo \"\$QR\" | grep -q \"WIFI:T:WPA;S:exxpiano-Setup-$SMOKE_ID;\""
 smoke "the page with the menu is served" "python3 -c \"import sys, urllib.request; sys.exit(0 if b'id=\\\"drawer\\\"' in urllib.request.urlopen('http://127.0.0.1:8080/', timeout=5).read() else 1)\""
@@ -199,7 +200,7 @@ dtparam=audio=on
 disable_splash=1
 CFG
 echo "root=LABEL=exxroot rootfstype=ext4 rootwait modules=sd-mod,usb-storage,ext4 console=tty1 quiet" > "$BOOTFILES/cmdline.txt"
-rm -rf "$ROOTFS/boot"; mkdir -p "$ROOTFS/boot"            # the boot partition is mounted here on the device
+rm -rf "${ROOTFS:?}/boot"; mkdir -p "$ROOTFS/boot"            # the boot partition is mounted here on the device
 truncate -s "${BOOT_MB}M" "$WORKDIR/boot.img"
 mkfs.vfat -F 32 -n EXXBOOT "$WORKDIR/boot.img" >/dev/null
 mcopy -s -i "$WORKDIR/boot.img" "$BOOTFILES"/* ::/
@@ -226,6 +227,7 @@ fail=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
 rootfile() { debugfs -R "cat $1" "$WORKDIR/root.img" 2>/dev/null; }
 rootexists() { debugfs -R "stat $1" "$WORKDIR/root.img" 2>/dev/null | grep -q '^Inode:'; }
+# shellcheck disable=SC2034  # bootlist is read by the checks below, inside their eval
 bootlist="$(mdir -/ -b -i "$WORKDIR/boot.img" ::/ 2>/dev/null)"
 check "the partition table: FAT32 boot, then the root" "sfdisk -d '$DISK' | grep -q 'type=c, bootable' && sfdisk -d '$DISK' | grep -q 'type=83'"
 check "the kernel, the initramfs and the firmware are on the boot partition" "echo \"\$bootlist\" | grep -q '/vmlinuz-rpi$' && echo \"\$bootlist\" | grep -q '/initramfs-rpi$' && echo \"\$bootlist\" | grep -qi '/start4.elf$' && echo \"\$bootlist\" | grep -qi '/bootcode.bin$'"

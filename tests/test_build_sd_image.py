@@ -2,6 +2,7 @@
 
 The real image is built and read back by scripts/test-sd-image-pipeline.sh (Docker, minutes).
 """
+
 import importlib.util
 import json
 import os
@@ -83,7 +84,7 @@ class Case(unittest.TestCase):
             return []
 
     def inner_call(self):
-        return [c for c in self.docker_calls() if c['args'][:1] == ['run']][0]
+        return next(c for c in self.docker_calls() if c['args'][:1] == ['run'])
 
 
 class PlanTests(Case):
@@ -97,8 +98,12 @@ class PlanTests(Case):
         self.assertEqual(self.docker_calls(), [])
 
     def test_missing_inputs_are_named(self):
-        r = subprocess.run([sys.executable, SCRIPT, '--apk-repo', os.path.join(self.tmp.name, 'none'), '--piano', self.piano, '--mech', self.mech,
-                            '--dry-run'], capture_output=True, text=True, env=self.env)
+        r = subprocess.run(
+            [sys.executable, SCRIPT, '--apk-repo', os.path.join(self.tmp.name, 'none'), '--piano', self.piano, '--mech', self.mech, '--dry-run'],
+            capture_output=True,
+            text=True,
+            env=self.env,
+        )
         self.assertEqual(r.returncode, 1)
         self.assertIn('build-apks.py', r.stderr)
         r = self.run_build('--dry-run', '--piano', os.path.join(self.tmp.name, 'nope.sf2'))
@@ -108,8 +113,12 @@ class PlanTests(Case):
         self.assertIn('exactly one public key', r.stderr)
 
     def test_bad_values_are_refused_before_anything_starts(self):
-        for extra, text in ((('--password', 'short'), 'at least 8'), (('--ap-password', 'short'), '8 to 63'),
-                            (('--country', 'Russia'), 'two letters'), (('--timezone', '../etc/passwd'), 'zone name')):
+        for extra, text in (
+            (('--password', 'short'), 'at least 8'),
+            (('--ap-password', 'short'), '8 to 63'),
+            (('--country', 'Russia'), 'two letters'),
+            (('--timezone', '../etc/passwd'), 'zone name'),
+        ):
             with self.subTest(extra):
                 r = self.run_build('--dry-run', *extra)
                 self.assertEqual(r.returncode, 1)
@@ -130,7 +139,7 @@ class PlanTests(Case):
             default_mech = self.touch('build/mech.sf2', b'default mech')
             args = bsi.parse_args(['--apk-repo', self.repo])
             self.assertEqual(bsi.resolve_inputs(args), dict(apk_repo=self.repo, piano=default_piano, mech=default_mech))
-            lite = self.touch('build/piano-lite.sf2', b'default lite')                 # the smaller bank is taken when it exists, it is not required
+            lite = self.touch('build/piano-lite.sf2', b'default lite')  # the smaller bank is taken when it exists, it is not required
             self.assertEqual(bsi.resolve_inputs(bsi.parse_args(['--apk-repo', self.repo]))['piano_lite'], lite)
             os.unlink(lite)
             args = bsi.parse_args(['--apk-repo', self.repo, '--piano-lite', os.path.join(self.tmp.name, 'nothing.sf2')])
@@ -139,7 +148,7 @@ class PlanTests(Case):
             self.touch('apk/exxpiano/aarch64/x', b'')
             os.makedirs(os.path.join(self.tmp.name, 'dist'), exist_ok=True)
             os.symlink(self.repo, os.path.join(self.tmp.name, 'dist', 'apk'))
-            self.assertEqual(bsi.resolve_inputs(bsi.parse_args([]))['apk_repo'], os.path.join(self.tmp.name, 'dist', 'apk'))   # the default
+            self.assertEqual(bsi.resolve_inputs(bsi.parse_args([]))['apk_repo'], os.path.join(self.tmp.name, 'dist', 'apk'))  # the default
         finally:
             bsi.ROOT = old_root
 
@@ -186,7 +195,7 @@ class BuildTests(Case):
         with open(os.path.join(self.out, 'README.txt')) as f:
             text = f.read()
         self.assertIn('Alpine Linux: 3.24.2', text)
-        self.assertIn('authorized_keys on the boot partition', text)            # no password given: key login only
+        self.assertIn('authorized_keys on the boot partition', text)  # no password given: key login only
         args = self.inner_call()['args']
         self.assertEqual(args[args.index('--country') + 1], 'RU')
         self.assertEqual(args[args.index('--timezone') + 1], 'Europe/Moscow')
@@ -200,8 +209,26 @@ class BuildTests(Case):
         self.assertIn('-e', call['args'])
         self.assertNotIn('secret', r.stdout + r.stderr)
         r = self.run_build(env=dict(SD_PASSWORD='from-the-env-1'))
-        self.assertEqual(self.inner_call()['env']['SD_PASSWORD'], 'root-secret-1')     # the first build of this log; the second:
+        self.assertEqual(self.inner_call()['env']['SD_PASSWORD'], 'root-secret-1')  # the first build of this log; the second:
         self.assertEqual([c for c in self.docker_calls() if c['args'][:1] == ['run']][1]['env']['SD_PASSWORD'], 'from-the-env-1')
+
+    def test_a_custom_setup_password_stays_out_of_the_published_files(self):
+        r = self.run_build('--ap-password', 'my-secret-setup-77', '--password', 'root-secret-88')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        for name in os.listdir(self.out):
+            if name.endswith(('.txt', '.json')):
+                with open(os.path.join(self.out, name), encoding='utf-8') as f:
+                    text = f.read()
+                self.assertNotIn('my-secret-setup-77', text, name)
+                self.assertNotIn('root-secret-88', text, name)
+        with open(os.path.join(self.out, 'README.txt'), encoding='utf-8') as f:
+            readme = f.read()
+        self.assertIn('the one given with --ap-password at build time', readme)
+        self.assertIn('with the password given when the image was built', readme)
+        plan = bsi.plan_image(
+            bsi.parse_args(['--apk-repo', self.repo, '--ap-password', 'my-secret-setup-77']), dict(apk_repo=self.repo, piano=self.piano, mech=self.mech)
+        )
+        self.assertNotIn('my-secret-setup-77', json.dumps(plan))  # the plan that feeds the README holds no password
 
     def test_the_container_gets_read_only_inputs_and_a_writable_output(self):
         r = self.run_build('--ssh-key', self.touch('me.pub', b'ssh-ed25519 AAAA me'))
@@ -211,13 +238,13 @@ class BuildTests(Case):
         self.assertIn('%s:/out' % self.out, volumes)
         self.assertIn('%s:/repo:ro' % ROOT, volumes)
         self.assertIn('%s:/in/apk_repo:ro' % self.repo, volumes)
-        self.assertEqual([v for v in volumes if not v.endswith(':ro')], ['%s:/out' % self.out, '%s:/cache' % bsi.APK_CACHE])   # and the downloads
+        self.assertEqual([v for v in volumes if not v.endswith(':ro')], ['%s:/out' % self.out, '%s:/cache' % bsi.APK_CACHE])  # and the downloads
         self.assertEqual(args[args.index('--cache-dir') + 1], '/cache')
-        self.assertNotIn('--privileged', args)                                          # files, not loop devices
+        self.assertNotIn('--privileged', args)  # files, not loop devices
         self.assertEqual(args[args.index('--apk-repo') + 1], '/in/apk_repo')
         self.assertTrue(args[args.index('--ssh-key') + 1].endswith('/me.pub'))
         self.assertEqual(args[args.index('--platform') + 1], 'linux/arm64')
-        self.assertNotIn('--mirror', args)                                             # the pinned mirror unless one is asked for
+        self.assertNotIn('--mirror', args)  # the pinned mirror unless one is asked for
 
     def test_another_mirror_is_passed_on_and_recorded(self):
         r = self.run_build(env=dict(EXXPIANO_ALPINE_MIRROR='https://mirrors.dotsrc.org/alpine/'))
@@ -281,7 +308,7 @@ class ConsoleScreenTests(unittest.TestCase):
         for needle in ('0123456789ABCDEF', 'http://192.168.1.95:8080/', 'http://fe80::1:8080/', '.local:8080/', 'no login on this screen', 'ssh root@'):
             self.assertIn(needle, out)
         self.assertNotIn('login:', out.lower())
-        self.assertNotIn('password', out.lower())                       # no prompt, and no secret on a screen anybody can see
+        self.assertNotIn('password', out.lower())  # no prompt, and no secret on a screen anybody can see
 
     def test_without_a_network_it_names_the_setup_wifi_of_this_installation(self):
         out = self.screen('0123456789ABCDEF', '')
@@ -295,7 +322,7 @@ class ConsoleScreenTests(unittest.TestCase):
     def test_the_addresses_come_from_ip_not_from_hostname(self):
         with open(os.path.join(ROOT, 'pi', 'exxpiano-console.sh')) as f:
             text = f.read()
-        self.assertNotIn('hostname -I', text)                           # busybox hostname has no -I
+        self.assertNotIn('hostname -I', text)  # busybox hostname has no -I
         self.assertIn('ip -4 -o addr show scope global', text)
 
 
@@ -306,7 +333,7 @@ class InnerScriptTests(unittest.TestCase):
 
     def function(self, name):
         start = self.src.index(name + '() {')
-        return self.src[start:self.src.index('\n}\n', start) + 3]
+        return self.src[start : self.src.index('\n}\n', start) + 3]
 
     def test_it_parses(self):
         self.assertEqual(subprocess.run(['bash', '-n', INNER]).returncode, 0)
@@ -314,24 +341,29 @@ class InnerScriptTests(unittest.TestCase):
     def test_a_tricky_password_comes_back_unchanged_through_the_programs_parser(self):
         sys.path.insert(0, os.path.join(ROOT, 'pi'))
         import exxpianoconf
+
         for password in ('plain password', 'a"b\\c d#e$f', "it's; 100% `ok`", '\\\\\\', 'x"'):
             with self.subTest(password), tempfile.TemporaryDirectory() as d:
                 os.makedirs(os.path.join(d, 'etc'))
                 f = os.path.join(d, 'etc', 'exxpiano.conf')
                 with open(f, 'w') as fh:
                     fh.write('GAIN=1.0\n# WIFI_AP_PASSWORD=exxpianosetup\n')
-                script = self.function('set_conf') + self.function('quote_conf') + '\nset_conf WIFI_AP_PASSWORD "$(quote_conf "$P")"\nset_conf WIFI_COUNTRY RU\n'
+                script = (
+                    self.function('set_conf') + self.function('quote_conf') + '\nset_conf WIFI_AP_PASSWORD "$(quote_conf "$P")"\nset_conf WIFI_COUNTRY RU\n'
+                )
                 subprocess.run(['bash', '-c', script], env=dict(os.environ, ROOTFS=d, P=password), check=True)
                 conf = exxpianoconf.parse_conf(f)
                 self.assertEqual(conf['WIFI_AP_PASSWORD'], password)
                 self.assertEqual((conf['GAIN'], conf['WIFI_COUNTRY']), ('1.0', 'RU'))
                 with open(f) as fh:
-                    self.assertEqual(fh.read().count('WIFI_AP_PASSWORD='), 1)             # the commented default became the setting
+                    self.assertEqual(fh.read().count('WIFI_AP_PASSWORD='), 1)  # the commented default became the setting
 
     def test_it_refuses_bad_inputs_before_it_changes_anything(self):
         with tempfile.TemporaryDirectory() as d:
-            for args, text in ((['--out', d + '/x.img'], '--out and --info-out'),
-                               (['--out', d + '/x.img', '--info-out', d, '--apk-repo', d], 'no package repository')):
+            for args, text in (
+                (['--out', d + '/x.img'], '--out and --info-out'),
+                (['--out', d + '/x.img', '--info-out', d, '--apk-repo', d], 'no package repository'),
+            ):
                 r = subprocess.run(['bash', INNER] + args, capture_output=True, text=True, env=dict(os.environ, SD_PASSWORD=''))
                 self.assertNotEqual(r.returncode, 0)
                 if os.geteuid() == 0 and os.uname().machine == 'aarch64':
@@ -341,23 +373,43 @@ class InnerScriptTests(unittest.TestCase):
     def test_the_passwords_never_reach_a_command_line(self):
         self.assertIn('PASSWORD="${SD_PASSWORD:-}"; AP_PASSWORD="${SD_AP_PASSWORD:-}"', self.src)
         self.assertNotIn('--password', self.src)
-        self.assertIn("printf 'root:%s\\n' \"$PASSWORD\" | chroot \"$ROOTFS\" /usr/sbin/chpasswd", self.src)     # through a pipe
+        self.assertIn("printf 'root:%s\\n' \"$PASSWORD\" | chroot \"$ROOTFS\" /usr/sbin/chpasswd", self.src)  # through a pipe
 
     def test_the_image_is_alpine_with_openrc_eudev_and_the_console_screen(self):
-        for needle in ('--initdb add alpine-base', 'linux-rpi raspberrypi-bootloader', 'runlevel sysinit devfs dmesg udev udev-trigger udev-settle',
-                       'rm -f "$ROOTFS"/etc/runlevels/*/mdev', 'tty1::respawn:/opt/exxpiano/exxpiano-console.sh', 'arm_64bit=1',
-                       'dtparam=audio=on', 'usercfg.txt', 'gpu_mem=16', 'raspberrypi-bootloader-cutdown', 'snd-seq snd-seq-midi', 'root=LABEL=exxroot', 'mkfs.ext4 -q -F -L exxroot -E root_owner=0:0 -d "$ROOTFS"',
-                       'exxpiano-firstboot exxpiano exxpiano-fx exxpiano-web exxpiano-wifi'):
+        for needle in (
+            '--initdb add alpine-base',
+            'linux-rpi raspberrypi-bootloader',
+            'runlevel sysinit devfs dmesg udev udev-trigger udev-settle',
+            'rm -f "$ROOTFS"/etc/runlevels/*/mdev',
+            'tty1::respawn:/opt/exxpiano/exxpiano-console.sh',
+            'arm_64bit=1',
+            'dtparam=audio=on',
+            'usercfg.txt',
+            'gpu_mem=16',
+            'raspberrypi-bootloader-cutdown',
+            'snd-seq snd-seq-midi',
+            'root=LABEL=exxroot',
+            'mkfs.ext4 -q -F -L exxroot -E root_owner=0:0 -d "$ROOTFS"',
+            'exxpiano-firstboot exxpiano exxpiano-fx exxpiano-web exxpiano-wifi',
+        ):
             self.assertIn(needle, self.src)
         self.assertNotIn('losetup', self.src)
         self.assertNotIn('dietpi', self.src.lower().replace('nothing of debian or dietpi', '').replace('/boot/dietpi', '').replace('grep -qi dietpi', ''))
 
     def test_the_read_back_covers_every_promise_of_the_image(self):
-        for needle in ('device trees for the Pi 3, 4 and 5', 'no installation ID is baked into the reusable image', 'no automatic login',
-                       'the console shows a status screen, no login prompt anywhere', 'hostapd and dnsmasq do not start by themselves',
-                       'the demonstration pieces are in the MIDI library', 'the smaller bank for 512 MB boards is in place',
-                       'root logs in by password only when one was given', 'nothing of Debian or DietPi',
-                       '16 MB for the graphics processor, with the cut-down firmware', 'the ALSA sequencer modules load at boot'):
+        for needle in (
+            'device trees for the Pi 3, 4 and 5',
+            'no installation ID is baked into the reusable image',
+            'no automatic login',
+            'the console shows a status screen, no login prompt anywhere',
+            'hostapd and dnsmasq do not start by themselves',
+            'the demonstration pieces are in the MIDI library',
+            'the smaller bank for 512 MB boards is in place',
+            'root logs in by password only when one was given',
+            'nothing of Debian or DietPi',
+            '16 MB for the graphics processor, with the cut-down firmware',
+            'the ALSA sequencer modules load at boot',
+        ):
             self.assertIn(needle, self.src)
 
 

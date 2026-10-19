@@ -3,6 +3,7 @@
 Everything here is a pure function on text, so it is tested without a radio. Secrets: a password is turned into the 256-bit key (what
 `wpa_passphrase` does) before it is stored; the password itself is never written anywhere by this module.
 """
+
 import hashlib
 import os
 import re
@@ -17,7 +18,7 @@ AP_DEFAULT_PASSWORD = 'exxpianosetup'
 AP_DEFAULT_PREFIX = 'exxpiano-Setup'
 AP_NETWORK = '10.42.0.0/24'
 INSTALLATION_ID_PATH = os.environ.get('EXXPIANO_INSTALLATION_ID_PATH', '/var/lib/exxpiano/installation-id')
-INSTALLATION_ID_RE = re.compile(r'^(?:[0-9A-F]{6}|[0-9A-F]{16})$')   # new copies get 6 digits; a longer ID made by an earlier version is kept
+INSTALLATION_ID_RE = re.compile(r'^(?:[0-9A-F]{6}|[0-9A-F]{16})$')  # new copies get 6 digits; a longer ID made by an earlier version is kept
 
 
 # ---- validation and keys
@@ -66,7 +67,7 @@ def _split(text):
                 block = None
         else:
             items.append(('line', line))
-    if block is not None:                                   # an unterminated block: keep it as it was
+    if block is not None:  # an unterminated block: keep it as it was
         items.extend(('line', l) for l in block)
     return items
 
@@ -109,8 +110,7 @@ def networks(text):
             priority = int(f.get('priority', '0'))
         except ValueError:
             priority = 0
-        out.append(dict(ssid=_decode_ssid(f['ssid']), secure=f.get('key_mgmt', 'WPA-PSK') != 'NONE', hidden=f.get('scan_ssid') == '1',
-                        priority=priority))
+        out.append(dict(ssid=_decode_ssid(f['ssid']), secure=f.get('key_mgmt', 'WPA-PSK') != 'NONE', hidden=f.get('scan_ssid') == '1', priority=priority))
     return out
 
 
@@ -131,7 +131,7 @@ def add_network(text, ssid, psk=None, hidden=False):
         block.append('\tscan_ssid=1')
     block += ['\tpriority=%d' % (top + 1), '}']
     block = '\n'.join(block).split('\n')
-    while items and items[-1] == ('line', ''):              # keep the file tidy: one blank line is added by the final newline
+    while items and items[-1] == ('line', ''):  # keep the file tidy: one blank line is added by the final newline
         items.pop()
     items.append(('net', block))
     items.append(('line', ''))
@@ -189,7 +189,7 @@ def parse_scan(text):
         sig = re.search(r'(?m)^\s*signal: (-?\d+(?:\.\d+)?) dBm', chunk)
         freq = re.search(r'(?m)^\s*freq: (\d+)', chunk)
         secure = bool(re.search(r'(?m)^\s*(RSN|WPA):', chunk)) or bool(re.search(r'capability:.*\bPrivacy\b', chunk))
-        entry = dict(ssid=ssid, signal=int(round(float(sig.group(1)))) if sig else -100, secure=secure, freq=int(freq.group(1)) if freq else None)
+        entry = dict(ssid=ssid, signal=round(float(sig.group(1))) if sig else -100, secure=secure, freq=int(freq.group(1)) if freq else None)
         if ssid not in best or entry['signal'] > best[ssid]['signal']:
             best[ssid] = entry
     return sorted(best.values(), key=lambda e: -e['signal'])
@@ -241,7 +241,7 @@ def scan_networks(run, iface, tries=3, pause=1.5, sleep=time.sleep):
         if rc == 0:
             return parse_scan(out), None
         reason = scan_failure_reason(rc, out)
-        if 'network is down' in (out or '').lower() or '(-100)' in (out or ''):    # the interface is down (after the setup network, say): bring it up
+        if 'network is down' in (out or '').lower() or '(-100)' in (out or ''):  # the interface is down (after the setup network, say): bring it up
             run(['ip', 'link', 'set', iface, 'up'], 10)
             sleep(2)
         if i + 1 < tries:
@@ -278,7 +278,7 @@ def installation_id(path=INSTALLATION_ID_PATH, random_hex=None):
         raise ValueError('an installation ID must be 6 hexadecimal characters (16 for a copy made by an earlier version)')
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
-    except FileExistsError:                                      # another service won the first-start race
+    except FileExistsError:  # another service won the first-start race
         return installation_id(path, random_hex)
     with os.fdopen(fd, 'w', encoding='ascii') as f:
         f.write(value + '\n')
@@ -318,9 +318,23 @@ def hostapd_conf(interface, ssid, passphrase, channel=6, country_code=None, ctrl
         raise ValueError('the access point needs a password')
     if channel not in CHANNELS_2G:
         raise ValueError('channel must be 1, 6 or 11')
-    lines = ['interface=' + interface, 'driver=nl80211', 'ssid=' + ssid, 'hw_mode=g', 'channel=%d' % channel, 'ieee80211n=1', 'wmm_enabled=1',
-             'auth_algs=1', 'wpa=2', 'wpa_key_mgmt=WPA-PSK', 'rsn_pairwise=CCMP', 'wpa_passphrase=' + passphrase, 'max_num_sta=4',
-             'macaddr_acl=0', 'ignore_broadcast_ssid=0']
+    lines = [
+        'interface=' + interface,
+        'driver=nl80211',
+        'ssid=' + ssid,
+        'hw_mode=g',
+        'channel=%d' % channel,
+        'ieee80211n=1',
+        'wmm_enabled=1',
+        'auth_algs=1',
+        'wpa=2',
+        'wpa_key_mgmt=WPA-PSK',
+        'rsn_pairwise=CCMP',
+        'wpa_passphrase=' + passphrase,
+        'max_num_sta=4',
+        'macaddr_acl=0',
+        'ignore_broadcast_ssid=0',
+    ]
     if country_code and re.fullmatch(r'[A-Z]{2}', country_code):
         lines += ['country_code=' + country_code, 'ieee80211d=1']
     if ctrl_dir:
@@ -331,11 +345,24 @@ def hostapd_conf(interface, ssid, passphrase, channel=6, country_code=None, ctrl
 def dnsmasq_conf(interface, run_dir, address=AP_ADDRESS):
     """DHCP for the phone and a DNS that answers every name with the Pi (so the phone's sign-in check lands on the page)."""
     base = address.rsplit('.', 1)[0]
-    return '\n'.join([
-        'interface=' + interface, 'listen-address=' + address, 'bind-interfaces', 'no-resolv', 'no-hosts', 'no-poll',
-        'user=nobody', 'group=nobody',                        # Alpine has no group nogroup; nobody/nobody owns nothing
-        'dhcp-range=%s.10,%s.60,255.255.255.0,2h' % (base, base), 'dhcp-option=3,' + address, 'dhcp-option=6,' + address,
-        'address=/#/' + address, 'pid-file=' + os.path.join(run_dir, 'dnsmasq.pid'), 'dhcp-leasefile=' + os.path.join(run_dir, 'dnsmasq.leases'), '']
+    return '\n'.join(
+        [
+            'interface=' + interface,
+            'listen-address=' + address,
+            'bind-interfaces',
+            'no-resolv',
+            'no-hosts',
+            'no-poll',
+            'user=nobody',
+            'group=nobody',  # Alpine has no group nogroup; nobody/nobody owns nothing
+            'dhcp-range=%s.10,%s.60,255.255.255.0,2h' % (base, base),
+            'dhcp-option=3,' + address,
+            'dhcp-option=6,' + address,
+            'address=/#/' + address,
+            'pid-file=' + os.path.join(run_dir, 'dnsmasq.pid'),
+            'dhcp-leasefile=' + os.path.join(run_dir, 'dnsmasq.leases'),
+            '',
+        ]
     )
 
 
@@ -368,7 +395,7 @@ def apply_hostname(name, run, hosts_path=None, hostname_path=None):
         write_secret(hosts_path, '\n'.join(lines) + '\n')
         os.chmod(hosts_path, 0o644)
     except OSError:
-        pass                                         # the name is set; a missing hosts line only slows sudo down
+        pass  # the name is set; a missing hosts line only slows sudo down
     run(['rc-service', '--ifstarted', 'avahi-daemon', 'restart'])
     return name
 
@@ -381,6 +408,7 @@ MAX_JSON = 64 * 1024
 def write_json(path, data):
     """Atomic, mode 0600 (the request files hold a network key)."""
     import json
+
     directory = os.path.dirname(os.path.abspath(path))
     os.makedirs(directory, mode=0o700, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix='.json.', dir=directory)
@@ -397,6 +425,7 @@ def write_json(path, data):
 
 def read_json(path):
     import json
+
     try:
         if os.path.getsize(path) > MAX_JSON:
             return None
@@ -410,6 +439,7 @@ def read_json(path):
 def post_request(run_dir, request):
     """The page asks the supervisor for something; one request at a time (a second one replaces an unread first)."""
     import time
+
     request = dict(request, id=str(int(time.time() * 1000)))
     write_json(os.path.join(run_dir, 'request.json'), request)
     return request['id']

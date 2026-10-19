@@ -1,0 +1,21 @@
+# CodeRabbit (AI review of pull requests): https://docs.coderabbit.ai/getting-started/configure-coderabbit
+language: ru-RU
+reviews:
+  profile: chill            # fewer nitpicks: style is checked by ruff (ruff.toml)
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "pi/**"
+      instructions: >-
+        Runs on a Raspberry Pi (from 512 MB of memory, Python 3.11 or newer) next to FluidSynth. Look for CPU or memory cost in the audio
+        and MIDI paths, and for anything that could stop the sound or lock the user out of the device (Wi-Fi setup, configuration writes).
+    - path: "{tools,scripts}/**"
+      instructions: "Must also run on the python3 of macOS (3.9)."
+    - path: "**/*.py"
+      instructions: >-
+        The house style is deliberate and enforced by ruff.toml: dict(a=1) records, %-formatting, short statements joined with ';',
+        long lines with a comment at the end. Do not ask to change these.

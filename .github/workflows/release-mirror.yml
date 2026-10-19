@@ -1,0 +1,79 @@
+name: release-mirror
+
+# Copies the files of an already published release to the download mirror (Cloudflare R2) and adds the mirror links to
+# its description. New releases do this themselves (release.yml); this is for a release made before the mirror existed
+# or whose copy failed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v1.10.21"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Download the release files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p dist/sd
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist/sd
+          (cd dist/sd && sha256sum -c SHA256SUMS)
+
+      - name: Copy them to the mirror
+        id: mirror
+        env:
+          TAG: ${{ inputs.tag }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+        run: |
+          url=$(scripts/mirror-to-r2.sh "$TAG" dist/sd/*)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Add the mirror links to the release description
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          MIRROR_URL: ${{ steps.mirror.outputs.url }}
+        run: |
+          # the published description stays as it is (it was written from that release's CHANGELOG.md); only the links go in
+          mkdir -p build
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > build/release-body.md
+          python3 scripts/release-notes.py --existing build/release-body.md --mirror "$MIRROR_URL" dist/sd/*.zip > build/release-notes.md
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file build/release-notes.md
+
+      - name: Keep only the last two versions on the mirror
+        # the older versions are deleted from the bucket, and their mirror links come out of their release descriptions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+        run: |
+          removed=$(scripts/mirror-to-r2.sh --prune 2)
+          mkdir -p build
+          for t in $removed; do
+            echo "Removed $t from the mirror"
+            gh release view "$t" --repo "$GITHUB_REPOSITORY" --json body -q .body > build/old-body.md || continue
+            grep -q '^## Faster download (mirror)' build/old-body.md || continue
+            python3 scripts/release-notes.py --existing build/old-body.md --remove-mirror > build/old-notes.md
+            gh release edit "$t" --repo "$GITHUB_REPOSITORY" --notes-file build/old-notes.md
+          done

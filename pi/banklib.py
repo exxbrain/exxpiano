@@ -3,8 +3,9 @@
 A bank is identified by its plain file name inside the library folder. The web interface only ever hands us such a name, and `resolve` accepts
 it only if the folder itself lists it, so a path can never be smuggled in (no `..`, no absolute paths, no symlinks).
 """
-import os
+
 import json
+import os
 import re
 import shutil
 import stat
@@ -12,16 +13,16 @@ import stat
 import sf2info
 
 BANK_EXT = ('.sf2', '.sf3')
-NAME_RE = re.compile(r'^[^/\\\x00-\x1f][^/\\\x00-\x1f]{0,119}$')      # a plain file name
+NAME_RE = re.compile(r'^[^/\\\x00-\x1f][^/\\\x00-\x1f]{0,119}$')  # a plain file name
 DEFAULT_DIR = '/var/lib/exxpiano/banks'
-IMPORT_DIR = '/var/lib/exxpiano/banks'      # banks imported from a USB drive: one folder <id>/ with bank.sf2 and meta.json each
+IMPORT_DIR = '/var/lib/exxpiano/banks'  # banks imported from a USB drive: one folder <id>/ with bank.sf2 and meta.json each
 IMPORT_ID_RE = re.compile(r'^i-[0-9a-f]{16}$')
-RESERVE_MB = 200                  # RAM kept for the system and the rest of the module on a board with 1 GB (the Pi 3 B has about 950 MB); the system itself took about 85 MB on a 512 MB board. Lowered from 400 for the 700 MB bank; not measured on a 1 GB board
-SMALL_BOARD_MB = 800              # below this (a Pi 3 A+ has 512 MB, about 414 usable) the system needs less than 400 MB: it used about 85 MB there
-SMALL_BOARD_RESERVE = 0.28        # share of the memory kept on such a board
-MECH_PROGRAMS = range(1, 7)       # the mechanics bank answers on bank 0, programs 1..6 (see exxpiano-fx.py: PROGRAMS)
+RESERVE_MB = 200  # RAM kept for the system and the rest of the module on a board with 1 GB (the Pi 3 B has about 950 MB); the system itself took about 85 MB on a 512 MB board. Lowered from 400 for the 700 MB bank; not measured on a 1 GB board
+SMALL_BOARD_MB = 800  # below this (a Pi 3 A+ has 512 MB, about 414 usable) the system needs less than 400 MB: it used about 85 MB there
+SMALL_BOARD_RESERVE = 0.28  # share of the memory kept on such a board
+MECH_PROGRAMS = range(1, 7)  # the mechanics bank answers on bank 0, programs 1..6 (see exxpiano-fx.py: PROGRAMS)
 
-_cache = {}                       # (path, size, mtime_ns) -> sf2info result or error text
+_cache = {}  # (path, size, mtime_ns) -> sf2info result or error text
 
 
 def mem_total_bytes(meminfo='/proc/meminfo'):
@@ -115,7 +116,7 @@ def list_banks(bank_dir, exclude=(), mem_total=None, mech_bytes=0, reserve_mb=No
             st = os.lstat(path)
         except OSError:
             continue
-        if not stat.S_ISREG(st.st_mode):                         # no symlinks, no folders
+        if not stat.S_ISREG(st.st_mode):  # no symlinks, no folders
             continue
         if any(_same(path, e) for e in exclude if e):
             continue
@@ -124,8 +125,17 @@ def list_banks(bank_dir, exclude=(), mem_total=None, mech_bytes=0, reserve_mb=No
         reason = error
         if reason is None and not fits:
             reason = 'too large for this device: %d MB, at most %d MB fit in memory' % (st.st_size >> 20, limit >> 20)
-        out.append(dict(id=name, size=st.st_size, name=(info or {}).get('name') or os.path.splitext(name)[0],
-                        presets=len((info or {}).get('presets', [])), ok=error is None, fits=fits, reason=reason))
+        out.append(
+            dict(
+                id=name,
+                size=st.st_size,
+                name=(info or {}).get('name') or os.path.splitext(name)[0],
+                presets=len((info or {}).get('presets', [])),
+                ok=error is None,
+                fits=fits,
+                reason=reason,
+            )
+        )
     return out
 
 
@@ -153,8 +163,7 @@ def presets_of(path):
     out = []
     for p in info['presets']:
         shadowed = p['bank'] == 0 and p['program'] in MECH_PROGRAMS and p['bank'] < 128
-        out.append(dict(p, usable=not shadowed,
-                        reason='shadowed by the mechanics bank (bank 0, programs 1-6)' if shadowed else None))
+        out.append(dict(p, usable=not shadowed, reason='shadowed by the mechanics bank (bank 0, programs 1-6)' if shadowed else None))
     return out
 
 
@@ -187,10 +196,11 @@ def fitting_replacement(piano, mech, bank_dir, mem_total=None):
     return os.path.join(bank_dir, best['id']) if best else None
 
 
-if __name__ == '__main__':       # used by exxpiano-run:  banklib.py PIANO MECH BANK_DIR  ->  prints the replacement path, or nothing
+if __name__ == '__main__':  # used by exxpiano-run:  banklib.py PIANO MECH BANK_DIR  ->  prints the replacement path, or nothing
     import sys
+
     if len(sys.argv) == 4:
-        meminfo = os.environ.get('EXXPIANO_MEMINFO')           # for tests
+        meminfo = os.environ.get('EXXPIANO_MEMINFO')  # for tests
         found = fitting_replacement(sys.argv[1], sys.argv[2], sys.argv[3], mem_total_bytes(meminfo) if meminfo else None)
         if found:
             print(found)
@@ -237,8 +247,19 @@ def list_imports(import_dir, mem_total=None, mech_bytes=0, reserve_mb=None):
         reason = error
         if reason is None and not fits:
             reason = 'too large for this device: %d MB, at most %d MB fit in memory' % (size >> 20, limit >> 20)
-        out.append(dict(id=name, size=size, name=(info or {}).get('name') or meta.get('name') or name, original_name=meta.get('original_name'),
-                        presets=len((info or {}).get('presets', [])), ok=error is None, fits=fits, reason=reason, source='imported'))
+        out.append(
+            dict(
+                id=name,
+                size=size,
+                name=(info or {}).get('name') or meta.get('name') or name,
+                original_name=meta.get('original_name'),
+                presets=len((info or {}).get('presets', [])),
+                ok=error is None,
+                fits=fits,
+                reason=reason,
+                source='imported',
+            )
+        )
     return out
 
 
@@ -255,7 +276,7 @@ def resolve_any(bank_dir, import_dir, bank_id):
 def delete_installed(bank_dir, bank_id, keep_paths=()):
     """Remove an installed bank (a plain file of the bank library) unless it is one of `keep_paths`: the current bank, the last good one and
     the mechanics bank. ValueError with a reason otherwise. -> the number of bytes freed. The file is renamed out of the catalog first."""
-    path = resolve(bank_dir, bank_id)                          # ValueError unless it is a plain file of the library
+    path = resolve(bank_dir, bank_id)  # ValueError unless it is a plain file of the library
     if any(_same(path, k) for k in keep_paths if k):
         raise ValueError('this bank is in use: choose another working bank first')
     size = os.lstat(path).st_size
@@ -264,7 +285,7 @@ def delete_installed(bank_dir, bank_id, keep_paths=()):
     try:
         os.remove(gone)
     except OSError:
-        pass                                                   # a leftover with a dot name is not listed; the next delete or restart can clear it
+        pass  # a leftover with a dot name is not listed; the next delete or restart can clear it
     return size
 
 
@@ -277,5 +298,5 @@ def delete_import(import_dir, bank_id, keep_paths=()):
         raise ValueError('this bank is in use: choose another working bank first')
     folder = os.path.join(import_dir, bank_id)
     gone = os.path.join(import_dir, '.deleting-' + bank_id)
-    os.rename(folder, gone)                                   # out of the catalog first, then the files
+    os.rename(folder, gone)  # out of the catalog first, then the files
     shutil.rmtree(gone, ignore_errors=True)

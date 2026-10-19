@@ -1,4 +1,5 @@
 """The demonstration piece that comes with the package: imported once, not again after the owner deleted it, never a failure of the installation."""
+
 import importlib.util
 import json
 import os
@@ -36,7 +37,7 @@ class DemoMidiTests(unittest.TestCase):
     def test_the_piece_is_imported_once_with_its_title(self):
         self.assertEqual(demo.import_demo(self.share, self.lib), [PIECE])
         self.assertEqual(self.names(), [TITLE])
-        self.assertEqual(demo.import_demo(self.share, self.lib), [])                 # the next run: nothing to do
+        self.assertEqual(demo.import_demo(self.share, self.lib), [])  # the next run: nothing to do
         self.assertEqual(len(midilib.list_library(self.lib)), 1)
 
     def test_a_piece_the_owner_deleted_does_not_come_back_with_an_update(self):
@@ -44,15 +45,15 @@ class DemoMidiTests(unittest.TestCase):
         midilib.delete_file(self.lib, midilib.list_library(self.lib)[0]['id'])
         self.assertEqual(demo.import_demo(self.share, self.lib), [])
         self.assertEqual(self.names(), [])
-        make_midi(os.path.join(self.share, 'new-piece.mid'), [(0, 62, 80, 1)])        # a piece of a later version is imported
+        make_midi(os.path.join(self.share, 'new-piece.mid'), [(0, 62, 80, 1)])  # a piece of a later version is imported
         self.assertEqual(demo.import_demo(self.share, self.lib), ['new-piece.mid'])
         self.assertEqual(self.names(), ['new piece'])
 
     def test_nothing_in_the_way_is_a_failure(self):
-        self.assertEqual(demo.import_demo(os.path.join(self.tmp.name, 'missing'), self.lib), [])         # no folder
+        self.assertEqual(demo.import_demo(os.path.join(self.tmp.name, 'missing'), self.lib), [])  # no folder
         with open(os.path.join(self.share, 'broken.mid'), 'wb') as f:
             f.write(b'not midi' * 20)
-        self.assertEqual(demo.import_demo(self.share, self.lib), [PIECE])                              # a bad file is skipped, the good one imported
+        self.assertEqual(demo.import_demo(self.share, self.lib), [PIECE])  # a bad file is skipped, the good one imported
         self.assertEqual(self.names(), [TITLE])
         with open(os.path.join(self.lib, demo.MARKER), encoding='utf-8') as f:
             self.assertEqual(json.load(f), [PIECE])
@@ -66,7 +67,7 @@ class DemoMidiTests(unittest.TestCase):
                 path = os.path.join(folder, name)
                 self.assertGreater(midilib.inspect(path)['notes'], 1000)
                 self.assertLess(os.path.getsize(path), midilib.MAX_BYTES)
-                self.assertIn(name, demo.TITLES)                                   # shown under a readable name, not a file name
+                self.assertIn(name, demo.TITLES)  # shown under a readable name, not a file name
         path = os.path.join(folder, PIECE)
         with open(os.path.join(ROOT, 'assets', 'midi', 'NOTICE.md'), encoding='utf-8') as f:
             notice = f.read()

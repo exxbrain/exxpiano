@@ -3,6 +3,7 @@
 Time is a fake clock and the synthesizer a recorder: nothing sleeps, nothing is heard. How exact the timing is on a real Pi is a separate check.
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+
 import importlib.util
 import json
 import os
@@ -38,8 +39,15 @@ class Rig:
         self.now = 1000.0
         self.port = 'FLUID Synth 1'
         self.events, self.released = [], []
-        self.player = midiplayer.Player(self.lib, self.run_dir, lambda *e: self.events.append((round(self.now - self.t0, 2),) + e),
-                                        lambda pedal: self.released.append(pedal), lambda: self.port, clock=lambda: self.now, wall=lambda: 1.7e9)
+        self.player = midiplayer.Player(
+            self.lib,
+            self.run_dir,
+            lambda *e: self.events.append((round(self.now - self.t0, 2),) + e),
+            self.released.append,
+            lambda: self.port,
+            clock=lambda: self.now,
+            wall=lambda: 1.7e9,
+        )
         self.t0 = self.now
         self.nonce = 0
 
@@ -66,17 +74,24 @@ class PlayerTests(unittest.TestCase):
         self.assertEqual(r.status()['state'], 'idle')
         r.ask(op='play', id=r.id)
         r.t0 = r.now
-        r.advance(0.3)                                                    # the request is seen within a quarter of a second
+        r.advance(0.3)  # the request is seen within a quarter of a second
         self.assertEqual(r.status()['state'], 'playing')
         r.advance(1.5)
         times = [(round(t, 1), k, a) for t, k, a, _ in r.events]
         self.assertEqual([(k, a) for _, k, a in times], [('pedal', 127), ('on', 60), ('off', 60), ('on', 64), ('off', 64), ('pedal', 0)])
         self.assertEqual([t for t, _, _ in times], sorted(t for t, _, _ in times))
-        for (t, k, a), want in zip(times, (0.0, 0.0, 0.5, 0.5, 1.0, 1.0)):
-            self.assertAlmostEqual(t, want + (times[0][0]), delta=0.2)    # the player starts when it saw the request, then keeps the time of the file
+        for (t, _k, _a), want in zip(times, (0.0, 0.0, 0.5, 0.5, 1.0, 1.0)):
+            self.assertAlmostEqual(t, want + (times[0][0]), delta=0.2)  # the player starts when it saw the request, then keeps the time of the file
         self.assertEqual(r.status()['state'], 'idle')
         self.assertEqual(r.status()['reason'], 'finished')
-        self.assertEqual(r.released, [False])                             # the pedal was up at the end
+        self.assertEqual(r.released, [False])  # the pedal was up at the end
+
+    def test_a_file_that_ends_in_a_half_pedal_lets_the_pedal_go(self):
+        r = Rig(self, notes=[(0, 60, 80, 1)], pedal=[(0, 127), (0.5, 63)])  # the bridge plays 63 as down
+        r.ask(op='play', id=r.id)
+        r.advance(2.0)
+        self.assertEqual(r.status()['reason'], 'finished')
+        self.assertEqual(r.released, [True])
 
     def test_the_position_grows_and_the_status_names_the_piece(self):
         r = Rig(self, notes=[(0, 60, 80, 8)], pedal=[], title='Etude')
@@ -93,17 +108,17 @@ class PlayerTests(unittest.TestCase):
         r.ask(op='play', id=r.id)
         r.advance(0.6)
         r.events.clear()
-        r.ask(op='seek', id=r.id, position=2.5)                           # the notes at 0 s, 1 s and 2 s are behind
+        r.ask(op='seek', id=r.id, position=2.5)  # the notes at 0 s, 1 s and 2 s are behind
         r.advance(0.4)
-        self.assertEqual(r.released, [True])                              # whatever sounded is let go, the pedal included
-        self.assertEqual(r.events[0][1:], ('pedal', 127, 0))              # the file has the pedal down there: it is pressed again
+        self.assertEqual(r.released, [True])  # whatever sounded is let go, the pedal included
+        self.assertEqual(r.events[0][1:], ('pedal', 127, 0))  # the file has the pedal down there: it is pressed again
         s = r.status()
         self.assertEqual(s['state'], 'playing')
         self.assertAlmostEqual(s['position'], 2.7, delta=0.45)
         r.events.clear()
         r.advance(1.0)
-        self.assertEqual([(k, a) for _, k, a, _ in r.events], [('on', 66), ('off', 66)])          # the note at 3 s comes at its time
-        r.ask(op='seek', id=r.id, position=0)                             # back to the beginning: the first note sounds again
+        self.assertEqual([(k, a) for _, k, a, _ in r.events], [('on', 66), ('off', 66)])  # the note at 3 s comes at its time
+        r.ask(op='seek', id=r.id, position=0)  # back to the beginning: the first note sounds again
         r.events.clear()
         r.advance(0.4)
         self.assertIn(('on', 60), [(k, a) for _, k, a, _ in r.events])
@@ -118,7 +133,7 @@ class PlayerTests(unittest.TestCase):
 
     def test_a_seek_for_nothing_that_plays_or_with_nonsense_is_ignored(self):
         r = Rig(self, notes=[(0, 60, 80, 10)], pedal=[])
-        r.ask(op='seek', id=r.id, position=1)                             # nothing plays
+        r.ask(op='seek', id=r.id, position=1)  # nothing plays
         r.advance(0.5)
         self.assertEqual(r.status()['state'], 'idle')
         r.ask(op='play', id=r.id)
@@ -126,16 +141,16 @@ class PlayerTests(unittest.TestCase):
         for bad in ('1', None, True, float('nan'), [1]):
             r.ask(op='seek', id=r.id, position=bad)
             r.advance(0.3)
-        r.ask(op='seek', id='m-0000000000000000', position=1.0)           # another piece than the one that plays
+        r.ask(op='seek', id='m-0000000000000000', position=1.0)  # another piece than the one that plays
         r.advance(0.3)
         self.assertEqual(r.status()['state'], 'playing')
         self.assertLess(r.status()['position'], 1.8)
 
     def test_the_status_names_the_piece_as_the_library_does(self):
-        r = Rig(self, notes=[(0, 60, 80, 8)], pedal=[], title='control track')                 # a title nobody wants to read
+        r = Rig(self, notes=[(0, 60, 80, 8)], pedal=[], title='control track')  # a title nobody wants to read
         r.ask(op='play', id=r.id)
         r.advance(0.6)
-        self.assertEqual(r.status()['title'], 'a')                                              # the library names it after the file
+        self.assertEqual(r.status()['title'], 'a')  # the library names it after the file
 
     def test_stop_in_the_middle_silences_everything_and_lets_the_pedal_go(self):
         r = Rig(self, pedal=[(0, 127), (4, 0)])
@@ -145,10 +160,10 @@ class PlayerTests(unittest.TestCase):
         r.advance(0.4)
         self.assertEqual(r.status()['state'], 'idle')
         self.assertEqual(r.status()['reason'], 'stopped')
-        self.assertEqual(r.released, [True])                              # the pedal was down when it stopped
+        self.assertEqual(r.released, [True])  # the pedal was down when it stopped
         count = len(r.events)
         r.advance(3)
-        self.assertEqual(len(r.events), count)                            # nothing more is sent
+        self.assertEqual(len(r.events), count)  # nothing more is sent
 
     def test_repeat_starts_again_after_a_short_gap_until_stopped(self):
         r = Rig(self)
@@ -185,12 +200,12 @@ class PlayerTests(unittest.TestCase):
         self.assertEqual(r.status()['reason'], 'the synthesizer is not running')
         r.port = 'FLUID Synth 1'
         r.advance(2)
-        self.assertEqual(r.status()['state'], 'idle')                     # the same request is not served again
+        self.assertEqual(r.status()['state'], 'idle')  # the same request is not served again
         with open(os.path.join(r.run_dir, 'request.json'), 'w') as f:
             f.write('{broken')
         r.advance(1)
-        self.assertEqual(r.status()['state'], 'idle')                     # a damaged request file is ignored
-        r.ask(op='play', id=r.id)                                         # a new nonce plays it
+        self.assertEqual(r.status()['state'], 'idle')  # a damaged request file is ignored
+        r.ask(op='play', id=r.id)  # a new nonce plays it
         r.advance(0.4)
         self.assertEqual(r.status()['state'], 'playing')
 
@@ -203,7 +218,7 @@ class PlayerTests(unittest.TestCase):
         r.ask(op='play', id=other_id)
         r.advance(0.4)
         self.assertEqual(r.status()['id'], other_id)
-        self.assertEqual(r.released, [True])                              # the first piece was silenced before the next began
+        self.assertEqual(r.released, [True])  # the first piece was silenced before the next began
 
     def test_the_status_is_a_valid_file_with_a_fresh_stamp(self):
         r = Rig(self)
@@ -251,11 +266,11 @@ class SameRoadTests(unittest.TestCase):
         file_bridge, key_bridge = bridge(), bridge()
         file_bridge.play_event('on', 60, 50)
         file_bridge.play_event('off', 60, 0)
-        key_bridge.on_msg(Msg(type='note_on', channel=0, note=60, velocity=50))                 # what a keyboard sends
+        key_bridge.on_msg(Msg(type='note_on', channel=0, note=60, velocity=50))  # what a keyboard sends
         key_bridge.on_msg(Msg(type='note_off', channel=0, note=60, velocity=0))
         self.assertEqual([shape(m) for m in file_bridge.out.sent], [shape(m) for m in key_bridge.out.sent])
-        self.assertGreater(len(file_bridge.out.sent), 2)                  # the piano's two messages and the mechanics' noise after them
-        self.assertTrue(any(getattr(m, 'channel', 0) > 0 for m in file_bridge.out.sent))      # the mechanics did sound
+        self.assertGreater(len(file_bridge.out.sent), 2)  # the piano's two messages and the mechanics' noise after them
+        self.assertTrue(any(getattr(m, 'channel', 0) > 0 for m in file_bridge.out.sent))  # the mechanics did sound
 
     def test_the_touch_curve_applies_to_the_file(self):
         b = bridge()
@@ -275,6 +290,14 @@ class SameRoadTests(unittest.TestCase):
         before = len(b.out.sent)
         b.release_all(False)
         self.assertEqual([(m.control, m.value) for m in b.out.sent[before:] if m.type == 'control_change' and m.channel == 0], [(123, 0)])
+
+    def test_a_half_pedal_dip_of_a_file_does_not_lift_the_pedal(self):
+        b = bridge()
+        for value in (127, 57, 63, 127, 21, 0):  # a dip to 57-63 (half pedal) and then a real lift
+            b.play_event('pedal', value, 0)
+        values = [m.value for m in b.out.sent if m.type == 'control_change' and m.control == 64]
+        self.assertEqual(values, [127, 127, 127, 127, 0, 0])
+        self.assertEqual(fx.FILE_PEDAL_DOWN, midiplayer.FILE_PEDAL_DOWN)  # the player knows the pedal the bridge holds down
 
 
 if __name__ == '__main__':

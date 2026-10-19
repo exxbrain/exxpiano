@@ -3,6 +3,7 @@
 These read the files; scripts/test-openrc-services.sh starts the services in an Alpine container.
 Run from the repository root:   python3 -m unittest discover -s tests -v
 """
+
 import os
 import re
 import shutil
@@ -59,12 +60,12 @@ class InitScriptTests(unittest.TestCase):
         self.assertEqual(var(read('pi', 'init.d', 'exxpiano'), 'rc_ulimit'), '-r 95 -l unlimited')
         fx = read('pi', 'init.d', 'exxpiano-fx')
         self.assertIn("--nice -5 ", var(fx, 'command_args'))
-        self.assertIn("'\\$FX_ARGS'", fx)                 # kept from the shell that evaluates command_args, for exxpiano-env
+        self.assertIn("'\\$FX_ARGS'", fx)  # kept from the shell that evaluates command_args, for exxpiano-env
 
     def test_the_order_of_the_services(self):
         for name in ('exxpiano-fx', 'exxpiano-web'):
             self.assertRegex(read('pi', 'init.d', name), r'\n\tafter [^\n]*\bexxpiano\b', name)
-            self.assertNotRegex(read('pi', 'init.d', name), r'\n\tneed [^\n]*\bexxpiano\b', name)      # a restart of the synthesizer leaves them running
+            self.assertNotRegex(read('pi', 'init.d', name), r'\n\tneed [^\n]*\bexxpiano\b', name)  # a restart of the synthesizer leaves them running
         self.assertRegex(read('pi', 'init.d', 'exxpiano-firstboot'), r'before exxpiano exxpiano-wifi exxpiano-web')
 
     def test_the_wifi_supervisor_is_restarted_only_after_a_failure(self):
@@ -134,10 +135,20 @@ class FirstBootTests(unittest.TestCase):
 
     def run_firstboot(self, mem_kb, root='/dev/mmcblk0p2', grow=0, resize=0, wifi=0):
         self.write(self.path('meminfo'), 'MemTotal:       %d kB\nMemFree:        1000 kB\n' % mem_kb)
-        env = dict(os.environ, FIRSTBOOT_LOG=self.path('log'), STAMP=self.path('stamp'), CONF=self.conf, MEMINFO=self.path('meminfo'),
-                   BOOT_KEYS=self.path('boot-authorized_keys'), ROOT_KEYS=self.path('root-ssh/authorized_keys'),
-                   LITE=self.lite, ROOT_SOURCE=root, GROWPART=self.tool('growpart', grow), RESIZE2FS=self.tool('resize2fs', resize),
-                   WIFI=self.tool('ensure-name', wifi))
+        env = dict(
+            os.environ,
+            FIRSTBOOT_LOG=self.path('log'),
+            STAMP=self.path('stamp'),
+            CONF=self.conf,
+            MEMINFO=self.path('meminfo'),
+            BOOT_KEYS=self.path('boot-authorized_keys'),
+            ROOT_KEYS=self.path('root-ssh/authorized_keys'),
+            LITE=self.lite,
+            ROOT_SOURCE=root,
+            GROWPART=self.tool('growpart', grow),
+            RESIZE2FS=self.tool('resize2fs', resize),
+            WIFI=self.tool('ensure-name', wifi),
+        )
         r = subprocess.run(['bash', os.path.join(ROOT, 'pi', 'exxpiano-firstboot')], env=env, capture_output=True, text=True, timeout=30)
         self.assertEqual(r.returncode, 0, r.stderr)
         with open(self.conf) as f:
@@ -152,7 +163,7 @@ class FirstBootTests(unittest.TestCase):
         self.assertIn('resize2fs /dev/mmcblk0p2', calls)
         self.assertIn('ensure-name', calls)
         with open(os.path.join(ROOT, 'pi', 'exxpiano-firstboot')) as f:
-            self.assertIn('exxpiano-wifi.py ensure-name exxpiano}', f.read())         # the generic name of the image is renamed
+            self.assertIn('exxpiano-wifi.py ensure-name exxpiano}', f.read())  # the generic name of the image is renamed
         self.assertTrue(os.path.exists(self.path('stamp')))
 
     def test_a_board_with_1_gb_keeps_the_full_bank(self):
@@ -179,11 +190,11 @@ class FirstBootTests(unittest.TestCase):
         self.run_firstboot(948000)
         keys = self.path('root-ssh/authorized_keys')
         with open(keys) as f:
-            self.assertEqual(f.read(), 'ssh-ed25519 AAAAone owner@laptop\n')        # only plain key lines
+            self.assertEqual(f.read(), 'ssh-ed25519 AAAAone owner@laptop\n')  # only plain key lines
         self.assertEqual(os.stat(keys).st_mode & 0o777, 0o600)
         self.assertEqual(os.stat(os.path.dirname(keys)).st_mode & 0o777, 0o700)
         self.write(self.path('boot-authorized_keys'), 'ssh-ed25519 AAAAone owner@laptop\nssh-ed25519 AAAAtwo phone')
-        self.run_firstboot(948000)                                                       # a later start: the stamp is there
+        self.run_firstboot(948000)  # a later start: the stamp is there
         with open(keys) as f:
             self.assertEqual(f.read(), 'ssh-ed25519 AAAAone owner@laptop\nssh-ed25519 AAAAtwo phone\n')
 

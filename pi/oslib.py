@@ -10,6 +10,7 @@ The system log is busybox syslogd writing /var/log/messages (rotated to messages
 The services write their output there through `logger -t <service>` (see pi/init.d). The lines carry no year, and the Raspberry Pi has no clock
 of its own: the time can jump forward when the network sets it. So "this boot" is everything after the last "syslogd started" line, not a time.
 """
+
 import os
 import re
 import subprocess
@@ -19,14 +20,12 @@ LOG_FILES = ('/var/log/messages.0', '/var/log/messages')
 LINE_RE = re.compile(r'^(\w{3}) +(\d{1,2}) (\d\d):(\d\d):(\d\d) (\S+) (\w+)\.(\w+) ([^:\[\s]+)(?:\[(\d+)\])?(?::|(?= )) ?(.*)$')
 MONTHS = {m: i + 1 for i, m in enumerate(('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'))}
 LEVELS = {'emerg': 0, 'panic': 0, 'alert': 1, 'crit': 2, 'err': 3, 'error': 3, 'warn': 4, 'warning': 4, 'notice': 5, 'info': 6, 'debug': 7}
-BOOT_MARK = 'started: BusyBox'                             # "syslogd started: BusyBox v1.37.0": tag syslogd, then this text
+BOOT_MARK = 'started: BusyBox'  # "syslogd started: BusyBox v1.37.0": tag syslogd, then this text
 CHILD_RE = re.compile(r'^Child command line: (.*)$')
 EXIT_RE = re.compile(r'^(\S+), pid (\d+), (.+)$')
 # the program each service runs (the command line supervise-daemon logs) -> the service
-PROGRAMS = (('exxpiano-run', 'exxpiano'), ('exxpiano-fx.py', 'exxpiano-fx'), ('exxpiano-web.py', 'exxpiano-web'),
-            ('exxpiano-wifi.py', 'exxpiano-wifi'))
-STATES = {'started': 'active', 'stopped': 'inactive', 'crashed': 'failed', 'starting': 'activating', 'stopping': 'deactivating',
-          'inactive': 'inactive'}
+PROGRAMS = (('exxpiano-run', 'exxpiano'), ('exxpiano-fx.py', 'exxpiano-fx'), ('exxpiano-web.py', 'exxpiano-web'), ('exxpiano-wifi.py', 'exxpiano-wifi'))
+STATES = {'started': 'active', 'stopped': 'inactive', 'crashed': 'failed', 'starting': 'activating', 'stopping': 'deactivating', 'inactive': 'inactive'}
 
 
 def _run(cmd, timeout):
@@ -38,6 +37,7 @@ def _run(cmd, timeout):
 
 
 # ---- services
+
 
 def parse_status(rc, text):
     """`rc-service <name> status` -> active | inactive | failed | activating | deactivating | unknown (the words of systemctl is-active,
@@ -60,8 +60,9 @@ def service_exists(name, run=_run):
 
 def restart(name, popen=None):
     """Restart a service without waiting for it (the synthesizer needs tens of seconds to load its banks)."""
-    (popen or subprocess.Popen)(['rc-service', name, 'restart'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-          start_new_session=True)
+    (popen or subprocess.Popen)(
+        ['rc-service', name, 'restart'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
+    )
 
 
 def synth_pid(proc='/proc', comm='fluidsynth'):
@@ -86,6 +87,7 @@ def synth_pid(proc='/proc', comm='fluidsynth'):
 
 # ---- the system log
 
+
 def _timestamp(month, day, hh, mm, ss, now):
     """Milliseconds since the epoch for a syslog time without a year: this year, or the last one when that would lie in the future."""
     now_tm = time.localtime(now)
@@ -107,8 +109,7 @@ def parse_line(line, now):
     t = _timestamp(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), now)
     if t is None:
         return None
-    return dict(t=t, facility=m.group(7), level=LEVELS.get(m.group(8), 6), tag=m.group(9),
-                pid=int(m.group(10)) if m.group(10) else None, text=m.group(11))
+    return dict(t=t, facility=m.group(7), level=LEVELS.get(m.group(8), 6), tag=m.group(9), pid=int(m.group(10)) if m.group(10) else None, text=m.group(11))
 
 
 def read_messages(files=LOG_FILES, now=None):
@@ -130,7 +131,7 @@ def read_messages(files=LOG_FILES, now=None):
         if e is None:
             continue
         if e['tag'] == 'syslogd' and e['text'].startswith(BOOT_MARK):
-            out = []                                         # a new boot (or a restart of the log): only what follows counts
+            out = []  # a new boot (or a restart of the log): only what follows counts
             continue
         out.append(e)
     return out
