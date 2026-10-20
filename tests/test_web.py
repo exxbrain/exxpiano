@@ -48,6 +48,7 @@ class FakeActions:
         self.live = None  # what exxpiano-synth wrote about the banks; None: no preview, the plain fluidsynth plays
         self.live_loads = []
         self.live_ready = [True, True]  # answers of load_bank_live, one per attempt
+        self.live_gate = None  # an Event: load_bank_live blocks until it is set (the test looks at the state while the bank loads)
         self.waits = 0
         self.gate = None  # an Event: wait_synth_ready blocks until it is set
         self.pid = 100
@@ -98,6 +99,8 @@ class FakeActions:
         return self.live  # None: the plain fluidsynth plays and a switch restarts it
 
     def load_bank_live(self, path, bank, prog, timeout=150):
+        if self.live_gate is not None:
+            self.live_gate.wait(5)
         self.live_loads.append((path, bank, prog))
         answer = self.live_ready[min(len(self.live_loads) - 1, len(self.live_ready) - 1)]
         if answer:
@@ -477,9 +480,11 @@ class BankWebTests(ServerCase):
 
     def test_with_the_preview_the_bank_loads_in_the_synthesizer_without_a_restart(self):
         self.actions.live = dict(state='ready', playing=self.old, loading=None, error=None)
+        self.actions.live_gate = threading.Event()  # the switch stays in progress until the message is read: no race with a fast machine
         code, _ = self.jcall('/api/bank', {'id': 'new.sf2'})
         self.assertEqual(code, 200)
         self.assertIn('preview plays', self.jcall('/api/state')[1]['banks']['switch']['message'])
+        self.actions.live_gate.set()
         self.finish_switch()
         self.assertEqual(self.actions.restarts, 0)
         self.assertEqual(self.actions.live_loads, [(self.new, 0, 0)])
