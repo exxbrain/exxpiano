@@ -195,6 +195,31 @@ class BuilderTests(unittest.TestCase):
         self.assertIn('unset EXXPIANO_APK_KEY', ba.INNER)  # the build itself does not see it
         self.assertIn(ba.APK_CACHE + ':/var/cache/apk', seen['cmd'])  # the downloads are kept for the next build
 
+    def test_the_packages_are_built_inside_the_container_and_given_to_the_user_of_the_host(self):
+        # a GitHub runner checks the rights of the mounted folder (Docker Desktop on a Mac does not): "builder" may not write into /out
+        self.assertNotIn('REPODEST=/out', ba.INNER)
+        self.assertIn('REPODEST=/home/builder/repo', ba.INNER)
+        self.assertIn('cp -r /home/builder/repo/. /out/', ba.INNER)
+        self.assertIn('chown -R "$HOST_UID:${HOST_GID:-$HOST_UID}" /out', ba.INNER)
+        seen = {}
+
+        class Done:
+            returncode = 0
+
+        def runner(cmd, env):
+            if cmd[:2] == ['docker', 'run']:
+                seen.update(cmd=cmd, env=env)
+            return Done()
+
+        class Args:
+            version, banks = '1.2.3', None
+
+        with tempfile.TemporaryDirectory() as out:
+            Args.out, Args.work = out, os.path.join(out, 'work')
+            ba.build(Args, env={'PATH': os.environ.get('PATH', '')}, runner=runner)
+        self.assertIn('HOST_UID', seen['cmd'])
+        self.assertEqual(seen['env']['HOST_UID'], str(os.getuid()))
+
     def test_another_mirror_must_be_https(self):
         self.assertIsNone(ba.alpine_mirror({}))
         self.assertEqual(ba.alpine_mirror({'EXXPIANO_ALPINE_MIRROR': 'https://mirror.yandex.ru/mirrors/alpine/'}), 'https://mirror.yandex.ru/mirrors/alpine')

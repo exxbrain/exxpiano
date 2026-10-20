@@ -172,22 +172,28 @@ elif [ -s "/devkey/$KEY_NAME.rsa" ]; then
 else
   openssl genrsa -out "/home/builder/.abuild/$KEY_NAME.rsa" 4096 2>/dev/null
   cp "/home/builder/.abuild/$KEY_NAME.rsa" "/devkey/$KEY_NAME.rsa"; chmod 600 "/devkey/$KEY_NAME.rsa"
+  [ -z "${HOST_UID:-}" ] || chown "$HOST_UID:${HOST_GID:-$HOST_UID}" "/devkey/$KEY_NAME.rsa"
 fi
 unset EXXPIANO_APK_KEY
 openssl rsa -in "/home/builder/.abuild/$KEY_NAME.rsa" -pubout -out "/home/builder/.abuild/$KEY_NAME.rsa.pub" 2>/dev/null
 chown -R builder /home/builder/.abuild; chmod 600 "/home/builder/.abuild/$KEY_NAME.rsa"
 cp "/home/builder/.abuild/$KEY_NAME.rsa.pub" /etc/apk/keys/
 echo "PACKAGER_PRIVKEY=/home/builder/.abuild/$KEY_NAME.rsa" > /home/builder/.abuild/abuild.conf
-cp -r /work /home/builder/work; chown -R builder /home/builder/work /out
-mkdir -p /out/exxpiano
+# abuild builds into a folder of the container, not into the mounted /out: on Linux the mounted folder belongs to the user of the host and
+# "builder" may not write there (Docker Desktop on a Mac does not check, a GitHub runner does: "mkdir: can't create directory
+# '/out/exxpiano/aarch64': Permission denied"). Root copies the result and gives it to the user of the host.
+cp -r /work /home/builder/work; chown -R builder /home/builder/work
+install -d -o builder /home/builder/repo
 for pkg in $PACKAGES; do
   echo "== $pkg"
   cd "/home/builder/work/exxpiano/$pkg"
   case "$pkg" in exxpiano|exxpiano-soundfonts) su builder -c "abuild checksum" >/dev/null ;; esac
-  su builder -c "REPODEST=/out abuild -r" 2>&1 | grep -v "^>>> .*: \(Fetching\|Checking\|Unpacking\)" || { echo "abuild failed for $pkg"; exit 1; }
-  ls /out/exxpiano/*/"$pkg"-*.apk >/dev/null 2>&1 || { echo "abuild made no package for $pkg"; exit 1; }
+  su builder -c "REPODEST=/home/builder/repo abuild -r" 2>&1 | grep -v "^>>> .*: \(Fetching\|Checking\|Unpacking\)" || { echo "abuild failed for $pkg"; exit 1; }
+  ls /home/builder/repo/exxpiano/*/"$pkg"-*.apk >/dev/null 2>&1 || { echo "abuild made no package for $pkg"; exit 1; }
 done
+mkdir -p /out; cp -r /home/builder/repo/. /out/
 cp "/home/builder/.abuild/$KEY_NAME.rsa.pub" /out/
+[ -z "${HOST_UID:-}" ] || chown -R "$HOST_UID:${HOST_GID:-$HOST_UID}" /out
 '''
 
 
@@ -228,6 +234,8 @@ def build(args, env=None, runner=subprocess.run):
     child_env.pop('EXXPIANO_APK_KEY', None)
     if pem:
         child_env['EXXPIANO_APK_KEY'] = pem
+    if hasattr(os, 'getuid'):  # the packages and the development key belong to the user who builds, not to root or "builder"
+        child_env['HOST_UID'], child_env['HOST_GID'] = str(os.getuid()), str(os.getgid())
     cmd = [
         'docker',
         'run',
@@ -242,6 +250,10 @@ def build(args, env=None, runner=subprocess.run):
         'EXXPIANO_APK_KEY',
         '-e',
         'ALPINE_MIRROR',
+        '-e',
+        'HOST_UID',
+        '-e',
+        'HOST_GID',
         '-v',
         APK_CACHE + ':/var/cache/apk',
         '-v',
