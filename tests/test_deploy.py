@@ -148,6 +148,27 @@ class DeployTests(unittest.TestCase):
             self.assertIn('[ "${EXXPIANO_DEV_UNTRUSTED:-0}" = 1 ] && TRUST=(--allow-untrusted)', text)
             self.assertEqual(text.count('--allow-untrusted'), 1, name)
 
+    def test_the_device_checks_read_the_log_of_this_boot_only(self):
+        with open(os.path.join(ROOT, 'deploy', 'check-on-pi.sh')) as f:
+            text = f.read()
+        for line in text.splitlines():  # every check of the log goes through boot_log: the file is kept across boots
+            if line.startswith('check ') and 'grep' in line:
+                self.assertNotIn('/var/log/messages', line, line)
+        definition = next(l for l in text.splitlines() if l.startswith('boot_log()'))
+        with tempfile.TemporaryDirectory() as tmp:
+            log = os.path.join(tmp, 'messages')
+            with open(log, 'w') as f:
+                f.write('syslogd started\nold boot: exited with return code 1\nsyslogd started\nthis boot: synth: FLUID Synth\n')
+            r = subprocess.run(['bash', '-c', definition.replace('/var/log/messages', log) + '; boot_log'], capture_output=True, text=True)
+        self.assertNotIn('old boot', r.stdout)
+        self.assertIn('this boot: synth: FLUID Synth', r.stdout)
+
+    def test_a_failed_rollback_starts_the_wifi_supervisor_again(self):
+        with open(os.path.join(ROOT, 'deploy', 'rollback-on-pi.sh')) as f:
+            text = f.read()
+        failure = text[text.index('apk add "${TRUST[@]}" "$previous" ||') : text.index('exit 1', text.index('apk add "${TRUST[@]}" "$previous" ||'))]
+        self.assertIn('rc-service exxpiano-wifi start', failure)  # its setup network may be the only way in
+
 
 if __name__ == '__main__':
     unittest.main()

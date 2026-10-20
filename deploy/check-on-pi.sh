@@ -41,8 +41,10 @@ section "Services"
 for s in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi exxpiano-firstboot udev sshd chronyd avahi-daemon syslog; do
   printf '  %-20s %s\n' "$s" "$(rc-service "$s" status 2>&1 | sed 's/^ \* //')"
 done
+# /var/log/messages is kept on the card across boots (busybox syslog): every check of the log looks at this boot only
+boot_log() { awk '/syslogd started/ {buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' /var/log/messages 2>/dev/null; }
 check "the synthesizer runs" "pgrep -f '^[^ ]*(fluidsynth -a |python3 /opt/exxpiano/exxpiano-synth.py )'"
-check "the synthesizer was not restarted in a loop" "[ \"\$(grep -c 'exited with return code' /var/log/messages)\" -lt 3 ]"
+check "the synthesizer was not restarted in a loop" "[ \"\$(boot_log | grep -c 'exited with return code')\" -lt 3 ]"
 check "the bridge runs" "pgrep -f '^[^ ]*python3 /opt/exxpiano/exxpiano-fx.py'"
 check "the web interface answers" "wget -q -T 5 -O - http://127.0.0.1:8080/api/ping | grep -q '\"ok\": true'"
 check "no control port 9800 is open" "! netstat -ltn 2>/dev/null | grep -q ':9800 '"
@@ -50,7 +52,7 @@ check "no control port 9800 is open" "! netstat -ltn 2>/dev/null | grep -q ':980
 section "Sound"
 aplay -l 2>/dev/null | grep '^card' | sed 's/^/  /'
 check "a playback card exists" "aplay -l 2>/dev/null | grep -q '^card'"
-grep 'audio output' /var/log/messages 2>/dev/null | tail -1 | sed 's/^/  /'
+boot_log | grep 'audio output' | tail -1 | sed 's/^/  /'
 check "the 3.5 mm jack is there (Pi 3/4)" "grep -qi headphones /proc/asound/cards"
 synth="$(pgrep -f -o '^[^ ]*(fluidsynth -a |python3 /opt/exxpiano/exxpiano-synth.py )')"
 [ -z "$synth" ] || echo "  synthesizer $synth ($(cat /proc/$synth/comm 2>/dev/null)): $(awk '/^VmRSS:/ {printf "%d MB", $2/1024}' /proc/$synth/status), highest real-time priority of its threads $(cat /proc/$synth/task/*/stat 2>/dev/null | awk '{if ($40 > m) m = $40} END {print m + 0}')"
@@ -60,14 +62,14 @@ section "MIDI"
 aconnect -l 2>/dev/null | sed 's/^/  /' | head -20
 check "the ALSA sequencer exists" "[ -e /dev/snd/seq ]"
 check "FluidSynth has its MIDI port" "aconnect -l 2>/dev/null | grep -q 'FLUID Synth'"
-check "the bridge found the synthesizer" "grep ' exxpiano-fx: ' /var/log/messages | grep -q 'synth: FLUID Synth'"
-grep ' exxpiano-fx: ' /var/log/messages 2>/dev/null | grep -E 'synth:|input:' | tail -4 | sed 's/^/  /'
+check "the bridge found the synthesizer" "boot_log | grep ' exxpiano-fx: ' | grep -q 'synth: FLUID Synth'"
+boot_log | grep ' exxpiano-fx: ' | grep -E 'synth:|input:' | tail -4 | sed 's/^/  /'
 
 section "Power and load"
 echo "  throttled: $(vcgencmd get_throttled 2>/dev/null || cat /sys/devices/platform/soc/soc:firmware/get_throttled 2>/dev/null)"
 echo "  temperature: $(awk '{printf "%.1f C", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null)"
 echo "  load: $(cut -d' ' -f1-3 /proc/loadavg); free memory $(awk '/^MemAvailable:/ {printf "%d MB", $2/1024}' /proc/meminfo)"
-check "no xruns or underruns were logged" "! grep -qiE 'xrun|underrun' /var/log/messages"
+check "no xruns or underruns were logged" "! boot_log | grep -qiE 'xrun|underrun'"
 check "the kernel killed nothing for memory" "! dmesg | grep -qi 'out of memory'"
 
 section "Network"

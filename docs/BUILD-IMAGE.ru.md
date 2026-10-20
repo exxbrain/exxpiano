@@ -104,7 +104,7 @@ scp root@<устройство>:/etc/wpa_supplicant/wpa_supplicant.conf ./exxpia
 После первого запуска новой карты верните их от имени root и перезапустите устройство:
 
 ```bash
-scp -r ./exxpiano-data/* root@<устройство>:/tmp/restore/
+scp -r ./exxpiano-data root@<устройство>:/tmp/restore     # каталог целиком: scp сам создаст /tmp/restore (на новой карте его нет)
 ssh root@<устройство> 'cp -a /tmp/restore/. /var/lib/exxpiano/ && mv /var/lib/exxpiano/exxpiano.conf /etc/ && mv /var/lib/exxpiano/wpa_supplicant.conf /etc/wpa_supplicant/ && reboot'
 ```
 

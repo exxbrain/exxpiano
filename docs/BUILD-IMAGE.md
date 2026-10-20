@@ -104,7 +104,7 @@ scp root@<device>:/etc/wpa_supplicant/wpa_supplicant.conf ./exxpiano-data/     #
 After the first start of the new card copy them back as root and restart the services:
 
 ```bash
-scp -r ./exxpiano-data/* root@<device>:/tmp/restore/
+scp -r ./exxpiano-data root@<device>:/tmp/restore     # the folder itself: scp makes /tmp/restore (a new card has none)
 ssh root@<device> 'cp -a /tmp/restore/. /var/lib/exxpiano/ && mv /var/lib/exxpiano/exxpiano.conf /etc/ && mv /var/lib/exxpiano/wpa_supplicant.conf /etc/wpa_supplicant/ && reboot'
 ```
 

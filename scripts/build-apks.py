@@ -185,18 +185,23 @@ echo "PACKAGER_PRIVKEY=/home/builder/.abuild/$KEY_NAME.rsa" > /home/builder/.abu
 cp -r /work /home/builder/work; chown -R builder /home/builder/work
 install -d -o builder /home/builder/repo
 # --packages adds to the repository in /out (the test versions of exxpiano need the py3-* already there): start from what is in it
-[ ! -d /out/exxpiano ] || { cp -r /out/exxpiano /home/builder/repo/; chown -R builder /home/builder/repo; }
+# packages signed with another key are never mixed in: then a full build is needed
+if [ -d /out/exxpiano ]; then
+  cmp -s "/out/$KEY_NAME.rsa.pub" "/home/builder/.abuild/$KEY_NAME.rsa.pub" || { echo "the repository in /out is signed with another key: make a full build"; exit 1; }
+  cp -r /out/exxpiano /home/builder/repo/; chown -R builder /home/builder/repo
+fi
 # the packages built first are build dependencies of exxpiano: apk finds them in this repository (signed with the key installed above)
 echo /home/builder/repo/exxpiano >> /etc/apk/repositories
 for pkg in $PACKAGES; do
   echo "== $pkg"
   cd "/home/builder/work/exxpiano/$pkg"
   case "$pkg" in exxpiano|exxpiano-soundfonts) su builder -c "abuild checksum" >/dev/null ;; esac
+  rm -f /home/builder/repo/exxpiano/*/"$pkg"-[0-9]*.apk   # an older package of the same name must not pass for the new one
   rc=0; su builder -c "REPODEST=/home/builder/repo abuild -r" > /tmp/abuild.log 2>&1 || rc=$?
   grep -v "^>>> .*: \(Fetching\|Checking\|Unpacking\)" /tmp/abuild.log || true
   [ "$rc" = 0 ] || { echo "abuild failed for $pkg (exit $rc)"; exit 1; }
-  ls /home/builder/repo/exxpiano/*/"$pkg"-*.apk >/dev/null 2>&1 || { echo "abuild made no package for $pkg"; exit 1; }
-  apk update -q >/dev/null 2>&1 || true   # the next package sees this one
+  ls /home/builder/repo/exxpiano/*/"$pkg"-[0-9]*.apk >/dev/null 2>&1 || { echo "abuild made no package for $pkg"; exit 1; }   # not exxpiano-soundfonts
+  apk update -q >/dev/null || { echo "apk could not read the repository after $pkg"; exit 1; }   # the next package sees this one
 done
 mkdir -p /out; cp -r /home/builder/repo/. /out/
 cp "/home/builder/.abuild/$KEY_NAME.rsa.pub" /out/

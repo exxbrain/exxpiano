@@ -201,10 +201,11 @@ class BuilderTests(unittest.TestCase):
         self.assertIn('REPODEST=/home/builder/repo', ba.INNER)
         self.assertIn('cp -r /home/builder/repo/. /out/', ba.INNER)
         self.assertIn('chown -R "$HOST_UID:${HOST_GID:-$HOST_UID}" /out', ba.INNER)
-        self.assertIn('echo /home/builder/repo/exxpiano >> /etc/apk/repositories', ba.INNER)
-        self.assertIn(
-            'cp -r /out/exxpiano /home/builder/repo/', ba.INNER
-        )  # --packages adds to the repository that is already there  # exxpiano needs the py3-* built before it
+        self.assertIn('echo /home/builder/repo/exxpiano >> /etc/apk/repositories', ba.INNER)  # exxpiano needs the py3-* built before it
+        self.assertIn('cp -r /out/exxpiano /home/builder/repo/', ba.INNER)  # --packages adds to the repository that is already there
+        self.assertIn('signed with another key: make a full build', ba.INNER)
+        self.assertIn('rm -f /home/builder/repo/exxpiano/*/"$pkg"-[0-9]*.apk', ba.INNER)  # an old package never passes for the new one
+        self.assertNotIn('"$pkg"-*.apk', ba.INNER)  # exxpiano-* would also match exxpiano-soundfonts-*
         self.assertIn('abuild failed for $pkg (exit $rc)', ba.INNER)  # the exit code of abuild, not of the grep after it
         seen = {}
 

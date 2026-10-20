@@ -13,7 +13,11 @@ if [ -z "$previous" ] || [ ! -s "$previous" ]; then
 fi
 
 rc-service exxpiano-wifi stop >/dev/null 2>&1     # exxpiano-wifi gives the radio back if it was serving its own network
-apk add "${TRUST[@]}" "$previous" || { echo "apk could not install $previous: the current version stays"; exit 1; }
+apk add "${TRUST[@]}" "$previous" || {
+  echo "apk could not install $previous: the current version stays"
+  rc-service exxpiano-wifi start >/dev/null 2>&1   # back as it was: its setup network may be the only way in
+  exit 1
+}
 [ -e "$BACKUP/exxpiano.conf" ] && cp -a "$BACKUP/exxpiano.conf" /etc/exxpiano.conf
 for s in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do rc-service "$s" restart >/dev/null 2>&1; done
 sleep "$WAIT"

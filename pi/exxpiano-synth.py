@@ -51,9 +51,10 @@ def write_state(path, **state):
 class Engine:
     """What to load and when to move over. `fs` does the work (FluidSynth below, a fake in the tests)."""
 
-    def __init__(self, fs, state_file=STATE_FILE, clock=time.monotonic, sleep=time.sleep, choose=None):
+    def __init__(self, fs, state_file=STATE_FILE, clock=time.monotonic, sleep=time.sleep, choose=None, remember=None):
         self.fs, self.state_file, self.clock, self.sleep = fs, state_file, clock, sleep
         self.choose = choose or (lambda piano, mech, preview: piano)  # the bank that fits the memory (see fitting_bank)
+        self.remember = remember or (lambda path: None)  # the bank that really plays goes into the settings (see store_piano)
         self.lock = threading.Lock()
         self.job = None
         self.preview = None  # (path, sfont id) while the preview is loaded
@@ -125,6 +126,8 @@ class Engine:
                 self._publish(state='preview', loading=fallback, error='%s did not load' % os.path.basename(piano))
                 log('loading the last good bank %s instead' % fallback)
                 self._bring_in(fallback, bank, prog)
+                if self.state.get('state') == 'ready' and self.state.get('playing') == fallback:
+                    self.remember(fallback)  # the page shows it, and a later switch rolls back to it, not to the damaged one
             else:
                 self._publish(state='failed', loading=None, error='%s did not load' % os.path.basename(piano))
             return
@@ -420,18 +423,25 @@ def fitting_bank(piano, mech, preview, conf=None, bank_dir=None):
     and the preview (a Pi 3 A+ has 512 MB). The choice is remembered in the settings file, so the page shows what really plays."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import banklib
-    import exxpianoconf
 
     bank_dir = bank_dir or os.environ.get('BANK_DIR') or '/opt/exxpiano/soundfonts'
     smaller = banklib.fitting_replacement(piano, mech, bank_dir, preview=preview)
     if not smaller or smaller == piano:
         return piano
     log('%s does not fit into the memory of this board, using the smaller bank %s' % (piano, smaller))
-    try:
-        exxpianoconf.apply_updates(None, conf or os.environ.get('EXXPIANO_CONF', exxpianoconf.CONF_PATH), raw={'PIANO_SF2': smaller})
-    except (OSError, ValueError) as exc:
-        log('could not store the smaller bank: %s' % exc)
+    store_piano(smaller, conf)
     return smaller
+
+
+def store_piano(path, conf=None):
+    """PIANO_SF2 in the settings file becomes the bank that really plays. A failure is only logged: the sound goes on."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import exxpianoconf
+
+    try:
+        exxpianoconf.apply_updates(None, conf or os.environ.get('EXXPIANO_CONF', exxpianoconf.CONF_PATH), raw={'PIANO_SF2': path})
+    except (OSError, ValueError) as exc:
+        log('could not store the bank %s in the settings: %s' % (path, exc))
 
 
 def parse_args(argv):
@@ -466,7 +476,7 @@ def main(argv=None):
     args = parse_args(sys.argv[1:] if argv is None else argv)
     set_process_name('exxpiano-synth')
     fs = FluidSynth(args.options)
-    engine = Engine(fs, choose=fitting_bank)
+    engine = Engine(fs, choose=fitting_bank, remember=store_piano)
     if not engine.start(args.preview, args.mech, args.piano, args.bank, args.prog, args.fallback or None):
         try:  # exxpiano-run then starts fluidsynth without the preview, until the preview file changes
             open(os.environ.get('EXXPIANO_PREVIEW_FAILED', '/run/exxpiano-preview.failed'), 'w').close()

@@ -276,6 +276,30 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(fs.loaded_aside, ['/p/preview.sf2', '/p/mech.sf2', '/p/bad.sf2', '/p/good.sf2'])
         self.assertEqual((self.state()['state'], self.state()['playing']), ('ready', '/p/good.sf2'))
 
+    def test_the_last_good_bank_that_plays_instead_is_remembered_in_the_settings(self):
+        stored = []
+        fs = FakeFS(broken={'/p/bad.sf2'})
+        e = synth.Engine(fs, state_file=self.state_file, clock=self.clock, sleep=self.clock.sleep, remember=stored.append)
+        e.start('/p/preview.sf2', '/p/mech.sf2', '/p/bad.sf2', 0, 0, fallback='/p/good.sf2')
+        self.finish(e)
+        self.assertEqual(stored, ['/p/good.sf2'])
+        stored.clear()
+        fs = FakeFS(broken={'/p/bad.sf2', '/p/good.sf2'})  # the last good one does not load either: nothing is stored
+        e = synth.Engine(fs, state_file=self.state_file, clock=self.clock, sleep=self.clock.sleep, remember=stored.append)
+        e.start('/p/preview.sf2', '/p/mech.sf2', '/p/bad.sf2', 0, 0, fallback='/p/good.sf2')
+        self.finish(e)
+        self.assertEqual(stored, [])
+
+    def test_store_piano_writes_the_settings_file_and_survives_a_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = os.path.join(tmp, 'exxpiano.conf')
+            with open(conf, 'w') as f:
+                f.write('PIANO_SF2=/p/bad.sf2\nMECH_SF2=/p/mech.sf2\n')
+            synth.store_piano('/p/good.sf2', conf)
+            with open(conf) as f:
+                self.assertIn('PIANO_SF2="/p/good.sf2"', f.read())
+            synth.store_piano('/p/good.sf2', os.path.join(tmp, 'no', 'such', 'dir', 'exxpiano.conf'))  # only logged
+
     def test_no_preview_no_start(self):
         fs = FakeFS(broken={'/p/preview.sf2'})
         e = self.engine(fs)
