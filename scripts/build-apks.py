@@ -184,12 +184,17 @@ echo "PACKAGER_PRIVKEY=/home/builder/.abuild/$KEY_NAME.rsa" > /home/builder/.abu
 # '/out/exxpiano/aarch64': Permission denied"). Root copies the result and gives it to the user of the host.
 cp -r /work /home/builder/work; chown -R builder /home/builder/work
 install -d -o builder /home/builder/repo
+# the packages built first are build dependencies of exxpiano: apk finds them in this repository (signed with the key installed above)
+echo /home/builder/repo/exxpiano >> /etc/apk/repositories
 for pkg in $PACKAGES; do
   echo "== $pkg"
   cd "/home/builder/work/exxpiano/$pkg"
   case "$pkg" in exxpiano|exxpiano-soundfonts) su builder -c "abuild checksum" >/dev/null ;; esac
-  su builder -c "REPODEST=/home/builder/repo abuild -r" 2>&1 | grep -v "^>>> .*: \(Fetching\|Checking\|Unpacking\)" || { echo "abuild failed for $pkg"; exit 1; }
+  rc=0; su builder -c "REPODEST=/home/builder/repo abuild -r" > /tmp/abuild.log 2>&1 || rc=$?
+  grep -v "^>>> .*: \(Fetching\|Checking\|Unpacking\)" /tmp/abuild.log || true
+  [ "$rc" = 0 ] || { echo "abuild failed for $pkg (exit $rc)"; exit 1; }
   ls /home/builder/repo/exxpiano/*/"$pkg"-*.apk >/dev/null 2>&1 || { echo "abuild made no package for $pkg"; exit 1; }
+  apk update -q >/dev/null 2>&1 || true   # the next package sees this one
 done
 mkdir -p /out; cp -r /home/builder/repo/. /out/
 cp "/home/builder/.abuild/$KEY_NAME.rsa.pub" /out/

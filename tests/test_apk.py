@@ -201,6 +201,8 @@ class BuilderTests(unittest.TestCase):
         self.assertIn('REPODEST=/home/builder/repo', ba.INNER)
         self.assertIn('cp -r /home/builder/repo/. /out/', ba.INNER)
         self.assertIn('chown -R "$HOST_UID:${HOST_GID:-$HOST_UID}" /out', ba.INNER)
+        self.assertIn('echo /home/builder/repo/exxpiano >> /etc/apk/repositories', ba.INNER)  # exxpiano needs the py3-* built before it
+        self.assertIn('abuild failed for $pkg (exit $rc)', ba.INNER)  # the exit code of abuild, not of the grep after it
         seen = {}
 
         class Done:
