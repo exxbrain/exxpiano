@@ -67,6 +67,9 @@ def config_from_env(env=None):
         retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600),
         retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
         connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300),
+        # without a saved network the setup network is up this long after the start and after the last network was forgotten (then the
+        # Wi-Fi is off: the box is on no network at all); someone connected to it keeps it up
+        setup_window=num('WIFI_SETUP_WINDOW', 300, 60, 3600),
         web_port=num('WEB_PORT', 8080, 1, 65535),
         enabled=env.get('WIFI_SETUP', '1') != '0',
     )
@@ -77,10 +80,20 @@ class System:
     """Everything that touches the machine; the tests replace it."""
 
     def __init__(
-        self, iface=IFACE, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, run=None, net_dir=NET_DIR, sys_net=SYS_NET, country=None, proc='/proc', kill=os.kill
+        self,
+        iface=IFACE,
+        run_dir=wifilib.RUN_DIR,
+        wpa_conf=WPA_CONF,
+        run=None,
+        net_dir=NET_DIR,
+        sys_net=SYS_NET,
+        country=None,
+        proc='/proc',
+        kill=os.kill,
+        sleep=time.sleep,
     ):
         self.iface, self.run_dir, self.wpa_conf = iface, run_dir, wpa_conf
-        self.net_dir, self.sys_net, self.proc, self._kill = net_dir, sys_net, proc, kill
+        self.net_dir, self.sys_net, self.proc, self._kill, self._sleep = net_dir, sys_net, proc, kill, sleep
         # the Wi-Fi country of the image (WIFI_COUNTRY in /etc/exxpiano.conf): written into wpa_supplicant.conf when that has none
         self.country = (country if country is not None else os.environ.get('WIFI_COUNTRY', '')).strip().upper() or None
         self._wired = {}  # wired interface -> True while a DHCP client was started for the cable that is plugged in
@@ -121,14 +134,25 @@ class System:
     def hostname(self):
         return socket.gethostname()
 
-    def has_default_route(self):
+    def default_routes(self):
+        """The interfaces of the default routes that can carry traffic. A cable pulled out leaves its route behind (busybox udhcpc does not
+        remove it; the kernel marks it `linkdown`): that one does not count, or the setup network would never start without the cable."""
         rc, out = self.run(['ip', '-4', 'route', 'show', 'default'], 5)
-        return rc == 0 and bool(out.strip())
+        if rc != 0:
+            return []
+        found = []
+        for line in out.splitlines():
+            m = re.search(r'\bdev (\S+)', line)
+            if m and 'linkdown' not in line.split():
+                found.append(m.group(1))
+        return found
+
+    def has_default_route(self):
+        return bool(self.default_routes())
 
     def has_cable_route(self):
         """A default route that does not go through the Wi-Fi: Ethernet is another way in."""
-        rc, out = self.run(['ip', '-4', 'route', 'show', 'default'], 5)
-        return rc == 0 and any(m.group(1) != self.iface for m in re.finditer(r'\bdev (\S+)', out))
+        return any(dev != self.iface for dev in self.default_routes())
 
     def link(self):
         """{ssid, ip, signal} of the Wi-Fi connection, or None."""
@@ -232,15 +256,29 @@ class System:
     def _pidfile(self, program):
         return os.path.join(self.run_dir, '%s-%s.pid' % (program, self.iface))
 
-    def _stop(self, program):
-        """End the program this supervisor started for wlan0 (by its pid file; a pid that now belongs to another program is left alone)."""
+    def _running(self, pid, program):
+        try:
+            with open(os.path.join(self.proc, str(pid), 'comm'), encoding='utf-8', errors='replace') as f:
+                return f.read().strip() == program
+        except OSError:
+            return False
+
+    def _stop(self, program, wait=5.0):
+        """End the program this supervisor started for wlan0 (by its pid file; a pid that now belongs to another program is left alone), and
+        wait until it is gone: a wpa_supplicant that is still leaving its network holds wlan0, and hostapd started meanwhile fails with
+        "Interface initialization failed" (seen on a Pi 3 B after "Forget"). Still there after `wait` seconds: SIGKILL."""
         path = self._pidfile(program)
         try:
             with open(path, encoding='ascii') as f:
                 pid = int(f.read().strip())
-            with open(os.path.join(self.proc, str(pid), 'comm'), encoding='utf-8', errors='replace') as f:
-                if f.read().strip() == program:
-                    self._kill(pid, signal.SIGTERM)
+            if self._running(pid, program):
+                self._kill(pid, signal.SIGTERM)
+                waited = 0.0
+                while self._running(pid, program) and waited < wait:
+                    self._sleep(0.1)
+                    waited += 0.1
+                if self._running(pid, program):
+                    self._kill(pid, signal.SIGKILL)
         except (OSError, ValueError):
             pass
         try:
@@ -375,7 +413,8 @@ class Supervisor:
         self.clock, self.wall, self.sleep = clock, wall, sleep
         self.portal = portal
         self.installation_id = install_id or wifilib.installation_id()
-        self.mode = 'client'
+        self.mode = 'client'  # client, ap, or off: no saved network and the window of the setup network is over
+        self.window_from = clock()  # the start of the window of the setup network: the start of the supervisor, or the last forget
         self.offline_since = None
         self.idle_since = None
         self.ap_until = None
@@ -430,7 +469,7 @@ class Supervisor:
         """Start the access point. The scan comes first: the radio cannot scan while it serves the access point."""
         self.busy = 'ap'
         self.publish(link=None)
-        if self.mode == 'client' and self.sys.exists():
+        if self.mode in ('client', 'off') and self.sys.exists():  # from off too: the page lists the networks it saw before the access point
             self.scan_result, self.scanned_at = self.sys.scan(), int(self.wall())
         wpa = self._read_wpa()
         self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.installation_id)
@@ -463,6 +502,19 @@ class Supervisor:
         self.mode = 'client'
         self.ap_until = None
         self.sys.client_up()
+
+    def window_open(self):
+        return self.clock() - self.window_from < self.cfg['setup_window']
+
+    def go_off(self):
+        """No saved network, the window is over and nobody is connected: the Wi-Fi goes off until the next start, a cable or a network."""
+        if self.portal:
+            self.portal.stop()
+        self.sys.ap_stop()
+        self.mode = 'off'
+        self.ap_until = None
+        log('no saved network and the setup network is not used: the Wi-Fi is off until the next start')
+        self.publish(link=None)
 
     def wait_online(self, ssid=None, timeout=45):
         """True when the Wi-Fi is associated (with `ssid` when given) and has an address and a route."""
@@ -510,6 +562,8 @@ class Supervisor:
             return
         log('connecting to %r' % ssid)
         was_ap = self.mode == 'ap'
+        if self.mode == 'off':
+            self.mode = 'client'
         if was_ap:
             self.leave_ap()
         else:
@@ -539,14 +593,21 @@ class Supervisor:
 
     def forget(self, req):
         ssid = req.get('ssid')
-        if self.only_way_in(ssid):
-            self._result(False, 'forget', ssid, 'this is the only way to reach the Pi: connect to another network or plug in a cable first')
+        if self.only_way_in(ssid) and not req.get('confirm'):
+            self._result(
+                False,
+                'forget',
+                ssid,
+                'this is the only way to reach the Pi: after forgetting it, the Pi is reached only through its setup network, for %d minutes'
+                % (self.cfg['setup_window'] // 60),
+            )
             self.publish()
             return
         link = self.sys.link() if self.mode == 'client' else None
         self._write_wpa(wifilib.remove_network(self._read_wpa(), ssid))
         self._result(True, 'forget', ssid)
-        if self.mode == 'client' and not self._known() and not self.sys.has_cable_route():
+        if self.mode in ('client', 'off') and not self._known() and not self.sys.has_cable_route():
+            self.window_from = self.clock()  # the owner gets the whole window to come back through the setup network
             self.enter_ap()  # nothing is left to connect to: no waiting, the setup network starts at once
         elif link and link.get('ssid') == ssid:
             self.sys.client_up()  # leave the network that was just forgotten
@@ -568,21 +629,36 @@ class Supervisor:
             self.handle(req)
         now = self.clock()
         online = self.sys.has_default_route()
-        if self.mode == 'client':
+        if self.mode == 'off':
+            if self._known():  # a network was saved meanwhile (through the cable and the page): the normal life again
+                self.mode = 'client'
+                self.sys.client_up()
+                self.publish()
+        elif self.mode == 'client':
             if online:
                 self.offline_since = None
             else:
                 self.offline_since = self.offline_since if self.offline_since is not None else now
-                grace = self.cfg['grace_known'] if self._known() else self.cfg['grace_new']
-                if now - self.offline_since >= grace and now >= self.next_ap_attempt and self.sys.exists():
+                known = self._known()
+                grace = self.cfg['grace_known'] if known else self.cfg['grace_new']
+                if not known and not self.window_open():
+                    if self.sys.exists():  # without a Wi-Fi adapter there is nothing to turn off
+                        self.go_off()
+                elif now - self.offline_since >= grace and now >= self.next_ap_attempt and self.sys.exists():
                     self.enter_ap()
         else:
             if self.ap_until is not None:
-                if now >= self.ap_until:  # a test: back to the normal network
-                    self.leave_ap()
-                    self.wait_online(None, self.cfg['retry_wait'])
+                if now >= self.ap_until:  # a test or the button: back to the normal network
+                    if self._known():
+                        self.leave_ap()
+                        self.wait_online(None, self.cfg['retry_wait'])
+                    elif self.sys.stations() == 0:
+                        self.go_off()
             elif online:  # a cable was plugged in: no need for the access point
                 self.leave_ap()
+            elif not self._known() and not self.window_open():
+                if self.sys.stations() == 0:
+                    self.go_off()
             elif self._known():
                 if self.sys.stations() == 0:
                     self.idle_since = self.idle_since if self.idle_since is not None else now

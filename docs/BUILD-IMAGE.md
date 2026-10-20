@@ -13,7 +13,7 @@ scripts/make-soundfonts.sh -p full -o build
 scripts/make-soundfonts.sh -p lite -o build
 ```
 
-The builder defaults to `build/piano-full.sf2`, `build/piano-lite.sf2` (when it exists) and `build/mech.sf2`. Use `--piano`, `--piano-lite` and `--mech` for controlled replacements. An image is never made without the piano and the mechanics bank; the first start uses the `lite` bank on a board with less than 800 MB of memory (a Pi 3 A+).
+The builder defaults to `build/piano-full.sf2`, `build/piano-lite.sf2` (when it exists), `build/piano-preview.sf2` and `build/mech.sf2` (`scripts/make-soundfonts.sh -p preview` makes the preview). Use `--piano`, `--piano-lite`, `--piano-preview` and `--mech` for controlled replacements. An image is never made without the piano, the preview (at most 25 MB, so that it fits next to the full bank on a 1 GB board) and the mechanics bank; the first start uses the `lite` bank on a board with less than 800 MB of memory (a Pi 3 A+).
 
 Build the packages (they are signed; see below):
 

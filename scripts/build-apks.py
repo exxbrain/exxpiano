@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Builds the signed Alpine packages of exxpiano (works on macOS and Linux: the build runs in an alpine:3.24 arm64 container).
 
-  python3 scripts/build-apks.py [--out dist/apk] [--banks PIANO.sf2 MECH.sf2] [--version V] [--packages exxpiano ...]
+  python3 scripts/build-apks.py [--out dist/apk] [--banks PIANO.sf2 MECH.sf2 PREVIEW.sf2] [--version V] [--packages exxpiano ...]
 
 Always builds  exxpiano-<version>-r0.apk (the program, its OpenRC services, the configuration) and the two MIDI libraries of the bridge that
-Alpine does not have: py3-mido and py3-python-rtmidi. With --banks also exxpiano-soundfonts (the two .sf2 files, hundreds of MB).
+Alpine does not have: py3-mido and py3-python-rtmidi. With --banks also exxpiano-soundfonts (the piano, mechanics and preview .sf2 files, hundreds of MB).
 The result is a small signed repository: <out>/exxpiano/aarch64/*.apk with its APKINDEX.tar.gz, and the public key <out>/<key>.rsa.pub that
 a device must trust (the image puts it into /etc/apk/keys).
 
@@ -133,7 +133,7 @@ def stage(work, version, banks, mtime, only=None, version_text=None):
     if 'exxpiano' in names:
         write_source_archive(os.path.join(work, REPO, 'exxpiano', 'exxpiano-%s.tar.gz' % version), 'exxpiano-%s' % version, mtime, version_text)
     if banks:
-        for src, name in zip(banks, ('piano.sf2', 'mech.sf2')):
+        for src, name in zip(banks, ('piano.sf2', 'mech.sf2', 'piano-preview.sf2')):
             shutil.copyfile(src, os.path.join(work, REPO, 'exxpiano-soundfonts', name))
     return names
 
@@ -269,7 +269,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--version', help='default: the VERSION file')
     ap.add_argument('--out', default=os.path.join(ROOT, 'dist', 'apk'))
-    ap.add_argument('--banks', nargs=2, metavar=('PIANO_SF2', 'MECH_SF2'))
+    ap.add_argument('--banks', nargs=3, metavar=('PIANO_SF2', 'MECH_SF2', 'PREVIEW_SF2'))
     ap.add_argument('--packages', nargs='+', metavar='NAME', help='build only these (added to the repository in --out, for tests)')
     args = ap.parse_args(argv)
     try:

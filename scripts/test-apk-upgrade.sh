@@ -44,7 +44,8 @@ installed() { apk list -I exxpiano 2>/dev/null | sed -n "s/^exxpiano-\([^ ]*\)-r
 echo "== install $VERSION"
 apk add -q exxpiano >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }
 check "the package is installed" "[ \"\$(installed)\" = \"$VERSION\" ]"
-check "its services are in the default runlevel" "rc-update show default | grep -q exxpiano-fx"
+# grep without -q: with pipefail an early exit of grep -q would end rc-update with SIGPIPE and fail the check
+check "its services are in their runlevels" "rc-update show boot | grep exxpiano-fx >/dev/null && rc-update show default | grep exxpiano-web >/dev/null"
 check "the MIDI libraries import" "python3 -c \"import mido, rtmidi\""
 mkdir -p /var/lib/exxpiano/packages; cp /base/exxpiano/aarch64/exxpiano-$VERSION-r0.apk /var/lib/exxpiano/packages/exxpiano-$VERSION-r0.apk    # what the image builder keeps
 
@@ -103,7 +104,7 @@ python3 /opt/exxpiano/exxpiano-wifi.py ensure-name >/dev/null 2>&1 || true
 check "an installation ID exists" "[ -s /var/lib/exxpiano/installation-id ]"
 apk del -q exxpiano >/dev/null 2>&1
 sleep 1
-check "its services are stopped and gone from the runlevel" "! synth_runs && ! pgrep -f \"^/usr/bin/python3 /opt/exxpiano/\" >/dev/null && ! rc-update show default | grep -q exxpiano"
+check "its services are stopped and gone from the runlevel" "! synth_runs && ! pgrep -f \"^/usr/bin/python3 /opt/exxpiano/\" >/dev/null && ! rc-update show | grep exxpiano >/dev/null"
 check "the installation ID stays" "[ -s /var/lib/exxpiano/installation-id ]"
 [ "$fail" = 0 ] || { echo "--- last upgrade log"; cat /tmp/upgrade.log; echo "--- system log"; tail -40 /var/log/messages; exit 1; }
 '

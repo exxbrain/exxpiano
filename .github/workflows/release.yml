@@ -40,6 +40,7 @@ jobs:
         run: |
           scripts/make-soundfonts.sh -p full -o build            # about 700 MB: the piano of the image
           scripts/make-soundfonts.sh -p lite -o build          # the same downloaded samples; the image uses it on boards with 512 MB
+          scripts/make-soundfonts.sh -p preview -o build       # about 24 MB: plays while the piano bank loads
 
       - name: Build the signed packages
         env:

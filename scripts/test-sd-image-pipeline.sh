@@ -15,8 +15,9 @@ VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 printf 'stand-in piano bank\n' > "$WORK/piano.sf2"
 printf 'stand-in smaller piano bank\n' > "$WORK/piano-lite.sf2"
 printf 'stand-in mechanics bank\n' > "$WORK/mech.sf2"
+printf 'stand-in preview bank\n' > "$WORK/piano-preview.sf2"
 SD_AP_PASSWORD='setup-pass-1' python3 -I "$ROOT/scripts/build-sd-image.py" --apk-repo "$ROOT/dist/apk" \
-  --piano "$WORK/piano.sf2" --piano-lite "$WORK/piano-lite.sf2" --mech "$WORK/mech.sf2" --country RU --timezone Europe/Moscow --out "$WORK/out"
+  --piano "$WORK/piano.sf2" --piano-lite "$WORK/piano-lite.sf2" --mech "$WORK/mech.sf2" --piano-preview "$WORK/piano-preview.sf2" --country RU --timezone Europe/Moscow --out "$WORK/out"
 
 ZIP="$(ls "$WORK"/out/exxpiano-rpi-v"$VERSION"-alpine-3.24.*-sd.zip)"
 test -s "$ZIP"

@@ -3,7 +3,13 @@
 # deploy/upgrade-on-pi.sh then checks that the synthesizer and the bridge came back, and rolls back if not.
 
 python3 /opt/exxpiano/exxpiano-demo-midi.py >/dev/null 2>&1 || true
-for service in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
+# the synthesizer and the bridge start in the boot runlevel, before the network (the first note within seconds of power-on); an older
+# installation had them in default
+for service in exxpiano exxpiano-fx; do
+	rc-update del "$service" default >/dev/null 2>&1 || true
+	rc-update add "$service" boot >/dev/null 2>&1 || true
+done
+for service in exxpiano-web exxpiano-wifi; do
 	rc-update add "$service" default >/dev/null 2>&1 || true
 done
 udevadm control --reload >/dev/null 2>&1 || true

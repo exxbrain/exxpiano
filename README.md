@@ -18,8 +18,8 @@ You need a Raspberry Pi 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microS
 
 1. **Download** the ZIP for your board from [the latest release](https://github.com/exxbrain/exxpiano/releases/latest): `exxpiano-rpi-…-sd.zip`, the same image for a Pi 3, 4 and 5 (a Pi 5 needs a USB sound card).
 2. **Write it to the microSD card** with [Raspberry Pi Imager](https://www.raspberrypi.com/software/): *Choose OS* → *Use custom* → the ZIP as it is (do not unzip it).
-3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and takes longer: about 1.5 minutes on a Pi 3 Model B. Until the piano bank has loaded (about 1.5 minutes on the first start, about 55 s on later starts, measured on a Pi 3 Model B with the full bank) the keys give no piano sound: press a key now and then until the piano answers. The web interface is not a sign of readiness: on a later start it opens before the bank has loaded, on the first start after it.
-4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. With an Ethernet cable there is no setup network: open that address directly.
+3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline and takes longer: about 1.5 minutes on a Pi 3 Model B. While the full bank loads, a small **preview piano** plays: on a Pi 3 Model B it sounds 5 s after the synthesizer starts, and the full bank follows about 32 s later (measured with a restart of the service; the time from power-on has not been measured with the preview yet). The piano moves over to the full bank at a moment with no key and no pedal down, without a pause. The preview is plainer: 3 velocity layers, 22 kHz, and notes held longer than 3 s stop with the end of their sample.
+4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. The setup network is on for **5 minutes** after the Pi is switched on while it has no saved network (as long as a phone is connected to it, it stays): if you missed it, unplug the power and plug it in again. With an Ethernet cable there is no setup network: open that address directly.
 
 Then play. More about the setup network: [Connecting to a new Wi-Fi](docs/USING.md#connecting-to-a-new-wi-fi); and read "Power supply" below. Building the banks and the image yourself is only for developers: [docs/BUILDING.md](docs/BUILDING.md).
 
@@ -95,7 +95,7 @@ A Pi 4 needs a 5.1 V / 3 A supply and a Pi 5 a 5.1 V / 5 A one (the official USB
 
 Other boards, keyboards and sound cards were not tested. I recommend a USB sound card; its delay was not measured. The full list with versions and numbers: [docs/ABOUT.md](docs/ABOUT.md#tested-on).
 
-**Start time** (measured on a Pi 3 Model B with the full bank): **about 55 s** from power-on to the first note, **about 1.5 minutes** on the first start of a freshly written card. Most of it is reading the 729 MB bank from the card at 23 MB/s, the limit of the Pi 3, so a faster card does not help.
+**Start time** (measured on a Pi 3 Model B with the full bank): the preview piano plays **5 s** after the synthesizer starts and the full bank **about 37 s** after it (Alpine, a restart of the service). Measured earlier on the DietPi image, without the preview: about 55 s from power-on to the first note, about 1.5 minutes on the first start of a freshly written card. Loading the full bank is reading 729 MB from the card at 23 MB/s, the limit of the Pi 3, so a faster card does not help.
 
 ## Choosing the piano bank
 
@@ -104,7 +104,9 @@ The images carry two banks of the same Salamander piano:
 - `full` (about 700 MB): 14 velocity layers, 12 s tails, for a board with 1 GB. **Not for 512 MB.**
 - `lite` (237 MB): 6 velocity layers instead of 14, tails of 9 s instead of 12 s, and the softest note is louder (−12 dB instead of −17 dB), so the dynamic range is somewhat smaller. A board with less than 800 MB of memory (a Pi 3 A+) selects it by itself.
 
-Both are in the **Piano bank** section of the web interface. **Use** switches the piano: the synthesizer reloads (about a minute of silence), and if the new bank does not come up, the previous one is put back automatically. **Delete** removes a bank that is not in use, to free space: the current bank, the last good one and the mechanics bank are never deleted, and it cannot be undone. Not tried on a real Raspberry Pi: pressing **Delete** there; the rules are covered by automatic tests. The touch curve, the volume and the mechanics levels are remembered per bank.
+They also carry `piano-preview.sf2` (24 MB, 3 layers, stereo at 22 kHz, 3 s tails): it plays only while a bank loads and is not offered as a bank.
+
+Both are in the **Piano bank** section of the web interface. **Use** switches the piano without a restart: the preview plays while the new bank loads (17 s for `lite`, 38 s for `full` on a Pi 3 Model B), so you can keep playing, and if the new bank does not come up, the previous one is put back automatically. **Delete** removes a bank that is not in use, to free space: the current bank, the last good one and the mechanics bank are never deleted, and it cannot be undone. Not tried on a real Raspberry Pi: pressing **Delete** there; the rules are covered by automatic tests. The touch curve, the volume and the mechanics levels are remembered per bank.
 
 Other `.sf2` / `.sf3` banks can be imported from a USB drive (folder `piano-banks/`), and MIDI files to play on the piano the same way (folder `piano-midi/`). The import from a USB drive has not been tried on real hardware yet. Details: [docs/USING.md](docs/USING.md#choosing-the-piano-bank).
 

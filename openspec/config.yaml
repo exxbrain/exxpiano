@@ -20,6 +20,10 @@ context: |
   Distinguish automated coverage from real Raspberry Pi verification. Never
   claim that first boot, an SD image, USB hotplug, or audio quality was tested
   on hardware unless the task includes that evidence.
+  Before every major release (X.Y.0) the released image is checked on a real
+  Raspberry Pi 3 Model B: the piano, the preview (first note within 15 s of
+  power-on) and Wi-Fi; the checklist is in docs/BUILDING.md ("Before a major
+  release"), the results go into the CHANGELOG.
 
 rules:
   proposal:

@@ -59,6 +59,7 @@ class Case(unittest.TestCase):
         self.touch('apk/exxpiano-dev.rsa.pub', b'-----BEGIN PUBLIC KEY-----\n')
         self.piano = self.touch('banks/piano.sf2', b'p' * 10)
         self.mech = self.touch('banks/mech.sf2', b'm' * 10)
+        self.preview = self.touch('banks/piano-preview.sf2', b'v' * 10)
         self.env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ['PATH'], FAKE_DOCKER_LOG=self.log)
         self.env.pop('SD_PASSWORD', None)
         self.env.pop('SD_AP_PASSWORD', None)
@@ -73,7 +74,7 @@ class Case(unittest.TestCase):
     def run_build(self, *extra, env=None, banks=True):
         args = ['--apk-repo', self.repo, '--out', self.out]
         if banks:
-            args += ['--piano', self.piano, '--mech', self.mech]
+            args += ['--piano', self.piano, '--mech', self.mech, '--piano-preview', self.preview]
         return subprocess.run([sys.executable, SCRIPT] + args + list(extra), capture_output=True, text=True, env=dict(self.env, **(env or {})))
 
     def docker_calls(self):
@@ -137,8 +138,9 @@ class PlanTests(Case):
             bsi.ROOT = self.tmp.name
             default_piano = self.touch('build/piano-full.sf2', b'default piano')
             default_mech = self.touch('build/mech.sf2', b'default mech')
+            default_preview = self.touch('build/piano-preview.sf2', b'default preview')
             args = bsi.parse_args(['--apk-repo', self.repo])
-            self.assertEqual(bsi.resolve_inputs(args), dict(apk_repo=self.repo, piano=default_piano, mech=default_mech))
+            self.assertEqual(bsi.resolve_inputs(args), dict(apk_repo=self.repo, piano=default_piano, mech=default_mech, piano_preview=default_preview))
             lite = self.touch('build/piano-lite.sf2', b'default lite')  # the smaller bank is taken when it exists, it is not required
             self.assertEqual(bsi.resolve_inputs(bsi.parse_args(['--apk-repo', self.repo]))['piano_lite'], lite)
             os.unlink(lite)
@@ -152,20 +154,29 @@ class PlanTests(Case):
         finally:
             bsi.ROOT = old_root
 
+    def test_a_preview_bank_over_25_mb_stops_before_building(self):
+        with open(self.preview, 'wb') as f:
+            f.truncate(25 * 10**6 + 1)
+        r = self.run_build('--dry-run')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('bigger than 25 MB', r.stderr)
+        self.assertEqual(self.docker_calls(), [])
+
     def test_each_missing_default_bank_stops_before_building(self):
         old_root = bsi.ROOT
         try:
             bsi.ROOT = self.tmp.name
             args = bsi.parse_args(['--apk-repo', self.repo])
-            for present, missing in (('mech.sf2', 'piano'), ('piano-full.sf2', 'mech')):
+            for missing, file_name in (('piano', 'piano-full.sf2'), ('mech', 'mech.sf2'), ('piano_preview', 'piano-preview.sf2')):
                 build = os.path.join(self.tmp.name, 'build')
                 os.makedirs(build, exist_ok=True)
-                for name in ('piano-full.sf2', 'mech.sf2'):
+                for name in ('piano-full.sf2', 'mech.sf2', 'piano-preview.sf2'):
                     path = os.path.join(build, name)
                     if os.path.exists(path):
                         os.unlink(path)
-                with open(os.path.join(build, present), 'wb') as f:
-                    f.write(b'bank')
+                    if name != file_name:
+                        with open(path, 'wb') as f:
+                            f.write(b'bank')
                 with self.assertRaisesRegex(bsi.BuildError, 'required %s bank' % missing):
                     bsi.resolve_inputs(args)
                 self.assertEqual(self.docker_calls(), [])
@@ -199,6 +210,7 @@ class BuildTests(Case):
         args = self.inner_call()['args']
         self.assertEqual(args[args.index('--country') + 1], 'RU')
         self.assertEqual(args[args.index('--timezone') + 1], 'Europe/Moscow')
+        self.assertTrue(args[args.index('--piano-preview') + 1].endswith('/piano-preview.sf2'))  # the preview bank goes into every image
 
     def test_the_passwords_go_through_the_environment_never_the_arguments(self):
         r = self.run_build('--password', 'root-secret-1', '--ap-password', 'ap-secret-22')
@@ -390,7 +402,8 @@ class InnerScriptTests(unittest.TestCase):
             'snd-seq snd-seq-midi',
             'root=LABEL=exxroot',
             'mkfs.ext4 -q -F -L exxroot -E root_owner=0:0 -d "$ROOTFS"',
-            'exxpiano-firstboot exxpiano exxpiano-fx exxpiano-web exxpiano-wifi',
+            'localmount alsa exxpiano-firstboot exxpiano exxpiano-fx',  # the piano in boot, before the network
+            'runlevel default chronyd sshd avahi-daemon exxpiano-web exxpiano-wifi local',
         ):
             self.assertIn(needle, self.src)
         self.assertNotIn('losetup', self.src)

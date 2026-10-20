@@ -13,8 +13,10 @@ respawn_max=0
 output_logger="logger -t exxpiano-fx -p daemon.info"
 error_logger="logger -t exxpiano-fx -p daemon.info"
 
+# In the boot runlevel and before the network, like the synthesizer: the keyboard must reach it as soon as it sounds.
 depend() {
 	need localmount
-	after exxpiano
+	after exxpiano modules
+	before networking
 	use logger
 }

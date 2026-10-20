@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Makes the reusable exxpiano SD card image: Alpine Linux (64-bit, OpenRC) + the exxpiano packages + the required banks.
 
-  python3 scripts/build-sd-image.py [--apk-repo dist/apk] [--piano P.sf2 --mech M.sf2] [--country RU --timezone Europe/Moscow]
+  python3 scripts/build-sd-image.py [--apk-repo dist/apk] [--piano P.sf2 --mech M.sf2 --piano-preview V.sf2] [--country RU --timezone Europe/Moscow]
 
 Result in dist/sd/: exxpiano-rpi-v<version>-alpine-<alpine version>-sd.zip (one image for the Raspberry Pi 3, 4 and 5), a README and a
 manifest. Flash the same ZIP with Raspberry Pi Imager or balenaEtcher. At first boot each installed copy creates a persistent random
@@ -95,6 +95,9 @@ def write_json(path, data):
     os.replace(tmp, path)
 
 
+PREVIEW_MAX_BYTES = 25 * 10**6  # the full bank (729 MB) and the preview must fit together in the 755 MB a Pi 3 B leaves for the banks
+
+
 def resolve_inputs(args):
     """Check everything before the long part starts. Returns a dict of absolute paths."""
     inputs = {}
@@ -107,17 +110,23 @@ def resolve_inputs(args):
     inputs['apk_repo'] = repo
     inputs['piano'] = os.path.abspath(args.piano or os.path.join(ROOT, 'build', 'piano-full.sf2'))
     inputs['mech'] = os.path.abspath(args.mech or os.path.join(ROOT, 'build', 'mech.sf2'))
+    inputs['piano_preview'] = os.path.abspath(args.piano_preview or os.path.join(ROOT, 'build', 'piano-preview.sf2'))
     lite = args.piano_lite or os.path.join(ROOT, 'build', 'piano-lite.sf2')  # for boards with 512 MB; optional unless asked for by name
     if args.piano_lite or os.path.isfile(lite):
         inputs['piano_lite'] = os.path.abspath(lite)
     if args.ssh_key:
         inputs['ssh_key'] = os.path.abspath(args.ssh_key)
-    for key in [k for k in ('piano', 'mech', 'piano_lite') if k in inputs]:
+    for key in [k for k in ('piano', 'mech', 'piano_preview', 'piano_lite') if k in inputs]:
         if not os.path.isfile(inputs[key]) or not os.access(inputs[key], os.R_OK):
             raise BuildError(
                 'the required %s bank is missing or unreadable: %s (prepare defaults with scripts/make-soundfonts.sh or pass --%s FILE.sf2)'
                 % (key, inputs[key], key.replace('_', '-'))
             )
+    if os.path.getsize(inputs['piano_preview']) > PREVIEW_MAX_BYTES:
+        raise BuildError(
+            'the preview bank %s is bigger than %d MB: with the full bank it would not fit the memory of a 1 GB board (scripts/make-soundfonts.sh -p preview)'
+            % (inputs['piano_preview'], PREVIEW_MAX_BYTES // 10**6)
+        )
     if 'ssh_key' in inputs and not os.path.isfile(inputs['ssh_key']):
         raise BuildError('no such public key: %s' % inputs['ssh_key'])
     return inputs
@@ -168,6 +177,8 @@ def inner_args(plan, path_of):
         path_of('piano'),
         '--mech',
         path_of('mech'),
+        '--piano-preview',
+        path_of('piano_preview'),
     ]
     if plan.get('has_lite'):
         a += ['--piano-lite', path_of('piano_lite')]
@@ -270,6 +281,10 @@ def parse_args(argv):
     )
     ap.add_argument('--mech', help='the mechanics bank (.sf2); default build/mech.sf2')
     ap.add_argument(
+        '--piano-preview',
+        help='the small piano bank that plays while the piano bank loads (.sf2, at most 25 MB); default build/piano-preview.sf2 (scripts/make-soundfonts.sh -p preview)',
+    )
+    ap.add_argument(
         '--password', default=os.environ.get('SD_PASSWORD', ''), help='the root password (SSH); default: SD_PASSWORD; without either root logs in by key only'
     )
     ap.add_argument('--ssh-key', help='a public key root accepts over SSH (for example ~/.ssh/id_ed25519.pub)')
@@ -305,7 +320,7 @@ def plan_image(args, inputs):
     if mirror and not MIRROR_RE.fullmatch(mirror):
         raise BuildError('--mirror: an https:// address such as https://mirrors.dotsrc.org/alpine')
     alpine = read_env_file(os.path.join(ROOT, '.github', 'alpine-image.env'))
-    banks = [os.path.basename(inputs[k]) for k in ('piano', 'piano_lite', 'mech') if k in inputs]
+    banks = [os.path.basename(inputs[k]) for k in ('piano', 'piano_lite', 'piano_preview', 'mech') if k in inputs]
     key = sorted(n for n in os.listdir(inputs['apk_repo']) if n.endswith('.rsa.pub'))[0]
     return dict(
         version=read_version(),

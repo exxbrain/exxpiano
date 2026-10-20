@@ -6,7 +6,7 @@
 # added to root's: that is how an owner without a root password gets SSH access. Keys already there are kept; the file is only read.
 #
 # For tests every path and program can be replaced: FIRSTBOOT_LOG, STAMP, CONF, MEMINFO, LITE, ROOT_SOURCE (the device of /), GROWPART,
-# RESIZE2FS, WIFI (the command that makes the installation ID and the host name), BOOT_KEYS, ROOT_KEYS.
+# RESIZE2FS, WIFI (the command that makes the installation ID and the host name), BOOT_KEYS, ROOT_KEYS, ASOUND (a /proc/asound), AMIXER, ALSACTL.
 LOG="${FIRSTBOOT_LOG:-/var/log/exxpiano-firstboot.log}"
 STAMP="${STAMP:-/var/lib/exxpiano/image-firstboot.done}"
 CONF="${CONF:-/etc/exxpiano.conf}"
@@ -17,6 +17,9 @@ RESIZE2FS="${RESIZE2FS:-resize2fs}"
 # the image is called exxpiano until its first start: that name is generic here, a name chosen later is kept by every other call
 WIFI="${WIFI:-python3 /opt/exxpiano/exxpiano-wifi.py ensure-name exxpiano}"
 BOOT_KEYS="${BOOT_KEYS:-/boot/authorized_keys}"
+ASOUND="${ASOUND:-/proc/asound}"
+AMIXER="${AMIXER:-amixer}"
+ALSACTL="${ALSACTL:-alsactl}"
 ROOT_KEYS="${ROOT_KEYS:-/root/.ssh/authorized_keys}"
 
 import_keys() {
@@ -66,6 +69,17 @@ if [ -s "$LITE" ] && [ "${MEM_KB:-0}" -gt 0 ] && [ "$MEM_KB" -lt 800000 ] && gre
   sed 's#^PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2$#PIANO_SF2=/opt/exxpiano/soundfonts/piano-lite.sf2#' "$CONF" > "$tmp" && cat "$tmp" > "$CONF"
   rm -f "$tmp"
   echo "memory ${MEM_KB} kB: the smaller piano bank is used"
+fi
+
+# 4. The 3.5 mm jack (Pi 3 and 4) starts at the full volume of its driver (it would be -20 dB): the owner turns it down on the web page if
+#    needed. Stored, so that the mixer restore of every later start keeps it, and every later change of the owner too.
+if grep -q '\[Headphones *\]' "$ASOUND/cards" 2>/dev/null; then
+  if $AMIXER -c Headphones -q sset PCM 100% unmute; then
+    $ALSACTL store >/dev/null 2>&1 || echo "alsactl store failed: the volume of the 3.5 mm jack is not kept for the next start"
+    echo "the 3.5 mm jack is at the full volume"
+  else
+    echo "the volume of the 3.5 mm jack could not be set"
+  fi
 fi
 
 echo "name: $(hostname), installation ID: $(cat /var/lib/exxpiano/installation-id 2>/dev/null || echo unavailable)"

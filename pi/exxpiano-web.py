@@ -283,18 +283,42 @@ class Actions:
     def set_gain(self, value):
         """Live master gain: write a shell command into the pipe FluidSynth reads (root-only, no network port).
         True on success. (`set synth.gain` is the command that really changes it; plain `gain` does not.)"""
+        return self.synth_command('set synth.gain %s' % exxpianoconf._fmt(float(value)))
+
+    def synth_command(self, line):
+        """Write one line into the command pipe of the synthesizer. False when nobody reads it (the synthesizer is down)."""
         fifo = os.environ.get('CMD_FIFO', '/run/exxpiano.cmd')
         try:
             fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)  # fails with ENXIO when nobody reads (synth is down)
         except OSError:
             return False
         try:
-            os.write(fd, ('set synth.gain %s\n' % exxpianoconf._fmt(float(value))).encode('ascii'))
+            os.write(fd, (line + '\n').encode('utf-8'))
             return True
         except OSError:
             return False
         finally:
             os.close(fd)
+
+    def loading_state(self):
+        """What exxpiano-synth says about the banks (see banklib.loading_state); None when the plain fluidsynth plays."""
+        return banklib.loading_state()
+
+    def load_bank_live(self, path, bank, prog, timeout=150):
+        """Ask exxpiano-synth to load a bank while the preview plays, and wait until it plays it. False when it failed or took too long."""
+        if '\n' in path or not self.synth_command('exxpiano-load %d %d %s' % (bank, prog, path)):
+            return False
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            time.sleep(1)
+            st = self.loading_state()
+            if st is None:
+                return False  # the synthesizer is gone
+            if st['state'] == 'ready' and st.get('playing') == path:
+                return True
+            if st['state'] == 'failed' and not st.get('loading'):
+                return False
+        return False
 
     def cards(self):
         """Sound cards that can play audio: [{id, name, usb}]."""
@@ -374,7 +398,9 @@ class Switcher:
         with self.lock:
             if self.busy():
                 raise Busy()
-            self.status = dict(state='switching', message='Loading the bank, this takes about a minute', bank=bank_id)
+            live = self.app.actions.loading_state() is not None
+            message = 'Loading the bank; the preview plays meanwhile' if live else 'Loading the bank, this takes about a minute'
+            self.status = dict(state='switching', message=message, bank=bank_id)
         self.thread = threading.Thread(target=self._run, args=(path, bank_id, preset), daemon=True)
         self.thread.start()
 
@@ -387,6 +413,16 @@ class Switcher:
 
     def _per_bank(self, settings):
         return {n: settings[n] for n in exxpianoconf.PER_BANK_NAMES}
+
+    def _load(self, path, settings, live):
+        """Play the bank at `path` with `settings` (already written to the file, the bridge reads them from there). True when it plays."""
+        actions = self.app.actions
+        if live:
+            actions.set_gain(settings['gain'])
+            return actions.load_bank_live(path, settings['piano_bank'], settings['piano_prog'])
+        old_pid = actions.synth_pid()
+        actions.restart_synth()
+        return actions.wait_synth_ready(old_pid)
 
     def _run(self, path, bank_id, preset):
         app, conf, actions = self.app, self.app.conf_path, self.app.actions
@@ -405,11 +441,10 @@ class Switcher:
         if not saved or (mine['piano_bank'], mine['piano_prog']) not in usable:
             mine['piano_bank'], mine['piano_prog'] = preset
         ready = False
+        live = actions.loading_state() is not None  # exxpiano-synth: the preview plays while the bank loads, no restart
         try:
             exxpianoconf.apply_updates(mine, conf, raw={'PIANO_SF2': path})
-            old_pid = actions.synth_pid()
-            actions.restart_synth()
-            ready = actions.wait_synth_ready(old_pid)
+            ready = self._load(path, mine, live)
         except Exception as exc:  # whatever went wrong, the old bank must come back
             print('bank switch failed: %s' % exc, file=sys.stderr)
         if ready:
@@ -425,9 +460,7 @@ class Switcher:
             return
         try:  # the old bank AND its settings come back
             exxpianoconf.apply_updates(old, conf, raw={'PIANO_SF2': old_path})
-            old_pid = actions.synth_pid()
-            actions.restart_synth()
-            back = actions.wait_synth_ready(old_pid)
+            back = self._load(old_path, old, live and actions.loading_state() is not None)
         except Exception as exc:
             print('rollback failed: %s' % exc, file=sys.stderr)
             back = False
@@ -637,9 +670,15 @@ class App:
             if not isinstance(ssid, str) or not any(n['ssid'] == ssid for n in state['saved']):
                 raise ValueError('that network is not saved')
             link = state.get('link')
-            if link and link.get('ssid') == ssid and len(state['saved']) == 1 and not state.get('cable'):
-                raise ValueError('this is the only way to reach the Pi: connect to another network or plug in a cable first')
-            return dict(accepted=True, id=self.actions.wifi_request(dict(action='forget', ssid=ssid)))
+            only_way = link and link.get('ssid') == ssid and len(state['saved']) == 1 and not state.get('cable')
+            if only_way and body.get('confirm') is not True:
+                raise ValueError(
+                    'this is the only way to reach the Pi: confirm to forget it; then the Pi is reached only through its setup network, for 5 minutes'
+                )
+            request = dict(action='forget', ssid=ssid)
+            if only_way:
+                request['confirm'] = True  # the owner agreed: the Pi then keeps only its setup network, for 5 minutes
+            return dict(accepted=True, id=self.actions.wifi_request(request))
         raise ValueError('unknown action')
 
     def qr(self, query, host=''):
@@ -696,15 +735,18 @@ class App:
         conf = exxpianoconf.parse_conf(self.conf_path)
         bank_dir = conf.get('BANK_DIR') or banklib.DEFAULT_DIR
         current, mech = conf.get('PIANO_SF2'), conf.get('MECH_SF2')
-        try:
-            mech_bytes = os.path.getsize(mech) if mech else 0
-        except OSError:
-            mech_bytes = 0
-        return bank_dir, current, mech, mech_bytes
+        preview = self._preview(conf)
+        return bank_dir, current, mech, banklib.resident_bytes(mech, preview)
+
+    def _preview(self, conf=None):
+        """The preview bank, when one is set and its file exists (exxpiano-run checks it further before it uses it)."""
+        conf = conf if conf is not None else exxpianoconf.parse_conf(self.conf_path)
+        path = conf.get('PREVIEW_SF2', banklib.DEFAULT_PREVIEW)  # a file kept from before the preview has no line
+        return path if path and os.path.isfile(path) else None
 
     def banks_state(self):
         bank_dir, current, mech, mech_bytes = self._bank_context()
-        banks = banklib.list_banks(bank_dir, exclude=[mech], mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
+        banks = banklib.list_banks(bank_dir, exclude=[p for p in (mech, self._preview()) if p], mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
         for b in banks:
             b['source'] = 'installed'
         banks += banklib.list_imports(self.import_dir, mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
@@ -728,7 +770,17 @@ class App:
             presets=banklib.presets_of(current) if current else [],
             preset=dict(bank=s['piano_bank'], program=s['piano_prog']),
             switch=self.switcher.status,
+            loading=self._loading(),
         )
+
+    def _loading(self):
+        """Which bank sounds while one loads: dict(preview=bool: a preview bank is set up, state=None|preview|ready|failed, loading=bank id|None,
+        error). state None: the plain fluidsynth plays (no preview, or it could not be used): a switch is silent until the bank is loaded."""
+        st = self.actions.loading_state()
+        out = dict(preview=self._preview() is not None, state=None, loading=None, error=None)
+        if st:
+            out.update(state=st['state'], loading=os.path.basename(st['loading']) if st.get('loading') else None, error=st.get('error'))
+        return out
 
     def _bank_path(self, bank_dir, bank_id):
         try:

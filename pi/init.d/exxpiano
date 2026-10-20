@@ -14,8 +14,11 @@ rc_ulimit="-r 95 -l unlimited"
 output_logger="logger -t exxpiano -p daemon.info"
 error_logger="logger -t exxpiano -p daemon.info"
 
+# In the boot runlevel and before the network: the first note must sound a few seconds after power-on, and the piano needs neither the
+# network nor the time (the web interface, Wi-Fi, SSH and the clock come up later or meanwhile).
 depend() {
 	need localmount
-	after alsa udev-settle exxpiano-firstboot
+	after alsa udev-settle modules exxpiano-firstboot
+	before networking
 	use logger
 }

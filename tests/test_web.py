@@ -45,6 +45,9 @@ class FakeActions:
         self.level_answer = dict(t=1.0, rate=44100, left=dict(peak=-12.0, hold=-6.0, clipped=0), right=dict(peak=0.0, hold=0.0, clipped=7), clip_ago=1.5)
         self.volume_db, self.volume_set, self.volume_asked, self.no_volume, self.volume_fails = -12.0, [], [], False, False
         self.ready = [True, True, True]  # answers of wait_synth_ready, one per switch attempt
+        self.live = None  # what exxpiano-synth wrote about the banks; None: no preview, the plain fluidsynth plays
+        self.live_loads = []
+        self.live_ready = [True, True]  # answers of load_bank_live, one per attempt
         self.waits = 0
         self.gate = None  # an Event: wait_synth_ready blocks until it is set
         self.pid = 100
@@ -90,6 +93,16 @@ class FakeActions:
 
     def restart_synth(self):
         self.restarts += 1
+
+    def loading_state(self):
+        return self.live  # None: the plain fluidsynth plays and a switch restarts it
+
+    def load_bank_live(self, path, bank, prog, timeout=150):
+        self.live_loads.append((path, bank, prog))
+        answer = self.live_ready[min(len(self.live_loads) - 1, len(self.live_ready) - 1)]
+        if answer:
+            self.live = dict(state='ready', playing=path, loading=None, error=None)
+        return answer
 
     def set_gain(self, value):
         self.gains.append(value)
@@ -462,6 +475,47 @@ class BankWebTests(ServerCase):
         self.assertEqual((b['current'], b['switch']['state']), ('new.sf2', 'done'))
         self.assertEqual(sorted(p['name'] for p in b['presets']), ['New piano', 'Pad'])
 
+    def test_with_the_preview_the_bank_loads_in_the_synthesizer_without_a_restart(self):
+        self.actions.live = dict(state='ready', playing=self.old, loading=None, error=None)
+        code, _ = self.jcall('/api/bank', {'id': 'new.sf2'})
+        self.assertEqual(code, 200)
+        self.assertIn('preview plays', self.jcall('/api/state')[1]['banks']['switch']['message'])
+        self.finish_switch()
+        self.assertEqual(self.actions.restarts, 0)
+        self.assertEqual(self.actions.live_loads, [(self.new, 0, 0)])
+        self.assertEqual(self.actions.gains, [1.0])  # the gain of the bank is set live, the bridge reads the rest from the file
+        text = self.conf_text()
+        self.assertIn('PIANO_SF2="%s"' % self.new, text)
+        self.assertIn('PIANO_SF2_LAST_GOOD="%s"' % self.new, text)
+        self.assertEqual(self.jcall('/api/state')[1]['banks']['switch']['state'], 'done')
+
+    def test_with_the_preview_a_bank_that_does_not_load_is_rolled_back_the_same_way(self):
+        self.actions.live = dict(state='ready', playing=self.old, loading=None, error=None)
+        self.actions.live_ready = [False, True]
+        self.jcall('/api/bank', {'id': 'odd.sf2'})
+        self.finish_switch()
+        self.assertEqual(self.actions.restarts, 0)
+        self.assertEqual(self.actions.live_loads, [(self.gm, 2, 5), (self.old, 0, 0)])  # the old bank comes back with its own preset
+        self.assertIn('PIANO_SF2="%s"' % self.old, self.conf_text())
+        self.assertEqual(self.jcall('/api/state')[1]['banks']['switch']['state'], 'rolled_back')
+
+    def test_the_preview_is_not_offered_counts_in_the_memory_and_its_state_is_shown(self):
+        preview = make_sf2(os.path.join(self.bank_dir, 'piano-preview.sf2'), presets=[('Preview', 0, 0)], name='Preview')
+        self.start(self.conf_text_base + 'PREVIEW_SF2="%s"\n' % preview)
+        b = self.jcall('/api/state')[1]['banks']
+        self.assertEqual(sorted(x['id'] for x in b['banks']), ['new.sf2', 'odd.sf2', 'old.sf2'])
+        self.assertEqual(b['memory']['mech'], os.path.getsize(self.mech) + os.path.getsize(preview))
+        self.assertEqual(b['loading'], dict(preview=True, state=None, loading=None, error=None))
+        self.actions.live = dict(state='preview', playing=preview, loading=self.new, error=None)
+        self.assertEqual(self.jcall('/api/state')[1]['banks']['loading'], dict(preview=True, state='preview', loading='new.sf2', error=None))
+
+    def test_the_page_says_when_the_preview_plays_in_both_languages(self):
+        page = self.call('/')[1].decode()
+        for key in ('ld_preview', 'ld_failed', 'sw_switching_live', 'bank_hint_live', 'no_preview'):
+            self.assertEqual(page.count(key + ':'), 2, key)  # English and Russian
+        self.assertIn('Играет превью, пока загружается {bank}.', page)
+        self.assertIn('loadingText(b)', page[page.index('function renderHomeBank') :])  # the Home pane says it too
+
     def test_a_bank_without_preset_zero_gets_its_first_usable_preset(self):
         self.jcall('/api/bank', {'id': 'odd.sf2'})
         self.finish_switch()
@@ -780,6 +834,27 @@ class WifiApiTests(ServerCase):
         self.actions.wifi_st['cable'] = False
         self.actions.wifi_saved_list.append(dict(ssid='Spare', secure=True, hidden=False, priority=0))
         self.assertEqual(self.post(dict(action='forget', ssid='Home'))[0], 200)
+
+    def test_the_only_way_in_is_forgotten_when_the_owner_confirms(self):
+        self.start()
+        code, r = self.post(dict(action='forget', ssid='Home', confirm='yes'))  # only a real true counts
+        self.assertEqual(code, 400)
+        self.assertIn('5 minutes', r['error'])
+        self.assertEqual(self.post(dict(action='forget', ssid='Home', confirm=True))[0], 200)
+        self.assertEqual(self.actions.wifi_requests, [dict(action='forget', ssid='Home', confirm=True)])
+
+    def test_the_page_scans_by_itself_when_it_has_no_list_and_the_radio_is_free(self):
+        self.start()
+        page = self.call('/')[1].decode()
+        self.assertIn('if (d.mode !== "ap" && !d.busy && !(d.networks || []).length) scanNetworks();', page)
+
+    def test_the_page_asks_before_forgetting_the_only_way_in_and_shows_the_wifi_off(self):
+        self.start()
+        page = self.call('/')[1].decode()
+        for key in ('w_confirm_forget_last', 'w_wifi_off'):
+            self.assertEqual(page.count(key + ':'), 2, key)  # English and Russian
+        self.assertIn('confirm: true', page)
+        self.assertNotIn('b.disabled = true; small.textContent', page)  # the button is no longer greyed out
 
     def test_a_busy_supervisor_is_not_given_a_second_job(self):
         self.start()

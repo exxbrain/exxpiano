@@ -9,7 +9,7 @@ depend() {
 	need localmount
 	after bootmisc
 	after hostname
-	before exxpiano exxpiano-wifi exxpiano-web avahi-daemon
+	before exxpiano exxpiano-wifi exxpiano-web avahi-daemon networking
 }
 
 start() {

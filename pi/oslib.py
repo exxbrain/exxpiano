@@ -65,8 +65,12 @@ def restart(name, popen=None):
     )
 
 
-def synth_pid(proc='/proc', comm='fluidsynth'):
-    """The process ID of the running FluidSynth, 0 when there is none (the newest one if, briefly, there are two)."""
+SYNTH_NAMES = ('fluidsynth', 'exxpiano-synth')  # the plain fluidsynth, or exxpiano-synth.py when a preview bank plays while the piano bank loads
+
+
+def synth_pid(proc='/proc', comm=SYNTH_NAMES):
+    """The process ID of the running synthesizer, 0 when there is none (the newest one if, briefly, there are two). `comm`: a name or names."""
+    names_wanted = (comm,) if isinstance(comm, str) else tuple(comm)
     found = 0
     try:
         names = os.listdir(proc)
@@ -77,7 +81,7 @@ def synth_pid(proc='/proc', comm='fluidsynth'):
             continue
         try:
             with open(os.path.join(proc, name, 'comm'), encoding='utf-8', errors='replace') as f:
-                if f.read().strip() != comm:
+                if f.read().strip() not in names_wanted:
                     continue
         except OSError:
             continue

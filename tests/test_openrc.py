@@ -68,6 +68,23 @@ class InitScriptTests(unittest.TestCase):
             self.assertNotRegex(read('pi', 'init.d', name), r'\n\tneed [^\n]*\bexxpiano\b', name)  # a restart of the synthesizer leaves them running
         self.assertRegex(read('pi', 'init.d', 'exxpiano-firstboot'), r'before exxpiano exxpiano-wifi exxpiano-web')
 
+    def test_the_piano_starts_before_the_network(self):
+        for name in ('exxpiano', 'exxpiano-fx', 'exxpiano-firstboot'):
+            text = read('pi', 'init.d', name)
+            self.assertRegex(text, r'\n\tbefore [^\n]*\bnetworking\b', name)
+            self.assertNotRegex(text, r'\n\t(need|after|use) [^\n]*\b(net|networking|chronyd|sshd|exxpiano-web|exxpiano-wifi)\b', name)
+        self.assertRegex(read('pi', 'init.d', 'exxpiano'), r'\n\tafter [^\n]*\bmodules\b')  # the ALSA sequencer modules: the MIDI port
+        for script in ('exxpiano.post-install', 'exxpiano.post-upgrade'):
+            text = read('packaging', 'alpine', 'exxpiano', script)
+            self.assertIn('rc-update add "$service" boot', text)
+            self.assertIn('rc-update del "$service" default', text)  # an older installation had them in default
+        inner = read('scripts', 'sd-image-inner.sh')
+        boot = next(l for l in inner.splitlines() if l.startswith('runlevel boot '))
+        default = next(l for l in inner.splitlines() if l.startswith('runlevel default '))
+        for s in ('alsa', 'exxpiano-firstboot', 'exxpiano', 'exxpiano-fx'):
+            self.assertIn(' %s' % s, boot)
+            self.assertNotIn(' %s ' % s, default + ' ')
+
     def test_the_wifi_supervisor_is_restarted_only_after_a_failure(self):
         text = read('pi', 'init.d', 'exxpiano-wifi')
         self.assertIsNone(var(text, 'supervisor'))
@@ -148,6 +165,9 @@ class FirstBootTests(unittest.TestCase):
             GROWPART=self.tool('growpart', grow),
             RESIZE2FS=self.tool('resize2fs', resize),
             WIFI=self.tool('ensure-name', wifi),
+            ASOUND=self.path('asound'),
+            AMIXER=self.tool('amixer', 0),
+            ALSACTL=self.tool('alsactl', 0),
         )
         r = subprocess.run(['bash', os.path.join(ROOT, 'pi', 'exxpiano-firstboot')], env=env, capture_output=True, text=True, timeout=30)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -176,6 +196,23 @@ class FirstBootTests(unittest.TestCase):
         self.assertIn('was not grown', log)
         self.assertIn('piano-lite.sf2', conf)
         self.assertTrue(os.path.exists(self.path('stamp')))
+
+    def test_the_jack_starts_at_the_full_volume_once(self):
+        os.makedirs(self.path('asound'))
+        self.write(self.path('asound/cards'), ' 0 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n')
+        _, calls, log = self.run_firstboot(948000)
+        self.assertIn('amixer -c Headphones -q sset PCM 100% unmute', calls)
+        self.assertIn('alsactl store', calls)
+        self.assertIn('the 3.5 mm jack is at the full volume', log)
+        os.unlink(self.calls)
+        self.run_firstboot(948000)  # a later start: the owner's volume is kept
+        self.assertFalse(os.path.exists(self.calls) and 'amixer' in open(self.calls).read())
+
+    def test_a_board_without_the_jack_is_left_alone(self):
+        os.makedirs(self.path('asound'))
+        self.write(self.path('asound/cards'), ' 0 [U24            ]: USB-Audio - U-24\n')  # a Pi 5 with a USB sound card
+        _, calls, _ = self.run_firstboot(948000)
+        self.assertNotIn('amixer', calls)
 
     def test_it_runs_once(self):
         self.run_firstboot(948000)

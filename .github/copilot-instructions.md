@@ -4,4 +4,5 @@
 - The house style is deliberate and checked by `ruff.toml` (see its `ignore` list): `dict(a=1)` records, `%`-formatting, short statements joined with `;`, long lines with a comment at the end. Do not ask to change these.
 - Tools in `tools/` and `scripts/` must also run on the python3 of macOS (3.9); code in `pi/` runs on Python 3.11 or newer.
 - Claims about sound, timing or hardware must say whether they were tried on a real Raspberry Pi; the README and CHANGELOG mark what was not.
+- Before every major release (`X.Y.0`) the released image is checked on a real Raspberry Pi 3 Model B: the piano, the preview (first note within 15 s of power-on) and Wi-Fi (setup network, joining, forgetting); see "Before a major release" in docs/BUILDING.md. A pull request that prepares such a release should say whether this was done.
 - Tests: `python3 -m unittest discover -s tests`; code checks: `scripts/lint.sh`; packages, services, upgrade and image in Alpine containers: `scripts/test-openrc-services.sh`, `scripts/test-apk-upgrade.sh`, `scripts/test-sd-image-pipeline.sh`.

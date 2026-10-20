@@ -5,6 +5,7 @@ import importlib.util
 import io
 import os
 import re
+import shutil
 import sys
 import tempfile
 import unittest
@@ -311,10 +312,24 @@ class ConnectTests(SupervisorCase):
         r = self.status()['last_result']
         self.assertEqual((r['ok'], r['kind']), (False, 'forget'))
         self.assertIn('only way', r['error'])
+        self.assertIn('5 minutes', r['error'])  # what forgetting would leave
         self.system.cable = True  # with a cable it is safe
         self.request(action='forget', ssid='Home')
         self.advance(3)
         self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
+
+    def test_the_only_way_in_is_forgotten_when_the_owner_confirms_then_the_setup_network_for_the_window(self):
+        self.with_home()
+        self.system.client_up()
+        self.advance(900)  # long after the start: the window counts from the forget
+        self.request(action='forget', ssid='Home', confirm=True)
+        self.advance(3)
+        self.assertEqual(wifilib.networks(self.system.read_wpa()), [])
+        self.assertEqual(self.sup.mode, 'ap')
+        self.advance(290)
+        self.assertEqual(self.sup.mode, 'ap')
+        self.advance(15)
+        self.assertEqual(self.sup.mode, 'off')
 
     def test_with_a_cable_forgetting_the_last_network_needs_no_setup_network(self):
         self.with_home()
@@ -363,11 +378,45 @@ class ConnectTests(SupervisorCase):
 
 
 class AccessPointLifeTests(SupervisorCase):
-    def test_without_saved_networks_it_stays_for_ever_even_with_nobody_there(self):
+    def test_without_saved_networks_it_is_up_for_the_window_after_the_start_then_the_wifi_is_off(self):
         self.advance(40)
-        self.advance(3600)
         self.assertEqual(self.sup.mode, 'ap')
+        self.advance(300)  # 5 minutes from the start, nobody connected
+        self.assertEqual(self.sup.mode, 'off')
+        self.assertIn('ap_stop', self.system.calls)
+        self.assertEqual(self.status()['mode'], 'off')
+        self.advance(3600)  # and it stays off: the box is on no network
         self.assertEqual(self.system.calls.count('ap_start'), 1)
+        self.assertEqual(self.sup.mode, 'off')
+
+    def test_someone_connected_keeps_the_setup_network_up_after_the_window(self):
+        self.advance(40)
+        self.system.station_count = 1
+        self.advance(600)
+        self.assertEqual(self.sup.mode, 'ap')
+        self.system.station_count = 0  # the phone left
+        self.advance(6)
+        self.assertEqual(self.sup.mode, 'off')
+
+    def test_off_a_cable_and_a_network_saved_through_the_page_bring_the_normal_life_back(self):
+        self.advance(400)
+        self.assertEqual(self.sup.mode, 'off')
+        self.system.cable = True
+        self.request(action='connect', ssid='Home', psk=HOME_PSK)
+        self.system.reachable = {'Home': HOME_PSK}
+        self.advance(6)
+        self.assertEqual(self.sup.mode, 'client')
+        self.assertEqual(self.system.connected, 'Home')
+
+    def test_the_button_works_while_the_wifi_is_off_and_it_goes_off_again_after(self):
+        self.advance(400)
+        scans = self.system.calls.count('scan')
+        self.request(action='ap', seconds=120)
+        self.advance(6)
+        self.assertEqual(self.sup.mode, 'ap')
+        self.assertEqual(self.system.calls.count('scan'), scans + 1)  # the page gets the networks it can join, also from off
+        self.advance(130)
+        self.assertEqual(self.sup.mode, 'off')
 
     def test_with_saved_networks_an_unused_access_point_looks_for_them_again(self):
         self.with_home()
@@ -472,8 +521,15 @@ class SystemTests(unittest.TestCase):
         self.wpa = os.path.join(self.tmp.name, 'wpa_supplicant.conf')
         self.run_dir = os.path.join(self.tmp.name, 'run')
         self.proc = os.path.join(self.tmp.name, 'proc')
-        self.killed = []
-        s = pw.System('wlan0', self.run_dir, self.wpa, run, net_dir=self.net, country=country, proc=self.proc, kill=lambda pid, sig: self.killed.append(pid))
+        self.killed, self.signals, self.stubborn = [], [], set()
+
+        def kill(pid, sig):  # a program ends on SIGTERM unless it is stubborn; SIGKILL always ends it
+            self.killed.append(pid)
+            self.signals.append((pid, sig))
+            if sig == pw.signal.SIGKILL or pid not in self.stubborn:
+                shutil.rmtree(os.path.join(self.proc, str(pid)), ignore_errors=True)
+
+        s = pw.System('wlan0', self.run_dir, self.wpa, run, net_dir=self.net, country=country, proc=self.proc, kill=kill, sleep=lambda x: None)
         return s, calls
 
     def test_the_link_comes_from_the_supplicant(self):
@@ -491,6 +547,15 @@ class SystemTests(unittest.TestCase):
         self.assertTrue(s.has_default_route())
         s, _ = self.make({'ip -4 route': (0, '')})
         self.assertFalse(s.has_default_route())
+        # the cable pulled out: its route stays, marked linkdown (seen on a Pi 3 B with Alpine): neither online nor a cable
+        s, _ = self.make({'ip -4 route': (0, 'default via 192.168.2.1 dev eth0 metric 202 linkdown\n')})
+        self.assertFalse(s.has_default_route())
+        self.assertFalse(s.has_cable_route())
+        s, _ = self.make({'ip -4 route': (0, 'default via 192.168.2.1 dev eth0 metric 202\n')})
+        self.assertTrue(s.has_cable_route())
+        s, _ = self.make({'ip -4 route': (0, 'default via 192.168.2.1 dev eth0 metric 202 linkdown\ndefault via 192.168.1.1 dev wlan0 metric 303\n')})
+        self.assertTrue(s.has_default_route())
+        self.assertFalse(s.has_cable_route())
         s, _ = self.make({'station dump': (0, 'Station aa:bb (on wlan0)\n\tinactive time: 0 ms\nStation cc:dd (on wlan0)\n')})
         self.assertEqual(s.stations(), 2)
         s, calls = self.make({'iwd status': (0, ' * status: started\n'), 'status': (3, ' * status: stopped\n')})
@@ -602,6 +667,16 @@ class SystemTests(unittest.TestCase):
         self.assertLess(calls.index(['ip', 'link', 'set', 'wlan0', 'up']), calls.index(['wpa_supplicant', '-B', '-i', 'wlan0', '-c', self.wpa, '-P', wpa]))
         self.assertFalse([c for c in calls if c[0] in ('ifup', 'ifdown', 'dhclient')])
 
+    def test_client_down_waits_for_wpa_supplicant_and_kills_it_if_it_does_not_end(self):
+        s, _ = self.make({})
+        os.makedirs(self.run_dir)
+        self.write(os.path.join(self.run_dir, 'wpa_supplicant-wlan0.pid'), '401\n')
+        self.write(os.path.join(self.proc, '401', 'comm'), 'wpa_supplicant\n')
+        self.stubborn.add(401)  # still leaving its network: wlan0 is not free yet
+        s.client_down()
+        self.assertEqual(self.signals, [(401, pw.signal.SIGTERM), (401, pw.signal.SIGKILL)])
+        self.assertFalse(os.path.exists(os.path.join(self.proc, '401')))  # gone before hostapd may take wlan0
+
     def test_client_down_ends_only_its_own_programs(self):
         s, calls = self.make({})
         os.makedirs(self.run_dir)
@@ -628,6 +703,14 @@ class SystemTests(unittest.TestCase):
 
     def test_scan_retries_when_the_radio_is_busy(self):
         results = iter([(1, 'command failed: Resource busy (-16)'), (0, 'BSS aa:bb:cc:dd:ee:ff(on wlan0)\n\tsignal: -40.0 dBm\n\tSSID: Home\n\tRSN:\t * x\n')])
+        s = pw.System('wlan0', '/tmp/none', '/tmp/none.conf', lambda cmd, timeout: next(results))
+        real = pw.time.sleep
+        pw.time.sleep = lambda x: None
+        self.addCleanup(setattr, pw.time, 'sleep', real)
+        self.assertEqual([n['ssid'] for n in s.scan()], ['Home'])
+
+    def test_an_empty_scan_right_after_leaving_a_network_is_tried_again(self):
+        results = iter([(0, ''), (0, 'BSS aa:bb:cc:dd:ee:ff(on wlan0)\n\tsignal: -40.0 dBm\n\tSSID: Home\n\tRSN:\t * x\n')])
         s = pw.System('wlan0', '/tmp/none', '/tmp/none.conf', lambda cmd, timeout: next(results))
         real = pw.time.sleep
         pw.time.sleep = lambda x: None

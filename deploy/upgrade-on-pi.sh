@@ -61,7 +61,7 @@ echo "== 4/6 Starting (the banks load for ~40 s)"
 for s in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do rc-update add "$s" default >/dev/null 2>&1; done
 started exxpiano || rc-service exxpiano start >/dev/null 2>&1
 sleep "$WAIT"
-started exxpiano && steady '^(/bin/sh )?[^ ]*fluidsynth -a ' || rollback "the synthesizer is not running"
+started exxpiano && steady '^(/bin/sh )?[^ ]*(fluidsynth -a |python3 /opt/exxpiano/exxpiano-synth.py )' || rollback "the synthesizer is not running"
 started exxpiano-fx || rc-service exxpiano-fx restart >/dev/null 2>&1
 started exxpiano-web || rc-service exxpiano-web restart >/dev/null 2>&1
 started exxpiano-fx && steady '^[^ ]*python3 /opt/exxpiano/exxpiano-fx\.py' || rollback "the bridge is not running"

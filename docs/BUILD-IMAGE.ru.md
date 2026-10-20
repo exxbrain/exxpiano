@@ -13,7 +13,7 @@ scripts/make-soundfonts.sh -p full -o build
 scripts/make-soundfonts.sh -p lite -o build
 ```
 
-По умолчанию сборщик использует `build/piano-full.sf2`, `build/piano-lite.sf2` (если он есть) и `build/mech.sf2`. Другие банки передаются через `--piano`, `--piano-lite` и `--mech`. Образ без фортепиано и механики не собирается; первый запуск на плате с памятью меньше 800 МБ (Pi 3 A+) выбирает банк `lite`.
+По умолчанию сборщик использует `build/piano-full.sf2`, `build/piano-lite.sf2` (если он есть), `build/piano-preview.sf2` и `build/mech.sf2` (превью собирает `scripts/make-soundfonts.sh -p preview`). Другие банки передаются через `--piano`, `--piano-lite`, `--piano-preview` и `--mech`. Образ без фортепиано, превью (не больше 25 МБ, чтобы на плате с 1 ГБ поместиться рядом с полным банком) и механики не собирается; первый запуск на плате с памятью меньше 800 МБ (Pi 3 A+) выбирает банк `lite`.
 
 Соберите пакеты (они подписаны, см. ниже):
 

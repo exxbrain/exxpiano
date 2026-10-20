@@ -3,7 +3,13 @@
 
 # the demonstration pieces go into the MIDI library once; a piece the owner deleted does not come back
 python3 /opt/exxpiano/exxpiano-demo-midi.py >/dev/null 2>&1 || true
-for service in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi; do
+# the synthesizer and the bridge start in the boot runlevel, before the network (the first note within seconds of power-on); an older
+# installation had them in default
+for service in exxpiano exxpiano-fx; do
+	rc-update del "$service" default >/dev/null 2>&1 || true
+	rc-update add "$service" boot >/dev/null 2>&1 || true
+done
+for service in exxpiano-web exxpiano-wifi; do
 	rc-update add "$service" default >/dev/null 2>&1 || true
 done
 # the setup access point is started by exxpiano-wifi itself: the packages' own services would only get in the way

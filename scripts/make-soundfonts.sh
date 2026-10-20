@@ -6,6 +6,7 @@
 # -p  Preset of the piano bank (size = memory the bank takes on a Pi 3):
 #       full      ~700 MB  14 layers, stereo, 12 s tails. The main one, for boards with 1 GB or more (gain 0.6)
 #       lite      ~250 MB  6 layers, stereo, 9 s tails (gain 0.6)
+#       preview   ~24 MB   3 layers, stereo at 22.05 kHz, 3 s tails: plays while a big bank loads (at most 25 MB, or the build fails)
 #
 # -v  Which published Salamander package to take the samples from (all CC-BY, from freepats.zenvoid.org):
 #       44k16       WAV, 44.1 kHz 16 bit, 412 MB download.  Default. Tested on real data.
@@ -44,7 +45,11 @@ done
 case "$PRESET" in
   lite)     ARGS="--layers 2,5,8,10,13,15 --tail 9 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
   full)     ARGS="--layers 1,2,4,5,6,7,8,9,10,11,12,13,15,16 --tail 12 --gamma 0.85 --peak-lo -17 --peak-hi -1.5 --veltrack 55" ;;
-  *) echo "Unknown preset: $PRESET (full | lite)"; exit 1 ;;
+  # Stereo, not mono: a mono bank has the same signal on both channels, and an input that takes the left minus the right (a TRS cable
+  # into a balanced mixer input) cancels it to nothing; 22.05 kHz keeps the stereo pair within 25 MB. Louder layer targets than full:
+  # with 3 layers a soft touch lands on the softest sample, and these targets keep it about as loud as full
+  preview)  ARGS="--layers 4,10,15 --rate 22050 --tail 3 --gamma 0.85 --peak-lo -12 --peak-hi -1 --veltrack 55 --subzones 3 --max-mb 25" ;;
+  *) echo "Unknown preset: $PRESET (full | lite | preview)"; exit 1 ;;
 esac
 
 case "$VERSION" in

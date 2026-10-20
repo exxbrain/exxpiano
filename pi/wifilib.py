@@ -239,7 +239,13 @@ def scan_networks(run, iface, tries=3, pause=1.5, sleep=time.sleep):
     for i in range(tries):
         rc, out = run(['iw', 'dev', iface, 'scan'], 20)
         if rc == 0:
-            return parse_scan(out), None
+            found = parse_scan(out)
+            if found or i + 1 == tries:
+                return found, None
+            # right after the radio left a network a scan may succeed with nothing in it (seen after "Forget" on a Pi 3 B): again
+            reason = 'no networks were found'
+            sleep(pause)
+            continue
         reason = scan_failure_reason(rc, out)
         if 'network is down' in (out or '').lower() or '(-100)' in (out or ''):  # the interface is down (after the setup network, say): bring it up
             run(['ip', 'link', 'set', iface, 'up'], 10)

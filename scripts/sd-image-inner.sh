@@ -3,7 +3,7 @@
 # the exxpiano packages and the sound banks. Each installed copy creates its own persistent installation ID at first boot.
 # Runs as root on Alpine aarch64 (build-sd-image.py starts it in the sd-builder container; Docker Desktop on a Mac runs arm64 natively).
 #
-#   sd-image-inner.sh --apk-repo DIR --out OUT.img --info-out DIR --piano P.sf2 --mech M.sf2 [--piano-lite L.sf2] [options]
+#   sd-image-inner.sh --apk-repo DIR --out OUT.img --info-out DIR --piano P.sf2 --mech M.sf2 --piano-preview V.sf2 [--piano-lite L.sf2] [options]
 #
 # --apk-repo: what scripts/build-apks.py made (DIR/exxpiano/aarch64/*.apk with its APKINDEX, DIR/<key>.rsa.pub)
 # --info-out: gets alpine-version.txt and packages.txt (every installed package with its version) for the manifest
@@ -15,7 +15,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APK_REPO="" OUT="" INFO_OUT="" PIANO="" PIANO_LITE="" MECH="" HOSTNAME_NEW="exxpiano" COUNTRY="GB" TIMEZONE="UTC" ALPINE="$HERE/../alpine"
+APK_REPO="" OUT="" INFO_OUT="" PIANO="" PIANO_LITE="" PIANO_PREVIEW="" MECH="" HOSTNAME_NEW="exxpiano" COUNTRY="GB" TIMEZONE="UTC" ALPINE="$HERE/../alpine"
 SSH_KEY="" WORKDIR="${TMPDIR:-/tmp}/exxpiano-sd-work" MIRROR="" CACHE_DIR=""
 BOOT_MB=256
 
@@ -29,6 +29,7 @@ while [ $# -gt 0 ]; do
     --info-out) INFO_OUT="$2"; shift 2 ;;
     --piano) PIANO="$2"; shift 2 ;;
     --piano-lite) PIANO_LITE="$2"; shift 2 ;;
+    --piano-preview) PIANO_PREVIEW="$2"; shift 2 ;;
     --mech) MECH="$2"; shift 2 ;;
     --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
     --country) COUNTRY="$2"; shift 2 ;;
@@ -56,6 +57,8 @@ PUBKEY="$(ls "$APK_REPO"/*.rsa.pub 2>/dev/null | head -1)"
 [ -r "$PIANO" ] || die "--piano is required and must be readable"
 [ -r "$MECH" ] || die "--mech is required and must be readable"
 [ -z "$PIANO_LITE" ] || [ -r "$PIANO_LITE" ] || die "--piano-lite must be readable"
+[ -r "$PIANO_PREVIEW" ] || die "--piano-preview is required and must be readable (scripts/make-soundfonts.sh -p preview)"
+[ "$(wc -c < "$PIANO_PREVIEW")" -le 25000000 ] || die "--piano-preview is bigger than 25 MB: with the full bank it does not fit a 1 GB board"
 [ -z "$SSH_KEY" ] || [ -r "$SSH_KEY" ] || die "--ssh-key must be readable"
 [ -z "$MIRROR" ] || [[ "$MIRROR" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$ ]] || die "--mirror: an https:// address"
 for t in apk mkfs.ext4 mkfs.vfat mcopy mdir debugfs sfdisk truncate dd awk sed; do command -v "$t" >/dev/null || die "missing tool: $t"; done
@@ -93,8 +96,10 @@ runlevel() { local level="$1"; shift; mkdir -p "$ROOTFS/etc/runlevels/$level"; f
   [ -e "$ROOTFS/etc/init.d/$s" ] || die "no service $s in the image"; ln -sf "/etc/init.d/$s" "$ROOTFS/etc/runlevels/$level/$s"; done; }
 rm -f "$ROOTFS"/etc/runlevels/*/mdev "$ROOTFS"/etc/runlevels/*/hwdrivers
 runlevel sysinit devfs dmesg udev udev-trigger udev-settle
-runlevel boot modules sysctl hostname bootmisc syslog klogd swclock seedrng networking root fsck localmount
-runlevel default chronyd sshd avahi-daemon alsa exxpiano-firstboot exxpiano exxpiano-fx exxpiano-web exxpiano-wifi local
+# the piano (its first start, the mixer levels, the synthesizer and the bridge) in boot, ordered before the network by their services:
+# the first note sounds seconds after power-on, without waiting for the network, the clock or SSH
+runlevel boot modules sysctl hostname bootmisc syslog klogd swclock seedrng networking root fsck localmount alsa exxpiano-firstboot exxpiano exxpiano-fx
+runlevel default chronyd sshd avahi-daemon exxpiano-web exxpiano-wifi local
 runlevel shutdown mount-ro killprocs savecache
 for s in hostapd dnsmasq; do rm -f "$ROOTFS"/etc/runlevels/*/"$s"; done        # exxpiano-wifi starts them itself
 
@@ -155,6 +160,7 @@ install -d "$ROOTFS/opt/exxpiano/soundfonts"
 install -m 644 "$PIANO" "$ROOTFS/opt/exxpiano/soundfonts/piano.sf2"
 install -m 644 "$MECH" "$ROOTFS/opt/exxpiano/soundfonts/mech.sf2"
 [ -z "$PIANO_LITE" ] || install -m 644 "$PIANO_LITE" "$ROOTFS/opt/exxpiano/soundfonts/piano-lite.sf2"   # the first start picks it with little memory
+install -m 644 "$PIANO_PREVIEW" "$ROOTFS/opt/exxpiano/soundfonts/piano-preview.sf2"   # plays while the piano bank loads
 
 say "6/8 The programs of the image, run in it"
 SMOKE_FAIL=0
@@ -197,7 +203,10 @@ cat > "$BOOTFILES/usercfg.txt" <<'CFG'
 # exxpiano: Raspberry Pi 3, 4 and 5 (64-bit Alpine Linux). config.txt is rewritten by package upgrades: settings go here.
 # the 3.5 mm jack (Pi 3 and 4; the Pi 5 has none and plays through a USB sound card)
 dtparam=audio=on
+# the first note within 15 s of power-on: no wait before the kernel, no splash, and the full clock speed for the first 30 s of the boot
 disable_splash=1
+boot_delay=0
+initial_turbo=30
 CFG
 echo "root=LABEL=exxroot rootfstype=ext4 rootwait modules=sd-mod,usb-storage,ext4 console=tty1 quiet" > "$BOOTFILES/cmdline.txt"
 rm -rf "${ROOTFS:?}/boot"; mkdir -p "$ROOTFS/boot"            # the boot partition is mounted here on the device
@@ -233,12 +242,16 @@ check "the partition table: FAT32 boot, then the root" "sfdisk -d '$DISK' | grep
 check "the kernel, the initramfs and the firmware are on the boot partition" "echo \"\$bootlist\" | grep -q '/vmlinuz-rpi$' && echo \"\$bootlist\" | grep -q '/initramfs-rpi$' && echo \"\$bootlist\" | grep -qi '/start4.elf$' && echo \"\$bootlist\" | grep -qi '/bootcode.bin$'"
 check "device trees for the Pi 3, 4 and 5" "echo \"\$bootlist\" | grep -q 'bcm2710-rpi-3-b.dtb$' && echo \"\$bootlist\" | grep -q 'bcm2711-rpi-4-b.dtb$' && echo \"\$bootlist\" | grep -q 'bcm2712-rpi-5-b.dtb$' && echo \"\$bootlist\" | grep -q '/overlays/'"
 check "config.txt: the 64-bit kernel; usercfg.txt: the 3.5 mm jack" "mtype -i '$WORKDIR/boot.img' ::/config.txt | grep -qx 'arm_64bit=1' && mtype -i '$WORKDIR/boot.img' ::/config.txt | grep -qx 'kernel=vmlinuz-rpi' && mtype -i '$WORKDIR/boot.img' ::/usercfg.txt | grep -qx 'dtparam=audio=on'"
+check "a quick start: no boot delay, no splash, the full clock for the first 30 s" "mtype -i '$WORKDIR/boot.img' ::/usercfg.txt | grep -qx 'boot_delay=0' && mtype -i '$WORKDIR/boot.img' ::/usercfg.txt | grep -qx 'disable_splash=1' && mtype -i '$WORKDIR/boot.img' ::/usercfg.txt | grep -qx 'initial_turbo=30'"
 check "16 MB for the graphics processor, with the cut-down firmware" "mtype -i '$WORKDIR/boot.img' ::/config.txt | grep -qx 'gpu_mem=16' && echo \"\$bootlist\" | grep -q '/start_cd.elf$' && echo \"\$bootlist\" | grep -q '/fixup_cd.dat$'"
 check "the ALSA sequencer modules load at boot" "rootfile /etc/modules | grep -qx snd-seq && rootfile /etc/modules | grep -qx snd-seq-midi"
 check "the root is found by its label" "mtype -i '$WORKDIR/boot.img' ::/cmdline.txt | grep -q 'root=LABEL=exxroot' && rootfile /etc/fstab | grep -q '^LABEL=exxroot'"
 check "the package is installed" "grep -q '^exxpiano-[0-9]' '$WORKDIR/packages'"
-for s in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi exxpiano-firstboot sshd chronyd avahi-daemon; do
+for s in exxpiano-web exxpiano-wifi sshd chronyd avahi-daemon; do
   check "$s starts at boot" "rootexists /etc/runlevels/default/$s"
+done
+for s in alsa exxpiano-firstboot exxpiano exxpiano-fx; do
+  check "$s starts in the boot runlevel, before the network" "rootexists /etc/runlevels/boot/$s && ! rootexists /etc/runlevels/default/$s"
 done
 check "eudev, not mdev, handles the devices" "rootexists /etc/runlevels/sysinit/udev && ! rootexists /etc/runlevels/sysinit/mdev"
 check "hostapd and dnsmasq do not start by themselves" "! rootexists /etc/runlevels/default/hostapd && ! rootexists /etc/runlevels/default/dnsmasq"
@@ -246,6 +259,7 @@ check "the console shows a status screen, no login prompt anywhere" "rootfile /e
 check "no automatic login" "! rootfile /etc/inittab | grep -q -- '-a root\|autologin'"
 check "the banks are in place" "rootexists /opt/exxpiano/soundfonts/piano.sf2 && rootexists /opt/exxpiano/soundfonts/mech.sf2"
 [ -z "$PIANO_LITE" ] || check "the smaller bank for 512 MB boards is in place" "rootexists /opt/exxpiano/soundfonts/piano-lite.sf2"
+check "the preview bank is in place, at most 25 MB, and configured" "rootexists /opt/exxpiano/soundfonts/piano-preview.sf2 && [ \"\$(rootfile /opt/exxpiano/soundfonts/piano-preview.sf2 | wc -c)\" -le 25000000 ] && rootfile /etc/exxpiano.conf | grep -qx 'PREVIEW_SF2=/opt/exxpiano/soundfonts/piano-preview.sf2'"
 check "the configured banks are the installed defaults" "rootfile /etc/exxpiano.conf | grep -qx 'PIANO_SF2=/opt/exxpiano/soundfonts/piano.sf2' && rootfile /etc/exxpiano.conf | grep -qx 'MECH_SF2=/opt/exxpiano/soundfonts/mech.sf2'"
 check "the demonstration pieces are in the MIDI library" "[ \"\$(debugfs -R 'ls -p /var/lib/exxpiano/midi' '$WORKDIR/root.img' 2>/dev/null | grep -c '/m-')\" -ge 2 ]"
 check "no installation ID is baked into the reusable image" "! rootexists /var/lib/exxpiano/installation-id"

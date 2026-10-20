@@ -38,7 +38,7 @@ package() {
 	local opt="$pkgdir"/opt/exxpiano f
 
 	for f in exxpiano-fx.py sf2info.py exxpiano-demo-midi.py exxpiano-meter.py exxpiano-usb.py deviceid.py exxpiano-wifi.py \
-		exxpiano-web.py exxpiano-run exxpiano-env exxpiano-respawn exxpiano-firstboot exxpiano-console.sh; do
+		exxpiano-web.py exxpiano-synth.py exxpiano-run exxpiano-env exxpiano-respawn exxpiano-firstboot exxpiano-console.sh; do
 		install -Dm755 pi/$f "$opt"/$f
 	done
 	for f in exxpianoconf.py banklib.py bankimport.py usblib.py midilib.py midiplayer.py profiles.py sysmon.py wifilib.py qrlib.py \

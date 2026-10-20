@@ -14,13 +14,21 @@ Only for building the banks and the image yourself, or working on the code. To p
 
 The shipped product is a ready device with exxpiano already installed. One complete Alpine Linux image is reusable across Raspberry Pi 3, 4 and 5 boards; a separate package or installer bundle is not a delivery format.
 
-1. Build the banks once: `scripts/make-soundfonts.sh -p full` and `-p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-full.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
+1. Build the banks once: `scripts/make-soundfonts.sh -p full`, `-p lite` and `-p preview` (the later ones reuse the samples downloaded by the first). This creates the required `build/piano-full.sf2`, `build/mech.sf2` and `build/piano-preview.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
 2. Build the signed packages with `scripts/build-apks.py`, then the reusable image with `scripts/build-sd-image.py`.
 3. Flash `exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
 4. Insert the card into a Raspberry Pi 3, 4 or 5 and power it on.
 
 See [the image-building guide](BUILD-IMAGE.md) for the complete procedure and current verification status.
 Version tags named `v<VERSION>` build this image and publish it together with its manifest, README, and checksums as assets of a GitHub Release.
+
+### Before a major release: the main functions on a real Raspberry Pi
+
+Before every major release (a new major or minor version, `X.Y.0`) write the image that is going to be released to a clean card and check on a Raspberry Pi 3 Model B with a USB MIDI keyboard. Automatic tests and containers do not replace this: they have no sound card, no keyboard and no radio. Write the results (what was tried, on which board, the numbers) into the CHANGELOG section of the release; what was not tried is said there too.
+
+1. **The piano:** the keys sound through the 3.5 mm jack with the full bank and the mechanics (hammer, damper, pedal); a bank switch in the web interface works; the MIDI player plays a demonstration piece.
+2. **The preview:** from power-on, with a key pressed again and again, the first note sounds within **15 s** (a stopwatch, from plugging in the power); the preview is heard, also through an input that takes the left channel minus the right (a TRS cable into a balanced mixer input); the piano moves to the full bank without a pause; during a bank switch the preview plays.
+3. **Wi-Fi:** with the cable pulled out and no saved network, the setup network `exxpiano-Setup-<ID>` comes up; a phone joins it, the page opens, the Pi joins a home network and is reached by `exxpiano-<id>.local`; forgetting that network takes the Pi off it, and the setup network stays on for 5 minutes.
 
 ## Build the sound banks (on a Mac/Linux)
 
