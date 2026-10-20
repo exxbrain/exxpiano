@@ -28,7 +28,8 @@ jobs:
       - name: Check that the package signing key is there
         env:
           EXXPIANO_APK_KEY: ${{ secrets.EXXPIANO_APK_KEY }}
-        run: test -n "$EXXPIANO_APK_KEY" || { echo "The secret EXXPIANO_APK_KEY is missing: a release must be signed with the project key"; exit 1; }
+        run: |
+          test -n "$EXXPIANO_APK_KEY" || { echo "The secret EXXPIANO_APK_KEY is missing: a release must be signed with the project key"; exit 1; }
 
       - name: Install sound-bank tools
         run: sudo apt-get update && sudo apt-get install -y ffmpeg

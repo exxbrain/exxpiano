@@ -184,6 +184,8 @@ echo "PACKAGER_PRIVKEY=/home/builder/.abuild/$KEY_NAME.rsa" > /home/builder/.abu
 # '/out/exxpiano/aarch64': Permission denied"). Root copies the result and gives it to the user of the host.
 cp -r /work /home/builder/work; chown -R builder /home/builder/work
 install -d -o builder /home/builder/repo
+# --packages adds to the repository in /out (the test versions of exxpiano need the py3-* already there): start from what is in it
+[ ! -d /out/exxpiano ] || { cp -r /out/exxpiano /home/builder/repo/; chown -R builder /home/builder/repo; }
 # the packages built first are build dependencies of exxpiano: apk finds them in this repository (signed with the key installed above)
 echo /home/builder/repo/exxpiano >> /etc/apk/repositories
 for pkg in $PACKAGES; do
