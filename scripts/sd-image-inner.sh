@@ -275,5 +275,8 @@ mv "$DISK" "$OUT"
 cp "$WORKDIR/alpine-version" "$INFO_OUT/alpine-version.txt"
 cp "$WORKDIR/packages" "$INFO_OUT/packages.txt"
 head -1 "$WORKDIR/alpine-repositories" | sed 's#/v[0-9.]*/main$##' > "$INFO_OUT/mirror.txt"
+# the builder runs as root in its container: what it leaves in the mounted output belongs to the user who runs the build (a GitHub runner
+# could not delete root's files: "rm: cannot remove .../info/packages.txt: Permission denied")
+[ -z "${HOST_UID:-}" ] || chown -R "$HOST_UID:${HOST_GID:-$HOST_UID}" "$OUT" "$INFO_OUT"
 rm -rf "$WORKDIR"
 echo "Image: $OUT ($(( $(stat -c %s "$OUT") / 1048576 )) MB), generic name $HOSTNAME_NEW, Alpine $(cat "$INFO_OUT/alpine-version.txt")"

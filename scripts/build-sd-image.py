@@ -212,6 +212,10 @@ def docker_command(plan, inputs, script_args):
             'SD_PASSWORD',
             '-e',
             'SD_AP_PASSWORD',
+            '-e',
+            'HOST_UID',
+            '-e',
+            'HOST_GID',
             '-v',
             '%s:/repo:ro' % ROOT,
             '-v',
@@ -364,6 +368,8 @@ def build_one(args, inputs, plan):
         cmd = docker_command(plan, inputs, lambda mapping: inner_args(plan, lambda k: mapping[k]))
     print('Making the reusable image (a few minutes) ...')
     env = dict(os.environ, SD_PASSWORD=args.password, SD_AP_PASSWORD=args.ap_password)
+    if hasattr(os, 'getuid'):  # the image and its info belong to the user who builds, not to root of the builder container
+        env['HOST_UID'], env['HOST_GID'] = str(os.getuid()), str(os.getgid())
     if subprocess.run(cmd, env=env).returncode != 0:
         raise BuildError('the image could not be made (see the messages above)')
     if not os.path.isfile(img):

@@ -24,7 +24,7 @@ import json, os, sys
 args = sys.argv[1:]
 log = os.environ['FAKE_DOCKER_LOG']
 with open(log, 'a') as f:
-    f.write(json.dumps(dict(args=args, env={k: os.environ.get(k) for k in ('SD_PASSWORD', 'SD_AP_PASSWORD')})) + '\n')
+    f.write(json.dumps(dict(args=args, env={k: os.environ.get(k) for k in ('SD_PASSWORD', 'SD_AP_PASSWORD')}, host_uid=os.environ.get('HOST_UID'))) + '\n')
 if args[:1] == ['info']:
     sys.exit(int(os.environ.get('FAKE_DOCKER_INFO', '0')))
 if args[:1] == ['run'] and 'sd-image-inner.sh' in ' '.join(args):
@@ -211,6 +211,9 @@ class BuildTests(Case):
         self.assertEqual(args[args.index('--country') + 1], 'RU')
         self.assertEqual(args[args.index('--timezone') + 1], 'Europe/Moscow')
         self.assertTrue(args[args.index('--piano-preview') + 1].endswith('/piano-preview.sf2'))  # the preview bank goes into every image
+        call = self.inner_call()
+        self.assertIn('HOST_UID', call['args'])  # "-e NAME": the files the builder leaves belong to the user who builds
+        self.assertEqual(call['host_uid'], str(os.getuid()))
 
     def test_the_passwords_go_through_the_environment_never_the_arguments(self):
         r = self.run_build('--password', 'root-secret-1', '--ap-password', 'ap-secret-22')

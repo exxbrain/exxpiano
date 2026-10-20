@@ -34,4 +34,4 @@ assert m['image_sha256'] == h, 'the manifest names another ZIP'
 print('manifest: ok (%d packages, Alpine %s)' % (len(m['packages']), m['alpine_version']))
 PY
 if grep -q 'setup-pass-1' "$WORK/out/manifest.json"; then echo "the setup password leaked into the manifest"; exit 1; fi
-echo "image pipeline: ok ($(( $(stat -f %z "$ZIP" 2>/dev/null || stat -c %s "$ZIP") / 1048576 )) MB ZIP)"
+echo "image pipeline: ok ($(( $(wc -c < "$ZIP") / 1048576 )) MB ZIP)"   # wc: the same on Linux and a Mac (stat -f means another thing on Linux)
