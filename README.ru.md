@@ -6,7 +6,7 @@
 [![сборка релиза](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml)
 [![latest release](https://img.shields.io/github/v/release/exxbrain/exxpiano?label=release)](https://github.com/exxbrain/exxpiano/releases/latest)
 
-**Фортепиано, которое звучит.** exxpiano превращает Raspberry Pi (даже б/у Pi 3 A+ с 512 МБ) в цифровое пианино для любой USB MIDI-клавиатуры: образ записывается на карту, плата включается, всё настраивается с телефона. Без установки и без экрана на плате. Первая нота звучит не позже 15 с от включения (Pi 3 Model B).
+**Фортепиано, которое звучит.** exxpiano превращает Raspberry Pi (даже б/у Pi 3 A+ с 512 МБ) в цифровое пианино для любой USB MIDI-клавиатуры: образ записывается на карту, плата включается, всё настраивается с телефона. Без установки и без экрана на плате.
 
 > **Сделано для плат с 1 ГБ памяти.** Полный банк рояля (около 700 МБ, тот, что в видео ниже) рассчитан на плату с 1 ГБ, например Raspberry Pi 3 Model B; на ней он настроен и проверен. Уменьшенный банк `lite` сделан для того, чтобы плата с 512 МБ (Pi 3 A+) тоже играла.
 >
