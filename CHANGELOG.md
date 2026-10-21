@@ -2,10 +2,9 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
-## 2.0.0-rc1
+## 2.0.0
 
-The release candidate of 2.0.0: the device on Alpine Linux, with the preview piano and the first note within 15 s of power-on. It is published as a pre-release, so the latest release stays 1.10.22 until the checks before a major release (docs/BUILDING.md) are done on this image.
-
+The device on Alpine Linux, with the preview piano and the first note within 15 s of power-on. **Checked before the release on the image of 2.0.0-rc1, written to a clean card, on a Raspberry Pi 3 Model B (1 GB) with a KeyLab Essential 49 mk3** (docs/BUILDING.md, "Before a major release"): the piano with the full bank and the mechanics, a bank switch and the MIDI player; the first note within 15 s of power-on, the preview heard, the move to the full bank without a pause; the setup network, joining a home network, forgetting it and the 5 minutes of the setup network.
 
 - **The device runs on Alpine Linux 3.24 (64-bit) instead of DietPi.** One image for the Raspberry Pi 3, 4 and 5 (`exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip`, `manifest.json`, `README.txt`), built from Alpine's packages of a pinned branch and mirror and checked with Alpine's keys; no ready-made image of a distribution is used any more. **The Raspberry Pi 2 is no longer supported.**
 - **OpenRC instead of systemd:** the services restart after a crash (`supervise-daemon`), the Wi-Fi supervisor only after a failure; `/etc/exxpiano.conf` is read as the environment of the services by `exxpiano-env` and never run by a shell. The devices are handled by eudev, the console `tty1` shows the status screen from `/etc/inittab`, the first start (growing the card, the name, the `lite` bank on 512 MB) is the OpenRC service `exxpiano-firstboot`.
@@ -21,6 +20,10 @@ The release candidate of 2.0.0: the device on Alpine Linux, with the preview pia
 - **The box can be on no network at all.** Without a saved network the setup network is on for 5 minutes after every start and after the last network is forgotten (a phone connected to it keeps it on), then the Wi-Fi is off. The network in use can now be forgotten even when it is the only way in: the page asks first. Tried on a Raspberry Pi 3 Model B: forgetting the network, the setup network with the list of networks for 5 minutes, then the Wi-Fi off, and the setup network again after a restart. Found and fixed there: hostapd was started before wpa_supplicant had left the network (no setup network after "Forget"), and the list of networks came out empty right after leaving one.
 - **The setup network comes up when the cable is pulled out.** The route of the unplugged cable stayed behind, marked `linkdown` (busybox `udhcpc` does not remove it), the Wi-Fi supervisor took the Pi for connected and never started the setup network; such routes no longer count. Tried on a Raspberry Pi 3 Model B: the setup network came up, a phone joined it by its password, the Pi joined the home network in 6 s and kept it.
 - **Not tried yet on hardware:** the Pi 3 A+, Pi 4 and Pi 5; a USB sound card and a USB drive plugged in through eudev; the QR code of the setup network; a rollback on the device; listening by ear and the latency compared with DietPi.
+
+## 2.0.0-rc1
+
+The release candidate of 2.0.0, with the same changes; published as a pre-release and checked on a Raspberry Pi 3 Model B (see 2.0.0).
 
 ## 1.10.22
 
