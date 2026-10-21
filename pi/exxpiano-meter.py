@@ -4,7 +4,11 @@
 exxpiano-run lets FluidSynth play through the ALSA device `exxpiano_tap` (see 60-exxpiano-tap.conf): a copy of everything that goes to the sound card
 (16 bit, 2 channels, 44.1 kHz) is written into a pipe, and this program reads the pipe and publishes a small status file for the web interface.
 
-  exxpiano-meter.py PIPE STATUS_FILE
+  exxpiano-meter.py PIPE STATUS_FILE [SYNTH_PID]
+
+With SYNTH_PID the meter ends when that process (the synthesizer exxpiano-run became) is gone. OpenRC's supervise-daemon stops only the process it
+started, not the whole group as systemd did: without this every restart of the synthesizer left one more meter reading the same pipe (seen on a
+Pi 3 B: three meters split the stream between them).
 
 It must never be slower than the audio: while the pipe is not read, the synthesizer waits. That is why exxpiano-run starts it in a loop and
 holds the pipe open itself; a read here takes microseconds (the peaks come from max/min on the whole block, not from a loop over samples).
@@ -96,11 +100,25 @@ def publish(path, status):
     os.replace(tmp, path)
 
 
-def run(pipe, status_path):
+def alive(pid):
+    if pid is None:
+        return True
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def run(pipe, status_path, parent=None):
     meter = Meter()
-    while True:
+    while alive(parent):
         try:
-            fd = os.open(pipe, os.O_RDONLY)
+            # not blocking: with no writer left (the synthesizer is gone) a plain open would wait for ever
+            fd = os.open(pipe, os.O_RDONLY | os.O_NONBLOCK)
+            os.set_blocking(fd, True)
         except OSError:
             time.sleep(0.5)
             continue
@@ -111,6 +129,8 @@ def run(pipe, status_path):
             except OSError:
                 break
             if not data:  # every writer is gone: wait for the next start of the synthesizer
+                break
+            if not alive(parent):
                 break
             now = time.monotonic()
             meter.feed(data, now)
@@ -126,7 +146,7 @@ def run(pipe, status_path):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and not sys.argv[3].isdigit()):
         print(__doc__)
         sys.exit(2)
-    run(sys.argv[1], sys.argv[2])
+    run(sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) == 4 else None)

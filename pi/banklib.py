@@ -16,6 +16,7 @@ BANK_EXT = ('.sf2', '.sf3')
 NAME_RE = re.compile(r'^[^/\\\x00-\x1f][^/\\\x00-\x1f]{0,119}$')  # a plain file name
 DEFAULT_DIR = '/var/lib/exxpiano/banks'
 IMPORT_DIR = '/var/lib/exxpiano/banks'  # banks imported from a USB drive: one folder <id>/ with bank.sf2 and meta.json each
+DEFAULT_PREVIEW = '/opt/exxpiano/soundfonts/piano-preview.sf2'  # exxpiano-run plays it when /etc/exxpiano.conf has no PREVIEW_SF2 line
 IMPORT_ID_RE = re.compile(r'^i-[0-9a-f]{16}$')
 RESERVE_MB = 200  # RAM kept for the system and the rest of the module on a board with 1 GB (the Pi 3 B has about 950 MB); the system itself took about 85 MB on a 512 MB board. Lowered from 400 for the 700 MB bank; not measured on a 1 GB board
 SMALL_BOARD_MB = 800  # below this (a Pi 3 A+ has 512 MB, about 414 usable) the system needs less than 400 MB: it used about 85 MB there
@@ -178,30 +179,61 @@ def default_preset(presets):
     return None
 
 
-def fitting_replacement(piano, mech, bank_dir, mem_total=None):
+def resident_bytes(mech, preview=None):
+    """What stays in memory next to the piano bank: the mechanics, and the preview bank while a big bank loads."""
+    total = 0
+    for path in (mech, preview):
+        try:
+            total += os.path.getsize(path) if path else 0
+        except OSError:
+            pass
+    return total
+
+
+def fitting_replacement(piano, mech, bank_dir, mem_total=None, preview=None):
     """The path of the largest bank that fits the memory, when `piano` does not fit; None when `piano` fits (or the memory is unknown) or nothing fits."""
     mem_total = mem_total_bytes() if mem_total is None else mem_total
     try:
-        mech_bytes = os.path.getsize(mech) if mech else 0
         piano_bytes = os.path.getsize(piano)
     except OSError:
         return None
+    mech_bytes = resident_bytes(mech, preview)
     limit = size_limit(mem_total, mech_bytes)
     if limit is None or piano_bytes <= limit:
         return None
     best = None
-    for b in list_banks(bank_dir, exclude=[mech] if mech else (), mem_total=mem_total, mech_bytes=mech_bytes):
+    for b in list_banks(bank_dir, exclude=[p for p in (mech, preview) if p], mem_total=mem_total, mech_bytes=mech_bytes):
         if b['ok'] and b['fits'] and (best is None or b['size'] > best['size']):
             best = b
     return os.path.join(bank_dir, best['id']) if best else None
 
 
-if __name__ == '__main__':  # used by exxpiano-run:  banklib.py PIANO MECH BANK_DIR  ->  prints the replacement path, or nothing
+# The state exxpiano-synth writes while a bank loads (see its docstring); the web interface shows it.
+LOADING_STATE = '/run/exxpiano-bank.json'
+
+
+def loading_state(path=None):
+    """dict(state=preview|ready|failed, playing, loading, error, t, pid) or None: no file, or the plain fluidsynth plays (no preview)."""
+    try:
+        with open(path or os.environ.get('EXXPIANO_BANK_STATE', LOADING_STATE), encoding='utf-8') as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(st, dict) or st.get('state') not in ('preview', 'ready', 'failed'):
+        return None
+    pid = st.get('pid')
+    if isinstance(pid, int) and pid > 0 and not os.path.exists('/proc/%d' % pid) and os.path.isdir('/proc/self'):
+        return None  # left behind by a synthesizer that is gone
+    return st
+
+
+if __name__ == '__main__':  # used by exxpiano-run:  banklib.py PIANO MECH BANK_DIR [PREVIEW]  ->  prints the replacement path, or nothing
     import sys
 
-    if len(sys.argv) == 4:
+    if len(sys.argv) in (4, 5):
         meminfo = os.environ.get('EXXPIANO_MEMINFO')  # for tests
-        found = fitting_replacement(sys.argv[1], sys.argv[2], sys.argv[3], mem_total_bytes(meminfo) if meminfo else None)
+        preview = sys.argv[4] if len(sys.argv) == 5 else None
+        found = fitting_replacement(sys.argv[1], sys.argv[2], sys.argv[3], mem_total_bytes(meminfo) if meminfo else None, preview=preview)
         if found:
             print(found)
 

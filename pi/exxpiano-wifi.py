@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """exxpiano-wifi: keeps the Pi reachable. Without a network it starts its own access point so a phone can pick the home Wi-Fi.
 
-  exxpiano-wifi.py            run the supervisor (the systemd service does this)
+  exxpiano-wifi.py            run the supervisor (the OpenRC service exxpiano-wifi does this)
   exxpiano-wifi.py status     print what the supervisor says
   exxpiano-wifi.py scan       scan now (client mode only)
-  exxpiano-wifi.py ensure-name give a device that still has a generic name the unique name exxpiano-<installation-id>
+  exxpiano-wifi.py ensure-name [NAME ...]  give a device that still has a generic name the unique name exxpiano-<installation-id>
+                              (the NAMEs count as generic too: the first start passes the generic name of the image, exxpiano)
   exxpiano-wifi.py ap-test N  start the access point for N seconds, then go back to the normal network by itself
 
 The supervisor is the only process that touches wlan0. The web page asks it for things through files in /run/exxpiano-wifi
-(see wifilib.py). Written for DietPi / Debian with ifupdown + wpa_supplicant + dhclient; with NetworkManager it stays out of the way.
+(see wifilib.py). Written for Alpine Linux: in client mode it runs wpa_supplicant and udhcpc on wlan0 itself (ifupdown-ng only looks after
+the wired port of the board); where NetworkManager, iwd or connman runs it stays out of the way.
 """
 
 import http.server
@@ -30,9 +32,9 @@ IFACE = os.environ.get('WIFI_IFACE', 'wlan0')
 WPA_CONF = os.environ.get('WIFI_WPA_CONF', '/etc/wpa_supplicant/wpa_supplicant.conf')
 TICK = 3.0
 NET_DIR = '/etc/network'
-DIETPI_TXT = ('/boot/firmware/dietpi.txt', '/boot/dietpi.txt')
-CTRL_LINE = 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev'
+CTRL_LINE = 'ctrl_interface=/run/wpa_supplicant'  # root only: the supervisor and the web interface run as root
 SYS_NET = '/sys/class/net'
+OTHER_MANAGERS = ('networkmanager', 'iwd', 'connman')  # OpenRC services of network managers that own Wi-Fi themselves
 WIRED_RE = re.compile(r'^(eth\d+|en[a-z0-9]+)$')
 
 
@@ -65,6 +67,9 @@ def config_from_env(env=None):
         retry_idle=num('WIFI_RETRY_IDLE', 120, 20, 3600),
         retry_wait=num('WIFI_RETRY_WAIT', 45, 10, 300),
         connect_wait=num('WIFI_CONNECT_WAIT', 45, 10, 300),
+        # without a saved network the setup network is up this long after the start and after the last network was forgotten (then the
+        # Wi-Fi is off: the box is on no network at all); someone connected to it keeps it up
+        setup_window=num('WIFI_SETUP_WINDOW', 300, 60, 3600),
         web_port=num('WEB_PORT', 8080, 1, 65535),
         enabled=env.get('WIFI_SETUP', '1') != '0',
     )
@@ -74,9 +79,23 @@ def config_from_env(env=None):
 class System:
     """Everything that touches the machine; the tests replace it."""
 
-    def __init__(self, iface=IFACE, run_dir=wifilib.RUN_DIR, wpa_conf=WPA_CONF, run=None, net_dir=NET_DIR, dietpi_txt=DIETPI_TXT, sys_net=SYS_NET):
+    def __init__(
+        self,
+        iface=IFACE,
+        run_dir=wifilib.RUN_DIR,
+        wpa_conf=WPA_CONF,
+        run=None,
+        net_dir=NET_DIR,
+        sys_net=SYS_NET,
+        country=None,
+        proc='/proc',
+        kill=os.kill,
+        sleep=time.sleep,
+    ):
         self.iface, self.run_dir, self.wpa_conf = iface, run_dir, wpa_conf
-        self.net_dir, self.dietpi_txt, self.sys_net = net_dir, dietpi_txt, sys_net
+        self.net_dir, self.sys_net, self.proc, self._kill, self._sleep = net_dir, sys_net, proc, kill, sleep
+        # the Wi-Fi country of the image (WIFI_COUNTRY in /etc/exxpiano.conf): written into wpa_supplicant.conf when that has none
+        self.country = (country if country is not None else os.environ.get('WIFI_COUNTRY', '')).strip().upper() or None
         self._wired = {}  # wired interface -> True while a DHCP client was started for the cable that is plugged in
         self._run = run or self._real_run
         self.procs = []
@@ -95,9 +114,12 @@ class System:
 
     # -- facts
     def managed_elsewhere(self):
-        """NetworkManager owns the network (Raspberry Pi OS): this program must not interfere."""
-        rc, out = self.run(['systemctl', 'is-active', 'NetworkManager'], 5)
-        return rc == 0 and out.strip() == 'active'
+        """Another network manager owns Wi-Fi (NetworkManager, iwd or connman runs): this program must not interfere."""
+        for name in OTHER_MANAGERS:
+            _rc, out = self.run(['rc-service', name, 'status'], 5)
+            if re.search(r'status: (started|starting)', out or ''):
+                return True
+        return False
 
     def exists(self):
         return os.path.isdir('/sys/class/net/%s' % self.iface)
@@ -112,14 +134,25 @@ class System:
     def hostname(self):
         return socket.gethostname()
 
-    def has_default_route(self):
+    def default_routes(self):
+        """The interfaces of the default routes that can carry traffic. A cable pulled out leaves its route behind (busybox udhcpc does not
+        remove it; the kernel marks it `linkdown`): that one does not count, or the setup network would never start without the cable."""
         rc, out = self.run(['ip', '-4', 'route', 'show', 'default'], 5)
-        return rc == 0 and bool(out.strip())
+        if rc != 0:
+            return []
+        found = []
+        for line in out.splitlines():
+            m = re.search(r'\bdev (\S+)', line)
+            if m and 'linkdown' not in line.split():
+                found.append(m.group(1))
+        return found
+
+    def has_default_route(self):
+        return bool(self.default_routes())
 
     def has_cable_route(self):
         """A default route that does not go through the Wi-Fi: Ethernet is another way in."""
-        rc, out = self.run(['ip', '-4', 'route', 'show', 'default'], 5)
-        return rc == 0 and any(m.group(1) != self.iface for m in re.finditer(r'\bdev (\S+)', out))
+        return any(dev != self.iface for dev in self.default_routes())
 
     def link(self):
         """{ssid, ip, signal} of the Wi-Fi connection, or None."""
@@ -144,18 +177,7 @@ class System:
         rc, out = self.run(['iw', 'dev', self.iface, 'station', 'dump'], 5)
         return len(re.findall(r'(?m)^Station ', out)) if rc == 0 else 0
 
-    # -- what a freshly written card may lack: DietPi sets up wlan0 only when its own Wi-Fi is switched on, and the image switches it off
-    def _dietpi_country(self):
-        for path in self.dietpi_txt:
-            try:
-                with open(path, encoding='utf-8', errors='replace') as f:
-                    m = re.search(r'(?m)^\s*AUTO_SETUP_NET_WIFI_COUNTRY_CODE\s*=\s*([A-Za-z]{2})\s*$', f.read())
-            except OSError:
-                continue
-            if m:
-                return m.group(1).upper()
-        return None
-
+    # -- the wired ports: the board's own one has a stanza in /etc/network/interfaces (ifupdown-ng); a USB adapter gets nothing by itself
     def _interfaces_files(self):
         files = [os.path.join(self.net_dir, 'interfaces')]
         folder = os.path.join(self.net_dir, 'interfaces.d')
@@ -177,7 +199,7 @@ class System:
         return False
 
     def ensure_wired(self):
-        """A wired interface that nothing configures (a USB Ethernet adapter or a USB hub with a network port: ifupdown knows only eth0) gets
+        """A wired interface that nothing configures (a USB Ethernet adapter or a USB hub with a network port: ifupdown-ng knows only eth0) gets
         an address by DHCP when a cable is plugged in, so that the Pi can be reached and the setup network can give way to the cable.
         One DHCP client per plugged cable; an interface with a stanza, or that already has an address, is left to its owner."""
         try:
@@ -203,21 +225,22 @@ class System:
             if rc == 0 and out.strip():
                 continue
             log('a cable is plugged in %s and nothing configures it: asking for an address' % name)
-            rc, out = self.run(['dhclient', '-1', '-nw', '-pf', os.path.join(self.run_dir, 'dhclient-%s.pid' % name), name], 20)
+            rc, out = self.run(['udhcpc', '-i', name, '-b', '-S', '-p', os.path.join(self.run_dir, 'udhcpc-%s.pid' % name)], 20)
             if rc != 0:
-                log('dhclient on %s failed: %s' % (name, out.strip()[-160:]))
+                log('udhcpc on %s failed: %s' % (name, out.strip()[-160:]))
 
     def ensure_client_config(self):
-        """Make `ifup wlan0` possible on a card that was never set up for Wi-Fi: Wi-Fi not blocked, a wpa_supplicant.conf that wpa_cli can talk
-        to (with the Wi-Fi country), and a stanza for the interface. What is already there is left alone."""
+        """Make wpa_supplicant possible on a card that was never set up for Wi-Fi: Wi-Fi not blocked, and a wpa_supplicant.conf that wpa_cli
+        can talk to (with the Wi-Fi country). What is already there is left alone."""
         self.run(['rfkill', 'unblock', 'wifi'], 5)
         try:
             with open(self.wpa_conf, encoding='utf-8') as f:
                 text = f.read()
         except OSError:
             text = ''
-        new = text
-        country = wifilib.country(text) or self._dietpi_country()
+        # a file brought over from DietPi names the group netdev, which Alpine does not have (wpa_supplicant would not open its socket)
+        new = re.sub(r'(?m)^ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev$', CTRL_LINE, text)
+        country = wifilib.country(text) or self.country
         if 'ctrl_interface' not in new:
             new = CTRL_LINE + '\n' + new
         if country and not wifilib.country(new):
@@ -229,40 +252,65 @@ class System:
             log('wpa_supplicant.conf was missing its header: written')
         if country:
             self.run(['iw', 'reg', 'set', country], 5)
-        if not self._has_stanza():
-            folder = os.path.join(self.net_dir, 'interfaces.d')
-            os.makedirs(folder, exist_ok=True)
-            with open(os.path.join(folder, 'exxpiano-' + self.iface), 'w', encoding='utf-8') as f:
-                f.write(
-                    '# written by exxpiano-wifi: the Wi-Fi interface joins the networks of %s\nallow-hotplug %s\niface %s inet dhcp\n\twpa-conf %s\n'
-                    % (self.wpa_conf, self.iface, self.iface, self.wpa_conf)
-                )
-            log('no stanza for %s in %s: written' % (self.iface, self.net_dir))
 
-    def _ifargs(self):
-        """ifup/ifdown read our own stanza file directly when the main interfaces file does not include the folder interfaces.d."""
-        mine = os.path.join(self.net_dir, 'interfaces.d', 'exxpiano-' + self.iface)
+    def _pidfile(self, program):
+        return os.path.join(self.run_dir, '%s-%s.pid' % (program, self.iface))
+
+    def _running(self, pid, program):
         try:
-            with open(os.path.join(self.net_dir, 'interfaces'), encoding='utf-8', errors='replace') as f:
-                includes = re.search(r'(?m)^\s*source(-directory)?\s', f.read()) is not None
+            with open(os.path.join(self.proc, str(pid), 'comm'), encoding='utf-8', errors='replace') as f:
+                return f.read().strip() == program
         except OSError:
-            includes = False
-        return ['-i', mine] if os.path.exists(mine) and not includes else []
+            return False
 
-    # -- client mode (ifupdown starts wpa_supplicant and dhclient)
+    def _stop(self, program, wait=5.0):
+        """End the program this supervisor started for wlan0 (by its pid file; a pid that now belongs to another program is left alone), and
+        wait until it is gone: a wpa_supplicant that is still leaving its network holds wlan0, and hostapd started meanwhile fails with
+        "Interface initialization failed" (seen on a Pi 3 B after "Forget"). Still there after `wait` seconds: SIGKILL."""
+        path = self._pidfile(program)
+        try:
+            with open(path, encoding='ascii') as f:
+                pid = int(f.read().strip())
+            if self._running(pid, program):
+                self._kill(pid, signal.SIGTERM)
+                waited = 0.0
+                while self._running(pid, program) and waited < wait:
+                    self._sleep(0.1)
+                    waited += 0.1
+                if self._running(pid, program):
+                    self._kill(pid, signal.SIGKILL)
+        except (OSError, ValueError):
+            pass
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    # -- client mode: wpa_supplicant joins the saved networks, udhcpc asks for the address
     def client_down(self):
         self.run(['wpa_cli', '-i', self.iface, 'terminate'], 5)
-        self.run(['ifdown', '--force'] + self._ifargs() + [self.iface], 20)
+        self._stop('wpa_supplicant')
+        self._stop('udhcpc')
+        self.run(['ip', 'addr', 'flush', 'dev', self.iface], 5)
 
     def client_up(self):
         try:
             self.ensure_client_config()
-        except OSError as exc:  # not root, a read-only disk: ifup will say what is missing
+        except OSError as exc:  # not root, a read-only disk: wpa_supplicant will say what is missing
             log('could not prepare the Wi-Fi configuration:', exc)
-        self.run(['ifdown', '--force'] + self._ifargs() + [self.iface], 20)
-        rc, out = self.run(['ifup'] + self._ifargs() + [self.iface], 30)
+        self.client_down()
+        try:
+            os.makedirs(self.run_dir, mode=0o700, exist_ok=True)
+        except OSError:
+            pass
+        self.run(['ip', 'link', 'set', self.iface, 'up'], 5)
+        rc, out = self.run(['wpa_supplicant', '-B', '-i', self.iface, '-c', self.wpa_conf, '-P', self._pidfile('wpa_supplicant')], 20)
         if rc != 0:
-            log('ifup %s failed: %s' % (self.iface, out.strip()[-200:]))
+            log('wpa_supplicant on %s failed: %s' % (self.iface, out.strip()[-200:]))
+            return
+        rc, out = self.run(['udhcpc', '-i', self.iface, '-b', '-S', '-p', self._pidfile('udhcpc')], 20)
+        if rc != 0:
+            log('udhcpc on %s failed: %s' % (self.iface, out.strip()[-200:]))
 
     def reload_wpa(self):
         self.run(['wpa_cli', '-i', self.iface, 'reconfigure'], 5)
@@ -365,7 +413,8 @@ class Supervisor:
         self.clock, self.wall, self.sleep = clock, wall, sleep
         self.portal = portal
         self.installation_id = install_id or wifilib.installation_id()
-        self.mode = 'client'
+        self.mode = 'client'  # client, ap, or off: no saved network and the window of the setup network is over
+        self.window_from = clock()  # the start of the window of the setup network: the start of the supervisor, or the last forget
         self.offline_since = None
         self.idle_since = None
         self.ap_until = None
@@ -420,7 +469,7 @@ class Supervisor:
         """Start the access point. The scan comes first: the radio cannot scan while it serves the access point."""
         self.busy = 'ap'
         self.publish(link=None)
-        if self.mode == 'client' and self.sys.exists():
+        if self.mode in ('client', 'off') and self.sys.exists():  # from off too: the page lists the networks it saw before the access point
             self.scan_result, self.scanned_at = self.sys.scan(), int(self.wall())
         wpa = self._read_wpa()
         self.ap_ssid = wifilib.ap_ssid(self.cfg['ap_prefix'], self.installation_id)
@@ -453,6 +502,19 @@ class Supervisor:
         self.mode = 'client'
         self.ap_until = None
         self.sys.client_up()
+
+    def window_open(self):
+        return self.clock() - self.window_from < self.cfg['setup_window']
+
+    def go_off(self):
+        """No saved network, the window is over and nobody is connected: the Wi-Fi goes off until the next start, a cable or a network."""
+        if self.portal:
+            self.portal.stop()
+        self.sys.ap_stop()
+        self.mode = 'off'
+        self.ap_until = None
+        log('no saved network and the setup network is not used: the Wi-Fi is off until the next start')
+        self.publish(link=None)
 
     def wait_online(self, ssid=None, timeout=45):
         """True when the Wi-Fi is associated (with `ssid` when given) and has an address and a route."""
@@ -500,6 +562,8 @@ class Supervisor:
             return
         log('connecting to %r' % ssid)
         was_ap = self.mode == 'ap'
+        if self.mode == 'off':
+            self.mode = 'client'
         if was_ap:
             self.leave_ap()
         else:
@@ -529,14 +593,21 @@ class Supervisor:
 
     def forget(self, req):
         ssid = req.get('ssid')
-        if self.only_way_in(ssid):
-            self._result(False, 'forget', ssid, 'this is the only way to reach the Pi: connect to another network or plug in a cable first')
+        if self.only_way_in(ssid) and not req.get('confirm'):
+            self._result(
+                False,
+                'forget',
+                ssid,
+                'this is the only way to reach the Pi: after forgetting it, the Pi is reached only through its setup network, for %d minutes'
+                % (self.cfg['setup_window'] // 60),
+            )
             self.publish()
             return
         link = self.sys.link() if self.mode == 'client' else None
         self._write_wpa(wifilib.remove_network(self._read_wpa(), ssid))
         self._result(True, 'forget', ssid)
-        if self.mode == 'client' and not self._known() and not self.sys.has_cable_route():
+        if self.mode in ('client', 'off') and not self._known() and not self.sys.has_cable_route():
+            self.window_from = self.clock()  # the owner gets the whole window to come back through the setup network
             self.enter_ap()  # nothing is left to connect to: no waiting, the setup network starts at once
         elif link and link.get('ssid') == ssid:
             self.sys.client_up()  # leave the network that was just forgotten
@@ -558,21 +629,36 @@ class Supervisor:
             self.handle(req)
         now = self.clock()
         online = self.sys.has_default_route()
-        if self.mode == 'client':
+        if self.mode == 'off':
+            if self._known():  # a network was saved meanwhile (through the cable and the page): the normal life again
+                self.mode = 'client'
+                self.sys.client_up()
+                self.publish()
+        elif self.mode == 'client':
             if online:
                 self.offline_since = None
             else:
                 self.offline_since = self.offline_since if self.offline_since is not None else now
-                grace = self.cfg['grace_known'] if self._known() else self.cfg['grace_new']
-                if now - self.offline_since >= grace and now >= self.next_ap_attempt and self.sys.exists():
+                known = self._known()
+                grace = self.cfg['grace_known'] if known else self.cfg['grace_new']
+                if not known and not self.window_open():
+                    if self.sys.exists():  # without a Wi-Fi adapter there is nothing to turn off
+                        self.go_off()
+                elif now - self.offline_since >= grace and now >= self.next_ap_attempt and self.sys.exists():
                     self.enter_ap()
         else:
             if self.ap_until is not None:
-                if now >= self.ap_until:  # a test: back to the normal network
-                    self.leave_ap()
-                    self.wait_online(None, self.cfg['retry_wait'])
+                if now >= self.ap_until:  # a test or the button: back to the normal network
+                    if self._known():
+                        self.leave_ap()
+                        self.wait_online(None, self.cfg['retry_wait'])
+                    elif self.sys.stations() == 0:
+                        self.go_off()
             elif online:  # a cable was plugged in: no need for the access point
                 self.leave_ap()
+            elif not self._known() and not self.window_open():
+                if self.sys.stations() == 0:
+                    self.go_off()
             elif self._known():
                 if self.sys.stations() == 0:
                     self.idle_since = self.idle_since if self.idle_since is not None else now
@@ -612,7 +698,7 @@ def main(argv=None):
         system = System()
         current = system.hostname().lower()
         install_id = wifilib.installation_id()
-        if current in wifilib.GENERIC_HOSTNAMES:
+        if current in wifilib.GENERIC_HOSTNAMES or current in [n.lower() for n in argv[1:]]:
             name = 'exxpiano-' + install_id.lower()
             wifilib.apply_hostname(name, system.run)
             print('The device is now called %s (it was %s)' % (name, current))

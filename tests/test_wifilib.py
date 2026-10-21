@@ -198,25 +198,35 @@ class HostnameTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 wifilib.installation_id(path)
 
-    def test_apply_hostname_sets_it_fixes_the_hosts_file_and_restarts_avahi(self):
+    def test_apply_hostname_stores_it_sets_it_fixes_the_hosts_file_and_restarts_avahi(self):
         calls = []
         with tempfile.TemporaryDirectory() as d:
-            hosts = os.path.join(d, 'hosts')
+            hosts, hostname = os.path.join(d, 'hosts'), os.path.join(d, 'hostname')
             with open(hosts, 'w') as f:
                 f.write('127.0.0.1\tlocalhost\n127.0.1.1\told-name\n::1 localhost ip6-localhost\n')
-            self.assertEqual(wifilib.apply_hostname('exxpiano-81de', lambda cmd: (calls.append(cmd), (0, ''))[1], hosts), 'exxpiano-81de')
+            with open(hostname, 'w') as f:
+                f.write('old-name\n')
+            run = lambda cmd: (calls.append(cmd), (0, ''))[1]
+            self.assertEqual(wifilib.apply_hostname('exxpiano-81de', run, hosts, hostname), 'exxpiano-81de')
             with open(hosts) as f:
                 text = f.read()
+            with open(hostname) as f:
+                self.assertEqual(f.read(), 'exxpiano-81de\n')
+            self.assertEqual(os.stat(hostname).st_mode & 0o777, 0o644)
         self.assertEqual(text, '127.0.0.1\tlocalhost\n127.0.1.1\texxpiano-81de\n::1 localhost ip6-localhost\n')
-        self.assertEqual(calls, [['hostnamectl', 'set-hostname', 'exxpiano-81de'], ['systemctl', 'try-restart', 'avahi-daemon.service']])
+        self.assertEqual(calls, [['hostname', '-F', hostname], ['rc-service', '--ifstarted', 'avahi-daemon', 'restart']])
 
     def test_bad_names_and_failures(self):
-        for bad in ('', '-a', 'a-', 'A', 'a b', 'a_b', 'x' * 64, None):
-            with self.subTest(bad), self.assertRaises(ValueError):
-                wifilib.apply_hostname(bad, lambda cmd: (0, ''))
-        with self.assertRaises(OSError):
-            wifilib.apply_hostname('ok', lambda cmd: (1, 'Access denied'), '/nonexistent/hosts')
-        self.assertEqual(wifilib.apply_hostname('ok', lambda cmd: (0, ''), '/nonexistent/hosts'), 'ok')  # a missing hosts file is not fatal
+        with tempfile.TemporaryDirectory() as d:
+            hostname = os.path.join(d, 'hostname')
+            for bad in ('', '-a', 'a-', 'A', 'a b', 'a_b', 'x' * 64, None):
+                with self.subTest(bad), self.assertRaises(ValueError):
+                    wifilib.apply_hostname(bad, lambda cmd: (0, ''), hostname_path=hostname)
+            with self.assertRaises(OSError):
+                wifilib.apply_hostname('ok', lambda cmd: (1, 'Operation not permitted'), '/nonexistent/hosts', hostname)
+            with self.assertRaises(OSError):  # the name cannot be stored
+                wifilib.apply_hostname('ok', lambda cmd: (0, ''), '/nonexistent/hosts', '/nonexistent/hostname')
+            self.assertEqual(wifilib.apply_hostname('ok', lambda cmd: (0, ''), '/nonexistent/hosts', hostname), 'ok')  # a missing hosts file is not fatal
 
 
 class AccessPointTests(unittest.TestCase):
@@ -262,7 +272,7 @@ class AccessPointTests(unittest.TestCase):
             'dhcp-option=6,10.42.0.1',
             'no-resolv',
             'user=nobody',
-            'group=nogroup',
+            'group=nobody',
             'pid-file=/run/exxpiano-wifi/dnsmasq.pid',
         ):
             self.assertIn(line + '\n', text)

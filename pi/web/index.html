@@ -199,6 +199,7 @@
       <div class="meterrow"><span>R</span><div class="meterbar"><i id="mR"></i><b id="mRH"></b></div><output id="mRV"></output></div>
       <p class="small" id="meterNote"></p>
     </div>
+    <div class="row" id="outVolRow2" style="display:none"><label for="outVol2" data-t="out_vol">Sound card volume</label><input type="range" id="outVol2" min="-60" max="0" step="1"><output id="outVolVal2"></output></div>
     <p class="small" id="volumeHint"></p>
   </div>
 
@@ -354,12 +355,14 @@ const T = {
     a_none: "No stream is open: the synthesizer is not playing right now.", a_card: "Card", a_state: "State", a_format: "Format", a_channels: "Channels", a_rate: "Sample rate",
     a_period: "Period", a_buffer: "Buffer (latency)", a_delay: "Queued now", a_clock: "USB clock", a_rates: "Supported rates",
     a_asked: "Asked for {p} × {n} frames; the driver gave {rp} × {rn}.", a_frames: "{n} frames", a_bit: "{n} bit",
-    nav_home: "Home", nav_bank: "Piano bank", nav_midi: "MIDI player", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", nav_about: "About", about_title: "About and licenses", about_links: "Links", about_rights: "Licenses", legal_more: "Licenses and links", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [DietPi](https://dietpi.com) and the [Debian](https://www.debian.org) packages in the image keep their own licenses.", about_code: "exxpiano (the scripts and this web interface): [MIT license](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Source code and documentation](https://github.com/exxbrain/exxpiano)", link_rel: "[Releases and SD card images](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Troubleshooting](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.md)", link_log: "[Changelog](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Report a problem](https://github.com/exxbrain/exxpiano/issues)", menu: "Menu",
+    nav_home: "Home", nav_bank: "Piano bank", nav_midi: "MIDI player", nav_sound: "Touch and mechanics", nav_audio: "Audio output", nav_mon: "Monitor", nav_wifi: "Wi-Fi", nav_about: "About", about_title: "About and licenses", about_links: "Links", about_rights: "Licenses", legal_more: "Licenses and links", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [Alpine Linux](https://alpinelinux.org) and its packages in the image keep their own licenses.", about_code: "exxpiano (the scripts and this web interface): [MIT license](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Source code and documentation](https://github.com/exxbrain/exxpiano)", link_rel: "[Releases and SD card images](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Troubleshooting](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.md)", link_log: "[Changelog](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Report a problem](https://github.com/exxbrain/exxpiano/issues)", menu: "Menu",
     home_now: "Now playing", home_midi: "MIDI player", home_midi_now: "MIDI: {pos} of {len}", home_change: "Change", home_health: "Device", home_more: "Details", h_power: "Power", h_net: "Network",
     h_power_ok: "OK", h_power_now: "Problem", h_power_past: "Earlier", h_net_ap: "Setup mode", h_net_none: "No network", h_loading: "Loading {bank}…",
     w_setup: "Start the setup network for 5 minutes", w_confirm_setup: "The Pi will leave {ssid} for 5 minutes and start its own network (exxpiano-Setup-…). This page stops answering; join that network to continue. After 5 minutes the Pi returns to {ssid} by itself. Continue?",
     w_setup_started: "Starting the setup network… join it from your phone: its name begins with exxpiano-Setup.",
-    w_only_way: "in use, the only way to reach the Pi: add another network or plug in a cable first",
+    w_only_way: "in use, the only way to reach the Pi",
+    w_confirm_forget_last: "Forget {ssid}? It is the only way to reach the Pi. The Pi leaves it, keeps its setup network on for 5 minutes, and then its Wi-Fi is off: it is on no network. To reach it later, restart it (the setup network is on for 5 minutes after every start) or plug in a cable.",
+    w_wifi_off: "Wi-Fi is off: no saved network, and the setup network was on for 5 minutes. Restart the Pi to have it for 5 minutes again, or start it with the button below.",
     n_title: "Device name", n_hint: "The installation ID is generated automatically at first boot; you never have to enter a board serial. It already makes the default hostname and setup Wi-Fi unique. You may give the device a friendlier name; use lowercase letters, digits and hyphens.", n_label: "Name", n_save: "Save the name", d_mismatch: "Warning: this code belongs to installation {wanted}, but this page is installation {have}. You may be connected to another device.", n_saved: "Saved: {name}. The page also opens at http://{name}.local:8080/.",
     q_title: "Phone setup by QR code", q_hint: "Scan with the phone camera: the first code joins this device's setup network, the second opens this settings page. The codes belong to this installation and can be downloaded only here: save the PNG or SVG and print a sticker for the device. The join code works whenever the setup network is on.",
     q_join: "1. Join the setup network", q_setup: "2. Open the setup page", q_page: "Open this page on a phone", q_print: "Print", q_png: "Download PNG", q_svg: "SVG",
@@ -372,8 +375,8 @@ const T = {
     w_not_connected: "Not connected to a network.", w_ap: "Setup mode: the Pi has no network and runs its own: {ap}. Choose your Wi-Fi below; this page stays reachable at http://10.42.0.1:8080/.",
     w_connecting: "Connecting… up to a minute. If this page stops answering, join your own Wi-Fi again and open http://{host}.local:8080/ or the address from the router's list of clients (the Pi is called {host}).",
     w_ok: "Connected to {ssid}.", w_failed: "Could not connect to {ssid}: {error}.", w_forgot: "Forgot {ssid}.", w_ap_failed: "The setup network could not start.",
-    w_nm: "This system uses NetworkManager. Connect with the command sudo nmtui; this page cannot change the network here.",
-    w_off: "The Wi-Fi service is not running (systemctl status exxpiano-wifi).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
+    w_nm: "Another network manager (NetworkManager, iwd or connman) owns Wi-Fi on this system; this page cannot change the network here.",
+    w_off: "The Wi-Fi service is not running (rc-service exxpiano-wifi status).", w_waiting: "Waiting for the Pi… If your phone changed network, reopen the page.",
     e_title: "Service messages", e_hint: "Warnings, errors and notes of the piano services since the boot (not the whole log).", e_none: "No messages since the boot.",
     m_throttle: "Power and throttling", m_cpu: "CPU", m_temp: "Temperature", m_freq: "Frequency", m_mem: "Memory",
     m_chart_cpu: "CPU load, last 2.5 minutes", m_chart_temp: "Temperature, last 2.5 minutes", m_cores: "Cores", m_procs: "Piano services",
@@ -385,7 +388,10 @@ const T = {
     bank_title: "Piano bank", midi_title: "MIDI files", midi_hint: "Put MIDI files (.mid) into the folder piano-midi of a USB drive and import them: a file plays on the piano you have chosen, with the hammer, damper and pedal noises. The drive is not needed afterwards.", midi_lib: "On the device", midi_drive: "On the USB drive", midi_nofolder: "There is no folder piano-midi on this drive.", midi_nofiles: "The folder piano-midi has no .mid or .midi files.", midi_none: "No MIDI files have been imported yet.", midi_play: "Play", midi_stop: "Stop", midi_repeat: "Repeat", midi_idle: "Not playing.", midi_playing: "Playing {title}", midi_seek: "Position in the piece", midi_back: "−10 s", midi_fwd: "+10 s", midi_unavailable: "The player is not running (the mechanics bridge exxpiano-fx).", midi_import: "Import", midi_delete: "Delete", midi_confirm_delete: "Delete the MIDI file {name}?", midi_notes: "{n} notes", midi_importing: "Copying {name}: {done} of {total}", midi_checking: "Checking {name}…", midi_done: "{name} is imported.", midi_already: "{name} was already imported.", midi_failed: "Import of {name} failed: {error}", usb_title: "Banks from a USB drive", usb_hint: "Put SoundFont files (.sf2, .sf3) into the folder piano-banks of a USB drive (FAT32, exFAT or ext4), plug it in and import: the copy starts only when you press the button, and the drive is not needed afterwards.", usb_none: "No USB drive is connected.", usb_nofolder: "There is no folder piano-banks on this drive.", usb_nofiles: "The folder piano-banks has no .sf2 or .sf3 files.", usb_import: "Import", usb_delete: "Delete", usb_imported: "imported", usb_confirm_delete: "Delete the imported bank {name}?", legal_copy: "© 2026 Denis Zakharov · [exxpiano {version}](https://github.com/exxbrain/exxpiano)", legal_sounds: "Sounds: [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/SalamanderGrandPiano/) by Alexander Holm, [CC-BY](https://creativecommons.org/licenses/by/3.0/) (converted to SF2). Banks you add keep the licenses of their authors.", legal_midi: "The demonstration recordings (Liszt, Un Sospiro and La Campanella) are from the [MAESTRO dataset](https://magenta.tensorflow.org/datasets/maestro) (Google), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only. Delete them if you use exxpiano commercially.", bank_confirm_delete: "Delete the bank {name} from this device? It cannot be undone: to get it back, install the bank again or write a new card.", bank_deleted: "Deleted: {name} {freed}", usb_copying: "Copying {name}: {done} of {total}", usb_verifying: "Checking {name}…", usb_done: "{name} is imported. You can take the drive out.", usb_already: "{name} was already imported.", usb_failed: "Import of {name} failed: {error}", bank_hint: "The sound banks in {dir}. Choosing one reloads the synthesizer: about a minute of silence. If a bank does not load, the previous one is restored by itself.",
     bank_profile: "Touch, volume and mechanics settings are remembered for each instrument.",
     bank_empty: "No banks found in {dir}.", use: "Use", playing: "Playing", outside: "outside the library", presets_n: "presets: {n}", bank_share: "{pct}% of what a bank may take", mem_limit_k: "Largest bank", mem_limit_note: "system keeps {reserve}, mechanics {mech}", mem_disk_k: "Free on the card", mem_current: "Current bank", preset: "Preset",
-    sw_switching: "Loading {bank}… about a minute of silence.", sw_done: "Now playing {bank}.", sw_rolled_back: "{bank} did not load; the previous bank is playing again.",
+    sw_switching: "Loading {bank}… about a minute of silence.", sw_switching_live: "Loading {bank}… the preview plays meanwhile: you can keep playing.",
+    ld_preview: "The preview plays while {bank} loads.", ld_failed: "The piano bank did not load: the preview plays. {error}",
+    bank_hint_live: "The sound banks in {dir}. A bank you choose loads in the background while a small preview piano plays, then the piano moves over to it at a moment with no key and no pedal down. If a bank does not load, the previous one is restored by itself.",
+    no_preview: "There is no usable preview bank: the module is silent while a bank loads.", sw_done: "Now playing {bank}.", sw_rolled_back: "{bank} did not load; the previous bank is playing again.",
     sw_failed: "{bank} did not load and the previous bank could not be restored either: check the device.", sw_same: "This bank is already in use.",
     title: "exxpiano", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
     volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
@@ -399,7 +405,7 @@ const T = {
     saved: "Saved", restart_needed: "Press \"Apply and restart\" for the audio changes.", restarting: "Restarting the synthesizer, about 45 seconds…",
     gain_not_live: "Saved, but the live volume could not be changed (applies after a restart).", err: "Error", denied: "Wrong or missing token",
     s_velocity_curve: ["Touch curve", "1 = unchanged · below 1: soft touches sound louder · above 1: you must play harder", ""],
-    s_gain: ["Master volume", "Scale in dB: 0 is the loudest setting at which even the densest passages with the pedal do not crackle. The orange end of the track is louder: a loud, dense passage may crackle there. The loudness of the headphones is set in Audio output (sound card volume).", ""],
+    s_gain: ["Master volume", "Scale in dB: 0 is the loudest setting at which even the densest passages with the pedal do not crackle. The orange end of the track is louder: a loud, dense passage may crackle there. The loudness of the headphones is set by the sound card volume (below, and in Audio output).", ""],
     s_hammer_boost: ["Hammer noise level", "dB relative to the original recording (0 = as recorded, very quiet).", " dB"],
     s_hammer_exp: ["Hammer noise vs. touch", "Larger = soft playing makes almost no noise. 0.6–1.0 is gentle.", ""],
     s_random: ["Randomness", "0 = every knock identical, 1 = natural, 2 = lively.", ""],
@@ -411,12 +417,14 @@ const T = {
     a_none: "Ни один поток не открыт: синтезатор сейчас не играет.", a_card: "Карта", a_state: "Состояние", a_format: "Формат", a_channels: "Каналы", a_rate: "Частота дискретизации",
     a_period: "Период", a_buffer: "Буфер (задержка)", a_delay: "В очереди сейчас", a_clock: "Тактирование USB", a_rates: "Поддерживаемые частоты",
     a_asked: "Запрошено {p} × {n} кадров; драйвер дал {rp} × {rn}.", a_frames: "{n} кадров", a_bit: "{n} бит",
-    nav_home: "Главная", nav_bank: "Банк рояля", nav_midi: "MIDI-плеер", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", nav_about: "О проекте", about_title: "О проекте и лицензии", about_links: "Ссылки", about_rights: "Лицензии", legal_more: "Лицензии и ссылки", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [DietPi](https://dietpi.com) и пакеты [Debian](https://www.debian.org) в образе остаются под своими лицензиями.", about_code: "exxpiano (скрипты и этот web-интерфейс): [лицензия MIT](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Исходный код и документация](https://github.com/exxbrain/exxpiano)", link_rel: "[Релизы и образы SD-карт](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Если что-то не работает](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.ru.md)", link_log: "[Список изменений](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Сообщить о проблеме](https://github.com/exxbrain/exxpiano/issues)", menu: "Меню",
+    nav_home: "Главная", nav_bank: "Банк рояля", nav_midi: "MIDI-плеер", nav_sound: "Туше и механика", nav_audio: "Звуковой выход", nav_mon: "Монитор", nav_wifi: "Wi-Fi", nav_about: "О проекте", about_title: "О проекте и лицензии", about_links: "Ссылки", about_rights: "Лицензии", legal_more: "Лицензии и ссылки", about_other: "[FluidSynth](https://www.fluidsynth.org) (LGPL), [Alpine Linux](https://alpinelinux.org) и её пакеты в образе остаются под своими лицензиями.", about_code: "exxpiano (скрипты и этот web-интерфейс): [лицензия MIT](https://github.com/exxbrain/exxpiano/blob/main/LICENSE), © 2026 Denis Zakharov.", link_src: "[Исходный код и документация](https://github.com/exxbrain/exxpiano)", link_rel: "[Релизы и образы SD-карт](https://github.com/exxbrain/exxpiano/releases)", link_help: "[Если что-то не работает](https://github.com/exxbrain/exxpiano/blob/main/docs/TROUBLESHOOTING.ru.md)", link_log: "[Список изменений](https://github.com/exxbrain/exxpiano/blob/main/CHANGELOG.md)", link_bug: "[Сообщить о проблеме](https://github.com/exxbrain/exxpiano/issues)", menu: "Меню",
     home_now: "Сейчас играет", home_midi: "MIDI-плеер", home_midi_now: "MIDI: {pos} из {len}", home_change: "Сменить", home_health: "Устройство", home_more: "Подробнее", h_power: "Питание", h_net: "Сеть",
     h_power_ok: "В порядке", h_power_now: "Проблема", h_power_past: "Было", h_net_ap: "Режим настройки", h_net_none: "Нет сети", h_loading: "Загружается {bank}…",
     w_setup: "Включить сеть настройки на 5 минут", w_confirm_setup: "Pi отключится от {ssid} на 5 минут и запустит свою сеть (exxpiano-Setup-…). Эта страница перестанет отвечать; для продолжения подключитесь к ней. Через 5 минут Pi сам вернётся к {ssid}. Продолжить?",
     w_setup_started: "Запускаю сеть настройки… подключитесь к ней с телефона: имя начинается с exxpiano-Setup.",
-    w_only_way: "используется, единственный путь к Pi: сначала добавьте другую сеть или подключите кабель",
+    w_only_way: "используется, единственный путь к Pi",
+    w_confirm_forget_last: "Забыть {ssid}? Это единственный путь к Pi. Pi отключится от неё, 5 минут будет держать свою сеть настройки, а затем выключит Wi-Fi: он не будет подключён ни к какой сети. Чтобы потом попасть на него, перезапустите его (сеть настройки работает 5 минут после каждого включения) или подключите кабель.",
+    w_wifi_off: "Wi-Fi выключен: сохранённых сетей нет, а сеть настройки уже проработала 5 минут. Перезапустите Pi, чтобы она снова включилась на 5 минут, или включите её кнопкой ниже.",
     n_title: "Имя устройства", n_hint: "Идентификатор установки создаётся автоматически при первом запуске; серийный номер платы вводить не нужно. Он уже делает hostname и сеть настройки уникальными. При желании устройству можно дать понятное имя: строчные латинские буквы, цифры и дефис.", n_label: "Имя", n_save: "Сохранить имя", d_mismatch: "Внимание: этот код принадлежит установке {wanted}, а эта страница — установке {have}. Возможно, вы подключились к другому устройству.", n_saved: "Сохранено: {name}. Страница открывается и по http://{name}.local:8080/.",
     q_title: "Настройка с телефона по QR-коду", q_hint: "Наведите камеру телефона: первый код подключает к сети настройки этого устройства, второй открывает эту страницу. Коды принадлежат этой установке и скачиваются только здесь: сохраните PNG или SVG и напечатайте наклейку для устройства. Код подключения работает всякий раз, когда включена сеть настройки.",
     q_join: "1. Подключиться к сети настройки", q_setup: "2. Открыть страницу настройки", q_page: "Открыть эту страницу на телефоне", q_print: "Печать", q_png: "Скачать PNG", q_svg: "SVG",
@@ -429,8 +437,8 @@ const T = {
     w_not_connected: "К сети не подключено.", w_ap: "Режим настройки: у Pi нет сети, он создал свою: {ap}. Выберите ниже свою Wi-Fi; эта страница доступна по адресу http://10.42.0.1:8080/.",
     w_connecting: "Подключаюсь… до минуты. Если страница перестанет отвечать, подключитесь к своей Wi-Fi и откройте http://{host}.local:8080/ или адрес из списка клиентов роутера (устройство называется {host}).",
     w_ok: "Подключено к {ssid}.", w_failed: "Не удалось подключиться к {ssid}: {error}.", w_forgot: "Сеть {ssid} забыта.", w_ap_failed: "Сеть настройки не запустилась.",
-    w_nm: "В этой системе сетью управляет NetworkManager. Подключайтесь командой sudo nmtui; отсюда сеть изменить нельзя.",
-    w_off: "Служба Wi-Fi не запущена (systemctl status exxpiano-wifi).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
+    w_nm: "В этой системе Wi-Fi управляет другой сетевой менеджер (NetworkManager, iwd или connman); отсюда сеть изменить нельзя.",
+    w_off: "Служба Wi-Fi не запущена (rc-service exxpiano-wifi status).", w_waiting: "Жду ответа Pi… Если телефон переключился на другую сеть, откройте страницу заново.",
     e_title: "Сообщения служб", e_hint: "Предупреждения, ошибки и пометки служб рояля с момента включения (не весь журнал).", e_none: "С момента включения сообщений нет.",
     m_throttle: "Питание и троттлинг", m_cpu: "Процессор", m_temp: "Температура", m_freq: "Частота", m_mem: "Память",
     m_chart_cpu: "Загрузка процессора, последние 2,5 минуты", m_chart_temp: "Температура, последние 2,5 минуты", m_cores: "Ядра", m_procs: "Службы рояля",
@@ -442,7 +450,10 @@ const T = {
     bank_title: "Банк рояля", midi_title: "MIDI-файлы", midi_hint: "Положите MIDI-файлы (.mid) в папку piano-midi на USB-накопителе и импортируйте: файл играет на выбранном рояле, со стуком молоточков, демпферов и педали. После импорта накопитель не нужен.", midi_lib: "На устройстве", midi_drive: "На USB-накопителе", midi_nofolder: "На накопителе нет папки piano-midi.", midi_nofiles: "В папке piano-midi нет файлов .mid и .midi.", midi_none: "MIDI-файлы ещё не импортированы.", midi_play: "Играть", midi_stop: "Стоп", midi_repeat: "Повторять", midi_idle: "Не играет.", midi_playing: "Играет {title}", midi_seek: "Позиция в произведении", midi_back: "−10 с", midi_fwd: "+10 с", midi_unavailable: "Проигрыватель не работает (мост механики exxpiano-fx).", midi_import: "Импортировать", midi_delete: "Удалить", midi_confirm_delete: "Удалить MIDI-файл {name}?", midi_notes: "нот: {n}", midi_importing: "Копируется {name}: {done} из {total}", midi_checking: "Проверяется {name}…", midi_done: "{name} импортирован.", midi_already: "{name} уже был импортирован.", midi_failed: "Импорт {name} не удался: {error}", usb_title: "Банки с USB-накопителя", usb_hint: "Положите файлы SoundFont (.sf2, .sf3) в папку piano-banks на USB-накопителе (FAT32, exFAT или ext4), подключите его и импортируйте: копирование начинается только по кнопке, а после него накопитель не нужен.", usb_none: "USB-накопитель не подключён.", usb_nofolder: "На накопителе нет папки piano-banks.", usb_nofiles: "В папке piano-banks нет файлов .sf2 и .sf3.", usb_import: "Импортировать", usb_delete: "Удалить", usb_imported: "импортирован", usb_confirm_delete: "Удалить импортированный банк {name}?", legal_copy: "© 2026 Denis Zakharov · [exxpiano {version}](https://github.com/exxbrain/exxpiano)", legal_sounds: "Звуки: [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/SalamanderGrandPiano/), автор Alexander Holm, [CC-BY](https://creativecommons.org/licenses/by/3.0/) (преобразовано в SF2). Банки, которые вы добавили, остаются под лицензиями своих авторов.", legal_midi: "Демонстрационные записи (Лист, «Вздох» и «Кампанелла») взяты из [набора MAESTRO](https://magenta.tensorflow.org/datasets/maestro) (Google), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование. Удалите их, если используете exxpiano коммерчески.", bank_confirm_delete: "Удалить банк {name} с этого устройства? Отменить нельзя: чтобы вернуть его, установите банк снова или запишите новую карту.", bank_deleted: "Удалён: {name} {freed}", usb_copying: "Копируется {name}: {done} из {total}", usb_verifying: "Проверяется {name}…", usb_done: "{name} импортирован. Накопитель можно вынуть.", usb_already: "{name} уже был импортирован.", usb_failed: "Импорт {name} не удался: {error}", bank_hint: "Звуковые банки в папке {dir}. При выборе синтезатор перезагружается: около минуты тишины. Если банк не загрузится, прежний вернётся сам.",
     bank_profile: "Чувствительность, громкость и механика запоминаются для каждого инструмента.",
     bank_empty: "В папке {dir} банков нет.", use: "Использовать", playing: "Играет", outside: "вне библиотеки", presets_n: "пресетов: {n}", bank_share: "{pct}% от допустимого для банка", mem_limit_k: "Наибольший банк", mem_limit_note: "системе {reserve}, механике {mech}", mem_disk_k: "Свободно на карте", mem_current: "Текущий банк", preset: "Пресет",
-    sw_switching: "Загружается {bank}… около минуты тишины.", sw_done: "Теперь играет {bank}.", sw_rolled_back: "{bank} не загрузился; снова играет прежний банк.",
+    sw_switching: "Загружается {bank}… около минуты тишины.", sw_switching_live: "Загружается {bank}… пока играет превью: можно продолжать играть.",
+    ld_preview: "Играет превью, пока загружается {bank}.", ld_failed: "Банк рояля не загрузился: играет превью. {error}",
+    bank_hint_live: "Звуковые банки в папке {dir}. Выбранный банк загружается в фоне, пока играет небольшой рояль-превью; затем пианино переходит на него, когда отпущены все клавиши и педаль. Если банк не загрузится, прежний вернётся сам.",
+    no_preview: "Нет исправного банка превью: пока банк загружается, пианино молчит.", sw_done: "Теперь играет {bank}.", sw_rolled_back: "{bank} не загрузился; снова играет прежний банк.",
     sw_failed: "{bank} не загрузился, и прежний банк восстановить тоже не удалось: проверьте устройство.", sw_same: "Этот банк уже используется.",
     title: "exxpiano", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
     volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
@@ -456,7 +467,7 @@ const T = {
     saved: "Сохранено", restart_needed: "Нажмите «Применить и перезапустить», чтобы изменения звука вступили в силу.", restarting: "Перезапуск синтезатора, около 45 секунд…",
     gain_not_live: "Сохранено, но громкость «на лету» изменить не удалось (применится после перезапуска).", err: "Ошибка", denied: "Неверный или отсутствующий ключ",
     s_velocity_curve: ["Кривая чувствительности", "1 = без изменений · меньше 1: тихие нажатия звучат громче · больше 1: надо играть сильнее", ""],
-    s_gain: ["Общая громкость", "Шкала в дБ: 0 — самая громкая настройка, при которой даже самые плотные места с педалью не трещат. Оранжевый конец дорожки громче: громкое плотное место там может трещать. Громкость наушников задаётся в «Звуковом выходе» (громкость звуковой карты).", ""],
+    s_gain: ["Общая громкость", "Шкала в дБ: 0 — самая громкая настройка, при которой даже самые плотные места с педалью не трещат. Оранжевый конец дорожки громче: громкое плотное место там может трещать. Громкость наушников задаёт громкость звуковой карты (ниже и в «Звуковом выходе»).", ""],
     s_hammer_boost: ["Громкость стука молоточков", "дБ относительно оригинальной записи (0 = как записано, очень тихо).", " дБ"],
     s_hammer_exp: ["Стук молоточков и сила нажатия", "Больше = при тихой игре стука почти нет. 0.6–1.0 — мягко.", ""],
     s_random: ["Случайность", "0 = каждый стук одинаковый, 1 = естественно, 2 = живее.", ""],
@@ -600,24 +611,31 @@ function fillAudio() {
   $("cpuCores").value = state.settings.cpu_cores;
 }
 
-let outVolTimer = null;
-function renderOutVol() {                          // the hardware volume of the card that plays; the row is hidden when the card has no such control
-  const v = state.output_volume, row = $("outVolRow");
-  row.style.display = v ? "" : "none";
-  if (!v) return;
-  const r = $("outVol"); r.min = v.lo; r.max = v.hi;
-  if (document.activeElement !== r && !outVolTimer) r.value = v.db;
-  $("outVolVal").textContent = (+r.value).toFixed(0) + " " + (L === "ru" ? "дБ" : "dB");
+let outVolTimer = null, outVolSource = null;
+const OUT_VOL = [["outVolRow", "outVol", "outVolVal"], ["outVolRow2", "outVol2", "outVolVal2"]];     // the same control in Audio output and under the master volume on Home
+function renderOutVol() {                          // the hardware volume of the card that plays; the rows are hidden when the card has no such control
+  const v = state.output_volume;
+  for (const [rowId, sliderId, valId] of OUT_VOL) {
+    $(rowId).style.display = v ? "" : "none";
+    if (!v) continue;
+    const r = $(sliderId); r.min = v.lo; r.max = v.hi;
+    if (document.activeElement !== r && !outVolTimer) r.value = v.db;
+    else if (outVolSource && outVolSource !== sliderId) r.value = $(outVolSource).value;       // the other slider follows the one that is being moved
+    $(valId).textContent = (+r.value).toFixed(0) + " " + (L === "ru" ? "дБ" : "dB");
+  }
 }
-$("outVol").addEventListener("input", () => {
-  renderOutVol();
-  clearTimeout(outVolTimer);
-  outVolTimer = setTimeout(async () => {
-    outVolTimer = null;
-    try { state.output_volume = (await api("/api/output-volume", { db: +$("outVol").value })).output_volume; renderOutVol(); }
-    catch (e) { say(tr("err") + ": " + e.message, "err"); }
-  }, 250);
-});
+for (const [, sliderId] of OUT_VOL) {
+  $(sliderId).addEventListener("input", () => {
+    outVolSource = sliderId;
+    renderOutVol();
+    clearTimeout(outVolTimer);
+    outVolTimer = setTimeout(async () => {
+      outVolTimer = null;
+      try { state.output_volume = (await api("/api/output-volume", { db: +$(sliderId).value })).output_volume; renderOutVol(); }
+      catch (e) { say(tr("err") + ": " + e.message, "err"); }
+    }, 250);
+  });
+}
 let lastStatus = "";
 let lastBanks = "";
 let bankNote = "";                 // what the last deletion did: shown until a switch starts
@@ -647,10 +665,12 @@ function renderBankMemory(m) {                      // like the Monitor: tiles w
 
 function renderBanks(force) {
   const b = state.banks; if (!b) return;
-  const sig = JSON.stringify([b.current, b.external, b.banks, b.switch, b.preset, b.presets, b.memory, L]);
+  const sig = JSON.stringify([b.current, b.external, b.banks, b.switch, b.preset, b.presets, b.memory, b.loading, L]);
   if (sig === lastBanks && !force) return;
   lastBanks = sig;
-  $("bankHint").textContent = fmt(tr("bank_hint"), { dir: b.dir }) + " " + tr("bank_profile");
+  const live = liveLoading(b);
+  $("bankHint").textContent = live ? fmt(tr("bank_hint_live"), { dir: b.dir }) + " " + tr("bank_profile")
+    : fmt(tr("bank_hint"), { dir: b.dir }) + " " + tr("bank_profile") + " " + tr("no_preview");
   renderBankMemory(b.memory);
   const list = $("bankList"); list.textContent = "";
   const busy = b.switch.state === "switching", limit = b.memory && b.memory.limit;
@@ -694,9 +714,25 @@ function renderBanks(force) {
   const cls = { switching: "warn", done: "ok", rolled_back: "err", failed: "err" }[sw.state] || "";
   st.className = cls;
   if (sw.state !== "idle") bankNote = "";
-  st.textContent = sw.state === "idle" ? bankNote : fmt(tr("sw_" + sw.state), { bank: sw.bank || "" });
+  st.textContent = sw.state === "idle" ? bankNote : switchText(b);
   if (sw.state === "idle" && bankNote) st.className = "ok";
+  const ld = loadingText(b);
+  if (ld && sw.state !== "switching") { st.textContent = ld.text; st.className = ld.cls; }
   renderHomeBank();
+}
+// exxpiano-synth loads banks in the background while the preview plays (state null: the plain fluidsynth, a switch is silent)
+const liveLoading = b => !!(b.loading && b.loading.state);
+function switchText(b) {
+  const sw = b.switch, key = sw.state === "switching" && liveLoading(b) ? "sw_switching_live" : "sw_" + sw.state;
+  return fmt(tr(key), { bank: sw.bank || "" });
+}
+// what plays while a bank loads (at the start of the module, before any switch): null when nothing is loading
+function loadingText(b) {
+  const l = b.loading;
+  if (!l || !l.state) return null;
+  if (l.state === "preview" && l.loading) return { text: fmt(tr("ld_preview"), { bank: l.loading }), cls: "warn" };
+  if (l.state === "failed") return { text: fmt(tr("ld_failed"), { error: l.error || "" }).trim(), cls: "err" };
+  return null;
 }
 
 // ---- MIDI files: the drive's files, the library, the player of the bridge
@@ -1083,8 +1119,10 @@ function renderHomeBank() {
   $("nowPreset").textContent = pr ? pr.name : "";
   const sw = b.switch, st = $("nowStatus");
   st.className = "hint";
-  st.textContent = sw.state === "idle" ? "" : fmt(tr("sw_" + sw.state), { bank: sw.bank || "" });
+  st.textContent = sw.state === "idle" ? "" : switchText(b);
   if (sw.state === "switching") st.classList.add("warn");
+  const ld = loadingText(b);
+  if (ld && sw.state !== "switching") { st.textContent = ld.text; st.classList.add(ld.cls); }
 }
 function renderHome(n, w) {
   setTile("hCpu", pct1(n.cpu), level(n.cpu, 70, 90));
@@ -1141,6 +1179,7 @@ function renderWifi() {
   if (!d) { line("warn", tr("w_waiting")); return; }
   if (!d.supported) { line("warn", tr(d.reason === "networkmanager" ? "w_nm" : "w_off")); }
   else if (d.mode === "ap") line("warn", fmt(tr("w_ap"), { ap: d.ap ? d.ap.ssid : "" }));
+  else if (d.mode === "off") line("warn", tr("w_wifi_off"));
   else if (d.link) {
     const parts = [fmt(tr("w_connected"), { ssid: d.link.ssid })];
     if (d.link.ip) parts.push(fmt(tr("w_ip"), { ip: d.link.ip }));
@@ -1158,7 +1197,11 @@ function renderWifi() {
   $("wAdd").hidden = !d.supported;
   $("wSetupRow").hidden = !(d.supported && d.mode === "client" && !d.busy);
   renderSaved(d);
-  if (d.supported && !wifi.scanned) { wifi.scanned = true; fillNetworks(d.networks); }
+  if (d.supported && !wifi.scanned) {
+    wifi.scanned = true; fillNetworks(d.networks);
+    // connected (or with the Wi-Fi off) the radio can scan: the list of the networks around is shown at once, not only after "Scan again"
+    if (d.mode !== "ap" && !d.busy && !(d.networks || []).length) scanNetworks();
+  }
   if (d.supported && !(d.networks || []).length && d.scan_error) wText($("wResult"), "warn", tr("w_scan_err") + ": " + d.scan_error);
 }
 function renderSaved(d) {
@@ -1173,8 +1216,8 @@ function renderSaved(d) {
     const b = document.createElement("button"); b.className = "secondary"; b.textContent = tr("w_forget");
     // the connection in use, the only saved network, no cable: forgetting it would leave no way to reach the Pi
     const onlyWay = d.link && d.link.ssid === n.ssid && d.saved.length === 1 && !d.cable;
-    if (onlyWay) { b.disabled = true; small.textContent += (small.textContent ? " · " : "") + tr("w_only_way"); }
-    b.addEventListener("click", () => forgetNetwork(n.ssid));
+    if (onlyWay) small.textContent += (small.textContent ? " · " : "") + tr("w_only_way");
+    b.addEventListener("click", () => forgetNetwork(n.ssid, onlyWay));
     row.append(meta, b); box.append(row);
   }
 }
@@ -1262,9 +1305,9 @@ async function startSetup() {
   try { await api("/api/wifi", { action: "setup" }); wText($("wResult"), "warn", tr("w_setup_started")); setTimeout(() => pollWifi(true), 1500); }
   catch (e) { wText($("wResult"), "bad", tr("err") + ": " + e.message); }
 }
-async function forgetNetwork(ssid) {
-  if (!window.confirm(fmt(tr("w_confirm_forget"), { ssid }))) return;
-  try { await api("/api/wifi", { action: "forget", ssid }); setTimeout(() => pollWifi(true), 800); }
+async function forgetNetwork(ssid, onlyWay) {
+  if (!window.confirm(fmt(tr(onlyWay ? "w_confirm_forget_last" : "w_confirm_forget"), { ssid }))) return;
+  try { await api("/api/wifi", onlyWay ? { action: "forget", ssid, confirm: true } : { action: "forget", ssid }); setTimeout(() => pollWifi(true), 800); }
   catch (e) { wText($("wResult"), "bad", tr("err") + ": " + e.message); }
 }
 async function initWifi() {

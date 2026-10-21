@@ -1,7 +1,7 @@
 name: image pipeline
 
-# The full stand-in image is useful when image-building code changes, but is too
-# expensive for unrelated application and documentation changes.
+# The packages, the OpenRC services, an upgrade with a rollback, and a complete image (with stand-in banks), all in Alpine containers on a
+# native arm64 runner. Useful when packaging or image-building code changes; too expensive for unrelated changes.
 on:
   push:
     branches:
@@ -9,23 +9,41 @@ on:
     paths:
       - ".github/workflows/image-pipeline.yml"
       - ".github/workflows/release.yml"
-      - ".github/dietpi-image.env"
-      - "dietpi/**"
+      - ".github/alpine-image.env"
+      - "alpine/**"
+      - "deploy/**"
       - "packaging/**"
-      - "scripts/build-deb.py"
+      - "pi/init.d/**"
+      - "pi/90-exxpiano.rules"
+      - "pi/exxpiano-env"
+      - "pi/exxpiano-respawn"
+      - "pi/exxpiano-firstboot"
+      - "scripts/build-apks.py"
+      - "scripts/apk-builder.Dockerfile"
       - "scripts/build-sd-image.py"
       - "scripts/sd-*"
+      - "scripts/test-*.sh"
+      - "tests/test_apk.py"
       - "tests/test_build_sd_image.py"
   pull_request:
     paths:
       - ".github/workflows/image-pipeline.yml"
       - ".github/workflows/release.yml"
-      - ".github/dietpi-image.env"
-      - "dietpi/**"
+      - ".github/alpine-image.env"
+      - "alpine/**"
+      - "deploy/**"
       - "packaging/**"
-      - "scripts/build-deb.py"
+      - "pi/init.d/**"
+      - "pi/90-exxpiano.rules"
+      - "pi/exxpiano-env"
+      - "pi/exxpiano-respawn"
+      - "pi/exxpiano-firstboot"
+      - "scripts/build-apks.py"
+      - "scripts/apk-builder.Dockerfile"
       - "scripts/build-sd-image.py"
       - "scripts/sd-*"
+      - "scripts/test-*.sh"
+      - "tests/test_apk.py"
       - "tests/test_build_sd_image.py"
   workflow_dispatch:
 
@@ -33,10 +51,20 @@ permissions:
   contents: read
 
 jobs:
-  stand-in:
-    runs-on: ubuntu-24.04
+  alpine:
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify the complete image pipeline on the DietPi stand-in
+      # no EXXPIANO_APK_KEY here: a throwaway development key signs the test packages
+      - name: Build the packages
+        run: python3 scripts/build-apks.py --out dist/apk
+
+      - name: The OpenRC services
+        run: scripts/test-openrc-services.sh
+
+      - name: Install, upgrade, roll back, remove
+        run: scripts/test-apk-upgrade.sh
+
+      - name: A complete image with stand-in banks, read back
         run: scripts/test-sd-image-pipeline.sh

@@ -1,6 +1,6 @@
 """Settings shared by exxpiano-fx (live reload) and exxpiano-web (the web interface): /etc/exxpiano.conf.
 
-The file stays a plain KEY=VALUE file that systemd reads as an EnvironmentFile. Only the whitelisted settings below
+The file stays a plain KEY=VALUE file: exxpiano-env reads it (never a shell) as the environment of the OpenRC services. Only the whitelisted settings below
 can be changed through the web interface, each with a type and a range, so a request can never inject anything else.
 
 Scopes tell what has to happen after a change:

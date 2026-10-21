@@ -6,7 +6,7 @@ How the piano and its mechanics are made, why the banks are reduced, what it was
 
 ## How it works
 
-A digital piano appliance for Raspberry Pi 2 (v1.2 and later)/3/4/5 (ARMv8): SoundFont banks through FluidSynth (the ready images carry **Salamander Grand Piano V3**, Yamaha C5; the mechanics are tuned on it, so with another bank the levels may need adjusting in the web interface), plus
+A digital piano appliance for Raspberry Pi 3/4/5 (64-bit Alpine Linux): SoundFont banks through FluidSynth (the ready images carry **Salamander Grand Piano V3**, Yamaha C5; the mechanics are tuned on it, so with another bank the levels may need adjusting in the web interface), plus
 **piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
 express by itself, so a small bridge program adds them.
 
@@ -52,7 +52,7 @@ The price: fewer velocity layers and shorter tails than the original; `lite` has
 
 ## Tested on
 
-- Raspberry Pi 3 Model B (1 GB; a 512 MB Pi 3 A+ needs the smaller `lite` bank, see [the presets](BUILDING.md#build-the-sound-banks-on-a-maclinux)), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
+- Raspberry Pi 3 Model B (1 GB; a 512 MB Pi 3 A+ needs the smaller `lite` bank, see [the presets](BUILDING.md#build-the-sound-banks-on-a-maclinux)), the earlier DietPi image (Debian, FluidSynth 2.4.4; 1.10.22 and older), Arturia KeyLab Essential 49 mk3 keyboard,
   onboard 3.5 mm output;
 - Raspberry Pi 5 (8 GB) with the `exxpiano-rpi5-…` image of v1.10.21 (DietPi 10.7.2) and a Zoom U-24 USB interface: the card was chosen by itself (`plughw:CARD=U24`, 64 x 3, about 4.4 ms of buffering, 44.1 kHz, `S32_LE`, 4 channels), the level meter runs on it, no underruns or errors since the boot, no under-voltage or throttling, the full bank loaded with 953 of 8046 MB in use. Not checked on it yet: re-picking the card when it is plugged in or out, the delay end to end;
 - building the banks: macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
@@ -60,7 +60,9 @@ The price: fewer velocity layers and shorter tails than the original; `lite` has
 Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see [Audio output and latency](USING.md#audio-output-and-latency));
 its delay was not measured.
 
-**Start time** (measured on a Pi 3 Model B with the full bank): **about 55 s** from power-on to the first note, **about 1.5 minutes** on the first start of a freshly written card. Most of it is reading the 729 MB bank from the card at 23 MB/s, the limit of the Pi 3, so a faster card does not help.
+**Start time** (measured on a Pi 3 Model B with the full bank): the preview piano plays **5 s** after the synthesizer starts and the full bank **about 37 s** after it (Alpine, a restart of the service). Measured earlier on the DietPi image, without the preview: about 55 s from power-on to the first note, about 1.5 minutes on the first start of a freshly written card. Loading the full bank is reading 729 MB from the card at 23 MB/s, the limit of the Pi 3, so a faster card does not help.
+
+**The preview piano** (`piano-preview.sf2`, 24 MB) is built by the same tool from the same Salamander recordings (CC-BY): 3 velocity layers, stereo at 22.05 kHz, 3 s tails. It is stereo on purpose: a mono bank has the same signal on both channels and vanishes on an input that takes the left minus the right (a TRS cable into a balanced mixer input). It plays while a big bank loads. FluidSynth reads a bank under the lock of the synthesizer it loads into, and every note waits for that lock (31.7 s on a Pi 3 B), so `exxpiano-synth` reads the big bank in a second synthesizer object and moves it over in 0.1 ms: notes waited at most 0.5 ms meanwhile.
 
 ## Comparison with alternatives
 
@@ -70,7 +72,7 @@ This comparison comes from project descriptions and reviews, not from my own mea
 |---|---|---|---|---|
 | Sound | samples of Salamander Grand Piano V3 (CC-BY) through FluidSynth plus a separate mechanics bank (hammers, dampers, resonance, pedal) | physical modelling (Modartt); little memory, the sound is computed live | many engines (piano, electric piano, synths, SoundFont and more) | any SoundFont; no piano mechanics |
 | Software price | free, open source (scripts MIT, sounds CC-BY) | a paid licence | the software is open; the ready Zynthian 5 kit with a screen and knobs is about €490 plus VAT without a Raspberry Pi, about €570 with one (from a review) | free |
-| Hardware | Raspberry Pi 2/3/4/5 (a Pi 5 through a USB sound card), a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official v5.1 kit on a Raspberry Pi 5 with a screen and a control board; Pi 4, 3 and 3B+ are also supported and Pi 4 or better is recommended (a Pi 3 copes worse with several engines at once); the Pi 3 A+ and a minimum amount of memory are not mentioned in the documentation, a forum post says ZynthianOS takes almost 1 GB; a Pi 2 is not supported by the image | any board that runs FluidSynth (Pi Zero and up) |
+| Hardware | Raspberry Pi 3/4/5 (a Pi 5 through a USB sound card), a 512 MB board (Pi 3 A+) is enough, no screen or buttons needed | reports mostly name a Pi 4/5 with a 64-bit system; there are reports of home use on a Pi 3 | the official v5.1 kit on a Raspberry Pi 5 with a screen and a control board; Pi 4, 3 and 3B+ are also supported and Pi 4 or better is recommended (a Pi 3 copes worse with several engines at once); the Pi 3 A+ and a minimum amount of memory are not mentioned in the documentation, a forum post says ZynthianOS takes almost 1 GB; a Pi 2 is not supported by the image | any board that runs FluidSynth (Pi Zero and up) |
 | Ready image | yes, one ZIP that works from the first power-on with no monitor | no, installed by hand | yes, the ZynthianOS image: about 7 GB compressed and about 16 GB unpacked, a card of 32 GB or more; a lighter variant with a reduced SoundFont library exists | no, usually a guide and scripts |
 | Settings from a phone | yes: touch curve, mechanics, banks, audio output, Wi-Fi, monitor | no single web interface; settings are in the program | a screen and knobs on the device, a web interface exists | at best a simple interface to choose a bank |
 | Piano mechanics | yes, a separate bank and a bridge | part of the physical model | depends on the chosen engine | none |

@@ -1,0 +1,7 @@
+#!/bin/sh
+# New banks: a running synthesizer loads them (it is not started where OpenRC does not run, as in the image builder).
+if [ -e /run/openrc/softlevel ]; then
+	rc-service --ifstarted exxpiano restart >/dev/null 2>&1 || true
+	rc-service --ifstarted exxpiano-fx restart >/dev/null 2>&1 || true
+fi
+exit 0

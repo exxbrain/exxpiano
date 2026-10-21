@@ -16,6 +16,8 @@ The pictures of every section are in the README, under [What it looks like](../R
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
 - **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
+  The 3.5 mm jack of the card starts at the full volume of its driver (+4 dB): the first start of a new card sets it, the card volume
+  slider turns it down and is remembered. At +4 dB the loudest passages can clip at the jack, after the level meter, so the meter does not show it.
 - **Monitor section**: live, once a second. **Service messages**: warnings and errors the piano services logged since the boot (for example "no sound card found"), the notes of the piano's own scripts (grey: which audio output was chosen, that a service started; not the whole log), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web interface, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
@@ -38,8 +40,11 @@ the synthesizer; hardening that is a task for a real product.
 ## Choosing the piano bank
 
 The web interface has a **Piano bank** card that lists the sound banks (`*.sf2`, `*.sf3`) found in `BANK_DIR` (default `/opt/exxpiano/soundfonts`; the
-mechanics bank is never offered). **Use** switches the piano: the synthesizer reloads (about a minute of silence). If the new bank does not come
-up, the previous one is put back automatically and the web interface says so. A bank is refused, with the reason shown, when it is damaged or too large
+mechanics bank and the preview bank are never offered). **Use** switches the piano without restarting the synthesizer: the preview piano plays while
+the new bank loads, so you can keep playing, and the piano moves over to the new bank at a moment with no key and no pedal down (after 60 s of
+uninterrupted playing, at the next release of the pedal). If the new bank does not come
+up, the previous one is put back automatically and the web interface says so. Without a usable preview bank (`PREVIEW_SF2` empty, missing or damaged)
+the synthesizer restarts instead and the piano is silent while the bank loads (about a minute); the card says so. A bank is refused, with the reason shown, when it is damaged or too large
 for the device's memory (on a Pi 3: about 500 MB). If the bank has several presets the card also offers a **Preset** drop-down (applied at once);
 bank 0 programs 1-6 are not offered because the mechanics bank answers there.
 
@@ -54,7 +59,7 @@ that is playing; choose another bank and that bank's own settings come back, the
 starts from the settings in force at that moment. The audio output, buffers, polyphony and reverb switch belong to the device and are the same
 for every bank. If a switch fails, the old bank and its settings are restored.
 
-To add a bank, copy a `.sf2` into `BANK_DIR` (for example `scp -O my.sf2 root@<Pi>:/opt/exxpiano/soundfonts/`).
+To add a bank, copy a `.sf2` into `BANK_DIR` (for example `scp my.sf2 root@<Pi>:/opt/exxpiano/soundfonts/`).
 
 ### Importing banks from a USB drive
 
@@ -62,7 +67,7 @@ You do not need SSH to add a bank. Put SoundFont files (`.sf2`, `.sf3`) into the
 
 How it is kept safe: the drive is mounted read only (`ro,nosuid,nodev,noexec`) and its files are never executed; only plain files of `piano-banks/` are offered (no links, no sub-folders, no hidden files, no `mech.sf2`); the browser never sends a path, only the name of a file the drive has just listed; the copy goes to a temporary folder, is checked (the SoundFont, the size against the memory of the board, the free space) and only then published in one step, so a drive pulled out in the middle or a full card leaves no half-copied bank. One import runs at a time.
 
-**What is tested and what is not.** The logic (listing, safety of names, the transaction, errors, the API, the interface in the demo `scripts/demo-web.py`) is covered by automatic tests. **Not tried on a real Raspberry Pi:** mounting FAT32, exFAT and ext4 drives, the udev rule (`90-exxpiano.rules`) and the unit `exxpiano-usb@.service`, pulling a drive out during the copy, and what a 400 MB copy does to playing and to the power supply (watch the Monitor section; use a powered hub if it shows under-voltage). Do not play while a big bank is being copied. If a drive is not offered, look at `journalctl -u 'exxpiano-usb@*'` and check that the file system is one of the three. NTFS is not supported. `bank.json` (author and licence of a bank) is not read yet.
+**What is tested and what is not.** The logic (listing, safety of names, the transaction, errors, the API, the interface in the demo `scripts/demo-web.py`) is covered by automatic tests. **Not tried on a real Raspberry Pi:** mounting FAT32, exFAT and ext4 drives, the eudev rule (`90-exxpiano.rules`), pulling a drive out during the copy, and what a 400 MB copy does to playing and to the power supply (watch the Monitor section; use a powered hub if it shows under-voltage). Do not play while a big bank is being copied. If a drive is not offered, look at `grep exxpiano-usb /var/log/messages` and check that the file system is one of the three. NTFS is not supported. `bank.json` (author and licence of a bank) is not read yet.
 
 ### Playing MIDI files from a USB drive
 
@@ -70,7 +75,7 @@ Put MIDI files (`.mid`, `.midi`) into the folder `piano-midi/` in the root of a 
 
 **Two pieces come with the device.** The package and the images carry two recordings of a real pianist, Liszt's *Un Sospiro* and *La Campanella*, played at the International Piano-e-Competition (`assets/midi/`), and put them into the library once, at the first installation; a piece you delete does not come back with an update. The recordings are from the MAESTRO dataset (Google, taken unchanged) and are licensed **CC BY-NC-SA 4.0**: non-commercial use, with attribution, shared under the same license; the rest of exxpiano stays MIT. If you use exxpiano commercially, delete the pieces (the **Delete** button of the MIDI player). Details: `assets/midi/NOTICE.md`.
 
-What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Changing the bank or restarting the synthesizer stops the piece; start it again after the new instrument has loaded. Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
+What the file may do: only its notes and its sustain pedal (CC 64) are played, on the one piano, all channels together. Everything else in the file is ignored: bank and program changes, volume and pan, pitch bend and the drum channel (channel 10), so a file never changes your instrument or your settings. The tempo is the file's own (no tempo or key controls yet). Restarting the synthesizer stops the piece (so does changing the bank when there is no preview bank); start it again after the new instrument has loaded. With the preview a change of the bank does not restart the synthesizer and the piece should go on (not tried with the player on a device yet). Limits against a file that is too heavy for a Raspberry Pi 3: at most 4 MB, 30 minutes and 200 000 events; a file that is not a standard MIDI file of format 0 or 1 is refused with the reason.
 
 **What is tested and what is not.** The reader of the files, the library, the import, the player (with a fake clock), the road through the touch curve and the mechanics, and the API are covered by automatic tests, and the interface works in the demo. **Tried on a real Raspberry Pi** with the two pieces that come with it (see [What it sounds like](../README.md#what-it-sounds-like)): they play through to the end, the load average stayed at 0.3-0.7, and the final fortissimo of *La Campanella* needed 256 voices (with 192 the synthesizer cut sounding notes, which clicked). **Not measured:** how exact the timing is (Python timers, together with the mechanics), files denser than these two, and everything about the USB drive that the bank import also leaves open. The player lives in the mechanics bridge (`exxpiano-fx`): when it is not running, the card says so.
 
@@ -94,12 +99,17 @@ Good to know:
   in `/etc/exxpiano.conf`; `WIFI_SETUP=0` turns the feature off. **Change the default password before you give a device to somebody**: it protects the
   Wi-Fi password typed during the setup.
 - The password of the home network is turned into a key before it is saved (as `wpa_passphrase` does) and is never logged.
-- This works where `ifupdown` + `wpa_supplicant` manage the network (DietPi). On **Raspberry Pi OS** with NetworkManager the Wi-Fi section says so; use `sudo nmtui` there.
+- `exxpiano-wifi` runs `wpa_supplicant` and `udhcpc` on `wlan0` itself; the system's `ifupdown-ng` only looks after the wired port. Where another network manager owns Wi-Fi (NetworkManager, iwd or connman runs) the Wi-Fi section says so and changes nothing.
 - **QR codes.** The Wi-Fi section shows a code for the unique setup network, one for the web interface in the setup network, and one for the current address, with a **Print** button and **Download PNG / SVG** links for each (file names contain the installation ID). **The codes exist only there**: the ID is created at the first start, so the image build makes no QR codes or stickers; take them from the web interface of the device they belong to and print a sticker. The join code works whenever the setup network is on, so a sticker printed in advance stays valid. The built-in `pi/qrlib.py` creates them without internet or extra packages.
 - The setup network starts **10 s** after the Pi finds itself without a network (immediately after you remove the last saved network and no cable is plugged
-  in). The **Start the setup network for 5 minutes** button in the Wi-Fi section does it by hand and the Pi comes back to its network by itself. The only network in use
-  cannot be forgotten while it is the only way to reach the Pi (no cable, no other saved network).
-- Test without risk: `sudo python3 /opt/exxpiano/exxpiano-wifi.py ap-test 120` starts the setup network for 2 minutes and then returns to the normal one by itself.
+  in). The **Start the setup network for 5 minutes** button in the Wi-Fi section does it by hand and the Pi comes back to its network by itself.
+- **Without a saved network the setup network is on for 5 minutes** after every start and after the last network is forgotten; while a phone is connected to it
+  it stays. Then the Wi-Fi is off and the box is on no network at all, until the next start, a cable, or a network saved through the cable. Change the time
+  with `WIFI_SETUP_WINDOW` (seconds, 60 to 3600).
+- **Taking the box off the network.** The network in use can be forgotten even when it is the only way to reach the Pi (no cable, no other saved network):
+  the page asks first and says what follows. The Pi leaves the network, keeps its setup network on for 5 minutes, and then turns the Wi-Fi off. To come back,
+  restart it (5 minutes of the setup network again) or plug in a cable. The piano plays all the time.
+- Test without risk (as root): `python3 /opt/exxpiano/exxpiano-wifi.py ap-test 120` starts the setup network for 2 minutes and then returns to the normal one by itself.
   (An SSH session over Wi-Fi is cut for that time.)
 
 ## Several devices
@@ -109,11 +119,11 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
 
 ## The screen of the device
 
-**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the web interface, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH (user `root`, DietPi's password).
+**The screen of the device asks for nothing.** With a monitor on HDMI the console shows a status screen (installation ID, name, addresses of the web interface, the setup network if there is no network) instead of a `login:` prompt, so nothing has to be typed on a device that is used without a monitor. There is no local login and no root autologin; administer the device over SSH as `root`: with the password the image was built with, or, without one, with a key (put your public key into `authorized_keys` on the boot partition of the card, or build with `--ssh-key`).
 
 ## Audio output and latency
 
-- **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/firmware/config.txt`; on a system you set up by hand: `dietpi-config` -> Audio Options), device
+- **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/usercfg.txt`), device
   `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
   30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The default `PERIOD_SIZE=64` x `PERIODS=3` (the smallest value FluidSynth accepts, the driver rounds it up) played without clicks on a Pi 3; raise `PERIOD_SIZE` in the web interface if you hear any. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
@@ -122,12 +132,12 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
   `Failed to find an audio format supported by alsa`.
   Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 with `64 x 3`: no clicks by ear, latency not
   measured; on a Pi 5 the same interface was picked by itself and ran with `64 x 3` without underruns. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
-  plug or unplug a card is done by a udev rule that was written from the documentation and **not tested on hardware**;
-  if it does not work, run `sudo systemctl restart exxpiano` after changing the interface.
+  plug or unplug a card is done by an eudev rule that was written from the documentation and **not tested on hardware**;
+  if it does not work, run `rc-service exxpiano restart` after changing the interface.
 
 ## Configuration
 
-Everything is in `/etc/exxpiano.conf`. After editing: `sudo systemctl restart exxpiano exxpiano-fx`.
+Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano restart; rc-service exxpiano-fx restart`.
 
 | Setting | What it does |
 |---|---|

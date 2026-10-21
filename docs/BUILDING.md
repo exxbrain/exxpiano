@@ -12,15 +12,23 @@ Only for building the banks and the image yourself, or working on the code. To p
 
 ## Deployment in short
 
-The shipped product is a ready device with exxpiano already installed. One complete DietPi image is reusable across compatible Raspberry Pi 2/3/4 boards (a Pi 5 has an image of its own, built with `--target rpi5`); a separate package or installer bundle is not a delivery format.
+The shipped product is a ready device with exxpiano already installed. One complete Alpine Linux image is reusable across Raspberry Pi 3, 4 and 5 boards; a separate package or installer bundle is not a delivery format.
 
-1. Build the banks once: `scripts/make-soundfonts.sh -p full` and `-p lite` (the second reuses the samples downloaded by the first). This creates the required `build/piano-full.sf2` and `build/mech.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
-2. Build the reusable image with `scripts/build-sd-image.py --dietpi <DietPi_RPi234-ARMv8...img.xz>`.
-3. Flash `exxpiano-rpi234-v<VERSION>-dietpi-<DIETPI_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
-4. Insert the card into a compatible Raspberry Pi 2, 3 or 4 and power it on.
+1. Build the banks once: `scripts/make-soundfonts.sh -p full`, `-p lite` and `-p preview` (the later ones reuse the samples downloaded by the first). This creates the required `build/piano-full.sf2`, `build/mech.sf2` and `build/piano-preview.sf2` and the smaller `build/piano-lite.sf2` for boards with 512 MB.
+2. Build the signed packages with `scripts/build-apks.py`, then the reusable image with `scripts/build-sd-image.py`.
+3. Flash `exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip` directly to a clean SD card with Raspberry Pi Imager or balenaEtcher.
+4. Insert the card into a Raspberry Pi 3, 4 or 5 and power it on.
 
 See [the image-building guide](BUILD-IMAGE.md) for the complete procedure and current verification status.
 Version tags named `v<VERSION>` build this image and publish it together with its manifest, README, and checksums as assets of a GitHub Release.
+
+### Before a major release: the main functions on a real Raspberry Pi
+
+Before every major release (a new major or minor version, `X.Y.0`) write the image that is going to be released to a clean card and check on a Raspberry Pi 3 Model B with a USB MIDI keyboard. Automatic tests and containers do not replace this: they have no sound card, no keyboard and no radio. Write the results (what was tried, on which board, the numbers) into the CHANGELOG section of the release; what was not tried is said there too.
+
+1. **The piano:** the keys sound through the 3.5 mm jack with the full bank and the mechanics (hammer, damper, pedal); a bank switch in the web interface works; the MIDI player plays a demonstration piece.
+2. **The preview:** from power-on, with a key pressed again and again, the first note sounds within **15 s** (a stopwatch, from plugging in the power); the preview is heard, also through an input that takes the left channel minus the right (a TRS cable into a balanced mixer input); the piano moves to the full bank without a pause; during a bank switch the preview plays.
+3. **Wi-Fi:** with the cable pulled out and no saved network, the setup network `exxpiano-Setup-<ID>` comes up; a phone joins it, the page opens, the Pi joins a home network and is reached by `exxpiano-<id>.local`; forgetting that network takes the Pi off it, and the setup network stays on for 5 minutes.
 
 ## Build the sound banks (on a Mac/Linux)
 
@@ -72,11 +80,13 @@ instead of 14, tails of 9 s instead of 12 s, and the softest note is louder (−
 scripts/deploy-to-pi.sh 192.168.1.95        # logs in as root by SSH key (or root@host)
 ```
 
-It builds the package, sends it to the Pi and upgrades it there: it keeps `/etc/exxpiano.conf`, backs the old version up first, checks that
-the synthesizer and the bridge come back, and rolls back by itself if they do not (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`).
-The sound banks are not touched.
+It builds the signed packages, sends them to the Pi and upgrades it there with `apk`: it keeps `/etc/exxpiano.conf` (a newer default lands next to it as
+`exxpiano.conf.apk-new`), keeps the package of the version before, checks that the synthesizer and the bridge come back and keep running, and rolls back by itself if they do
+not, by installing that package again (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`). A package signed with a key the device does not trust is refused
+before anything changes; your development key needs `EXXPIANO_DEV_UNTRUSTED=1`. The sound banks are not touched. `deploy/check-on-pi.sh` reports the state of a device
+(`ssh root@<device> sh -s < deploy/check-on-pi.sh`).
 
-**Passwords during an upgrade.** The script logs in with your SSH key and asks no password and no host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs the key with `ssh-copy-id`: the SSH password is asked **that one time**. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). If the key cannot be installed, the script falls back to a plain password login (asked once) rather than stopping: nothing is ever asked on the device itself, which has no monitor. DietPi's password is `dietpi` unless `SD_PASSWORD` (`--password`) was set when the image was built. A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
+**Passwords during an upgrade.** The script logs in with your SSH key and asks no password and no host-key question. On a device that does not have your key yet (a new card, a reinstalled image) it installs the key with `ssh-copy-id`: the SSH password is asked **that one time**. You need a key on your computer (`ls ~/.ssh/*.pub`; if there is none: `ssh-keygen -t ed25519`). If the key cannot be installed, the script falls back to a plain password login (asked once) rather than stopping: nothing is ever asked on the device itself, which has no monitor. The password is the root password the image was built with (`SD_PASSWORD`); an image without one accepts keys only. A host key that has CHANGED still stops the script: that is a reason to check, not to ignore.
 
 ## Where things live
 
@@ -85,7 +95,7 @@ staged file over 5 MB):
 
 | Folder | What | In git |
 |---|---|---|
-| `pi/`, `tools/`, `scripts/`, `deploy/`, `dietpi/`, `packaging/`, `tests/`, `docs/` | the program, image builder, internal packaging, tests | yes |
+| `pi/`, `tools/`, `scripts/`, `deploy/`, `alpine/`, `packaging/`, `tests/`, `docs/` | the program, the pinned Alpine base, the image builder, the packages, tests | yes |
 | `build/` | built banks (`mech.sf2`, `piano-<preset>.sf2`), the downloaded Salamander in `build/salamander-44k16/`, older banks in `build/archive/` | no |
 | `dist/sd/` | the reusable complete SD image and its metadata | no |
 
@@ -106,9 +116,10 @@ interface). Change the sliders, switch the bank, rename the device, add or forge
 python3 -m unittest discover -s tests -v
 ```
 
-They check the mechanics logic (`FXCore`), the structure of the `.deb` packages, and that the SF2 builders accept the
+They check the mechanics logic (`FXCore`), the OpenRC services and the Alpine packages as files, the image builder, and that the SF2 builders accept the
 different sample packages (44.1 kHz/16 bit and 48 kHz/24 bit, WAV and FLAC, different folder layouts; this part needs
 `ffmpeg` and is skipped without it). No hardware is needed. The ALSA exchange is not covered by tests (checked on a real Pi),
-and the audio quality of a built bank was checked by hand through FluidSynth.
+and the audio quality of a built bank was checked by hand through FluidSynth. The packages, the services, an upgrade with a rollback and the image itself are checked in
+Alpine containers (Docker): `scripts/test-openrc-services.sh`, `scripts/test-apk-upgrade.sh`, `scripts/test-sd-image-pipeline.sh`; the code checks of CI run with `scripts/lint.sh`.
 
 `scripts/lint.sh` runs the code checks: `ruff` on the Python code (errors, and cleanliness: likely bugs, needless code, files left open, sorted imports, naming; the rules and the house-style exceptions are in `ruff.toml`), `shellcheck` on the shell scripts, and no file over 5 MB in git. CI runs the tests and these checks on every push and pull request (`.github/workflows/build.yml`).

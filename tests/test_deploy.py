@@ -1,4 +1,4 @@
-"""scripts/deploy-to-pi.sh: builds the package and streams it to the Pi over ssh (a fake ssh stands in for the Pi)."""
+"""scripts/deploy-to-pi.sh: sends the packages to the Pi over ssh (a fake ssh stands in for the Pi, ready-made files for the Docker build)."""
 
 import io
 import os
@@ -9,7 +9,10 @@ import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 with open(os.path.join(ROOT, 'VERSION')) as _f:
-    VERSION = _f.read().strip()
+    VERSION = _f.read().strip().replace('-', '_')
+SENT = sorted(
+    ['exxpiano-%s-r0.apk' % VERSION, 'py3-mido-1.3.3-r0.apk', 'py3-python-rtmidi-1.5.8-r0.apk', 'check-on-pi.sh', 'rollback-on-pi.sh', 'upgrade-on-pi.sh']
+)
 
 
 class DeployTests(unittest.TestCase):
@@ -35,10 +38,16 @@ class DeployTests(unittest.TestCase):
                 '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s"\n[ "${FAKE_COPY_ID_FAILS:-0}" = 1 ] && exit 1\ntouch "%s"\n' % (self.copy_id_log, self.key_marker)
             )
         os.chmod(os.path.join(self.bin, 'ssh-copy-id'), 0o755)
+        self.apk_dir = os.path.join(self.tmp.name, 'apk')  # what scripts/build-apks.py leaves in dist/apk/exxpiano/aarch64
+        os.makedirs(self.apk_dir)
+        for name in ('exxpiano-%s-r0.apk' % VERSION, 'exxpiano-0.9.0-r0.apk', 'py3-mido-1.3.3-r0.apk', 'py3-python-rtmidi-1.5.8-r0.apk'):
+            with open(os.path.join(self.apk_dir, name), 'w') as f:
+                f.write('package\n')
 
     def run_deploy(self, *args, **extra_env):
         env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ['PATH'])
         env['FAKE_KEY'] = '1'
+        env.update(EXXPIANO_SKIP_BUILD='1', EXXPIANO_APK_DIR=self.apk_dir)
         env.update(extra_env)
         return subprocess.run(['bash', os.path.join(ROOT, 'scripts', 'deploy-to-pi.sh')] + list(args), env=env, capture_output=True, text=True)
 
@@ -57,7 +66,7 @@ class DeployTests(unittest.TestCase):
         args = self.ssh_args()
         target = args.index('root@192.168.1.95')
         self.assertIn('upgrade-on-pi.sh', args[target + 1])
-        self.assertEqual(self.sent_files(), sorted(['exxpiano_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
+        self.assertEqual(self.sent_files(), SENT)
 
     def test_an_explicit_user_is_kept(self):
         r = self.run_deploy('denis@piano.local')
@@ -79,7 +88,7 @@ class DeployTests(unittest.TestCase):
             self.assertEqual(len(f.read().strip().split('\n')), 1)
         with open(self.copy_id_log) as f:
             self.assertIn('root@192.168.1.95', f.read())
-        self.assertEqual(self.sent_files(), sorted(['exxpiano_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
+        self.assertEqual(self.sent_files(), SENT)
         r = self.run_deploy('192.168.1.95', FAKE_KEY='0')  # the second upgrade: the key is installed, no second prompt
         self.assertNotIn('installing your SSH key', r.stdout)
         with open(self.copy_id_log) as f:
@@ -92,7 +101,7 @@ class DeployTests(unittest.TestCase):
         args = self.ssh_args()
         self.assertNotIn('BatchMode=yes', args)  # plain ssh: the password is asked once
         self.assertIn('upgrade-on-pi.sh', args[args.index('root@192.168.1.95') + 1])
-        self.assertEqual(self.sent_files(), sorted(['exxpiano_%s_all.deb' % VERSION, 'rollback-on-pi.sh', 'upgrade-on-pi.sh']))
+        self.assertEqual(self.sent_files(), SENT)
 
     def test_no_host_prints_usage(self):
         r = self.run_deploy()
@@ -104,7 +113,7 @@ class DeployTests(unittest.TestCase):
         with open(os.path.join(ROOT, 'deploy', 'upgrade-on-pi.sh')) as f:
             text = f.read()
         self.assertIn("grep -q '^BANK_DIR=' /etc/exxpiano.conf", text)
-        expr = text.split("sed -n '")[1].split("' /etc/exxpiano.conf")[0]
+        expr = text.split('cur="$(sed -n \'')[1].split("' /etc/exxpiano.conf")[0]
         for line, expected in (
             ('PIANO_SF2=/root/soundfonts/v5.sf2', '/root/soundfonts/v5.sf2'),
             ('PIANO_SF2="/root/sound fonts/v 5.sf2"', '/root/sound fonts/v 5.sf2'),
@@ -119,7 +128,46 @@ class DeployTests(unittest.TestCase):
             self.assertNotIn('1.0.0', text)
             self.assertNotIn('1.1.0', text)
         with open(os.path.join(ROOT, 'deploy', 'upgrade-on-pi.sh')) as f:
-            self.assertIn('exxpiano_*_all.deb', f.read())
+            self.assertIn('exxpiano-[0-9]*.apk', f.read())
+
+    def test_without_built_packages_it_stops_before_connecting(self):
+        os.unlink(os.path.join(self.apk_dir, 'exxpiano-%s-r0.apk' % VERSION))
+        r = self.run_deploy('192.168.1.95')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('build-apks.py', r.stderr)
+        self.assertFalse(os.path.exists(self.stdin_file))
+
+    def test_untrusted_packages_need_an_explicit_choice(self):
+        self.run_deploy('192.168.1.95')
+        self.assertIn('EXXPIANO_DEV_UNTRUSTED=0 bash', self.ssh_args()[self.ssh_args().index('root@192.168.1.95') + 1])
+        self.run_deploy('192.168.1.95', EXXPIANO_DEV_UNTRUSTED='1')
+        self.assertIn('EXXPIANO_DEV_UNTRUSTED=1 bash', self.ssh_args()[self.ssh_args().index('root@192.168.1.95') + 1])
+        for name in ('upgrade-on-pi.sh', 'rollback-on-pi.sh'):
+            with open(os.path.join(ROOT, 'deploy', name)) as f:
+                text = f.read()
+            self.assertIn('[ "${EXXPIANO_DEV_UNTRUSTED:-0}" = 1 ] && TRUST=(--allow-untrusted)', text)
+            self.assertEqual(text.count('--allow-untrusted'), 1, name)
+
+    def test_the_device_checks_read_the_log_of_this_boot_only(self):
+        with open(os.path.join(ROOT, 'deploy', 'check-on-pi.sh')) as f:
+            text = f.read()
+        for line in text.splitlines():  # every check of the log goes through boot_log: the file is kept across boots
+            if line.startswith('check ') and 'grep' in line:
+                self.assertNotIn('/var/log/messages', line, line)
+        definition = next(l for l in text.splitlines() if l.startswith('boot_log()'))
+        with tempfile.TemporaryDirectory() as tmp:
+            log = os.path.join(tmp, 'messages')
+            with open(log, 'w') as f:
+                f.write('syslogd started\nold boot: exited with return code 1\nsyslogd started\nthis boot: synth: FLUID Synth\n')
+            r = subprocess.run(['bash', '-c', definition.replace('/var/log/messages', log) + '; boot_log'], capture_output=True, text=True)
+        self.assertNotIn('old boot', r.stdout)
+        self.assertIn('this boot: synth: FLUID Synth', r.stdout)
+
+    def test_a_failed_rollback_starts_the_wifi_supervisor_again(self):
+        with open(os.path.join(ROOT, 'deploy', 'rollback-on-pi.sh')) as f:
+            text = f.read()
+        failure = text[text.index('apk add "${TRUST[@]}" "$previous" ||') : text.index('exit 1', text.index('apk add "${TRUST[@]}" "$previous" ||'))]
+        self.assertIn('rc-service exxpiano-wifi start', failure)  # its setup network may be the only way in
 
 
 if __name__ == '__main__':

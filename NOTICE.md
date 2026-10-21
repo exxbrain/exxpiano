@@ -20,3 +20,9 @@ The package and the images carry two recordings of piano performances, `assets/m
 from the **MAESTRO dataset v3.0.0** (Google LLC, https://magenta.tensorflow.org/datasets/maestro), licensed under **CC BY-NC-SA 4.0**:
 non-commercial use only, with attribution, shared under the same license. That license covers these files, not the MIT code. See
 `assets/midi/NOTICE.md`; delete the files if you use exxpiano commercially.
+
+## The system and the libraries in the image
+
+The SD card image is made of **Alpine Linux** packages (each under its own license, listed in `/usr/share/licenses` and by `apk info -L`) and of the
+exxpiano packages. Two Python libraries that Alpine does not carry are packaged unchanged from their releases: **mido** (MIT,
+https://github.com/mido/mido) and **python-rtmidi** with the bundled RtMidi (MIT, https://github.com/SpotlightKid/python-rtmidi).

@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   image:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
     steps:
@@ -24,6 +24,12 @@ jobs:
 
       - name: Check that the tag matches VERSION
         run: test "v$(tr -d '\n' < VERSION)" = "${GITHUB_REF_NAME}"
+
+      - name: Check that the package signing key is there
+        env:
+          EXXPIANO_APK_KEY: ${{ secrets.EXXPIANO_APK_KEY }}
+        run: |
+          test -n "$EXXPIANO_APK_KEY" || { echo "The secret EXXPIANO_APK_KEY is missing: a release must be signed with the project key"; exit 1; }
 
       - name: Install sound-bank tools
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
@@ -35,46 +41,20 @@ jobs:
         run: |
           scripts/make-soundfonts.sh -p full -o build            # about 700 MB: the piano of the image
           scripts/make-soundfonts.sh -p lite -o build          # the same downloaded samples; the image uses it on boards with 512 MB
+          scripts/make-soundfonts.sh -p preview -o build       # about 24 MB: plays while the piano bank loads
 
-      - name: Read the pinned DietPi image metadata
-        run: cat .github/dietpi-image.env >> "$GITHUB_ENV"
-
-      - name: Download and verify the pinned DietPi image from GitHub
+      - name: Build the signed packages
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p build/cache
-          gh release download "$DIETPI_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --pattern "$DIETPI_IMAGE" --dir build/cache
-          printf '%s  %s\n' "$DIETPI_SHA256" "build/cache/$DIETPI_IMAGE" | sha256sum -c -
+          EXXPIANO_APK_KEY: ${{ secrets.EXXPIANO_APK_KEY }}
+          EXXPIANO_APK_KEY_NAME: exxpiano
+        run: python3 scripts/build-apks.py --out dist/apk
 
-      - name: Download and verify the DietPi image for the Raspberry Pi 5
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # the pinned copy in this repository's pre-release (made by the dietpi-mirror workflow); until it exists, the official download
-          # checked against the checksum DietPi publishes next to it
-          if gh release download "$DIETPI_RPI5_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$DIETPI_RPI5_IMAGE" --dir build/cache; then
-            printf '%s  %s\n' "$DIETPI_RPI5_SHA256" "build/cache/$DIETPI_RPI5_IMAGE" | sha256sum -c -
-          else
-            echo "No pinned pre-release $DIETPI_RPI5_RELEASE_TAG yet: using the official download."
-            curl -fsSL -o "build/cache/$DIETPI_RPI5_IMAGE" "$DIETPI_RPI5_SOURCE_URL"
-            curl -fsSL -o "build/cache/$DIETPI_RPI5_IMAGE.sha256" "$DIETPI_RPI5_SOURCE_URL.sha256"
-            (cd build/cache && sha256sum -c "$DIETPI_RPI5_IMAGE.sha256")
-          fi
-
-      - name: Enable ARM64 programs in the image builder
-        run: docker run --privileged --rm tonistiigi/binfmt --install arm64
-
-      - name: Build and verify the release image for the Raspberry Pi 2/3/4
-        run: python3 scripts/build-sd-image.py --target rpi234 --dietpi "build/cache/$DIETPI_IMAGE" --country RU --timezone Europe/Moscow
-
-      - name: Build and verify the release image for the Raspberry Pi 5
-        run: python3 scripts/build-sd-image.py --target rpi5 --dietpi "build/cache/$DIETPI_RPI5_IMAGE" --country RU --timezone Europe/Moscow
+      - name: Build and verify the image for the Raspberry Pi 3/4/5
+        run: python3 scripts/build-sd-image.py --apk-repo dist/apk --country RU --timezone Europe/Moscow
 
       - name: Write release checksums
         working-directory: dist/sd
-        run: sha256sum ./*.zip manifest-*.json README-*.txt > SHA256SUMS
+        run: sha256sum ./*.zip manifest.json README.txt > SHA256SUMS
 
       - name: Copy the release files to the download mirror (Cloudflare R2)
         id: mirror
@@ -89,7 +69,7 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
         run: |
-          url=$(scripts/mirror-to-r2.sh "$GITHUB_REF_NAME" dist/sd/*.zip dist/sd/manifest-*.json dist/sd/README-*.txt dist/sd/SHA256SUMS)
+          url=$(scripts/mirror-to-r2.sh "$GITHUB_REF_NAME" dist/sd/*.zip dist/sd/manifest.json dist/sd/README.txt dist/sd/SHA256SUMS)
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Create the GitHub Release and upload the image
@@ -97,11 +77,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MIRROR_URL: ${{ steps.mirror.outputs.url }}
         run: |
-          assets=(dist/sd/*.zip dist/sd/manifest-*.json dist/sd/README-*.txt dist/sd/SHA256SUMS)
+          assets=(dist/sd/*.zip dist/sd/manifest.json dist/sd/README.txt dist/sd/SHA256SUMS)
           mirror=()
           if [ -n "$MIRROR_URL" ]; then mirror=(--mirror "$MIRROR_URL" dist/sd/*.zip); fi
           python3 scripts/release-notes.py "$(tr -d '\n' < VERSION)" "${mirror[@]}" > build/release-notes.md
-          title="exxpiano ${GITHUB_REF_NAME} — SD card images for Raspberry Pi 2/3/4/5"
+          title="exxpiano ${GITHUB_REF_NAME} — SD card image for Raspberry Pi 3/4/5"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" --title "$title" \
               --notes-file build/release-notes.md

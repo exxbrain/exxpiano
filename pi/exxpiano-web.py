@@ -43,6 +43,7 @@ import banklib
 import exxpianoconf
 import midilib
 import midiplayer
+import oslib
 import profiles
 import qrlib
 import sysmon
@@ -52,7 +53,8 @@ import wifilib
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 MAX_BODY = 4096
 HOSTNAME_RE = wifilib.HOSTNAME_RE
-ERROR_UNITS = ('exxpiano.service', 'exxpiano-fx.service', 'exxpiano-web.service', 'exxpiano-wifi.service')
+ERROR_UNITS = ('exxpiano', 'exxpiano-fx', 'exxpiano-web', 'exxpiano-wifi', 'exxpiano-usb')
+OTHER_MANAGERS = ('networkmanager', 'iwd', 'connman')  # OpenRC services of network managers that own Wi-Fi themselves
 ERROR_LIMIT = 40
 OOM_RE = re.compile(r'Out of memory: Killed process \d+ \(([^)]*)\).*?anon-rss:(\d+)kB')
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
@@ -81,8 +83,10 @@ def parse_amixer(text):
 class Actions:
     """Everything that touches the system; tests replace this."""
 
-    def __init__(self, asound=None):
+    def __init__(self, asound=None, log_files=None, proc='/proc'):
         self.asound = asound or os.environ.get('ASOUND_DIR', '/proc/asound')
+        self.log_files = log_files or oslib.LOG_FILES  # the system log of busybox syslogd (see oslib.py)
+        self.proc = proc
         self._monitor = sysmon.Monitor(asound=self.asound)
         self.wifi_run_dir = os.environ.get('EXXPIANO_WIFI_RUN', wifilib.RUN_DIR)
         self.wifi_iface = os.environ.get('WIFI_IFACE', 'wlan0')
@@ -139,11 +143,7 @@ class Actions:
         return banklib.mem_available_bytes()
 
     def synth_pid(self):
-        try:
-            r = subprocess.run(['systemctl', 'show', '-p', 'MainPID', '--value', 'exxpiano'], capture_output=True, text=True, timeout=3)
-            return int(r.stdout.strip() or 0)
-        except (OSError, subprocess.SubprocessError, ValueError):
-            return 0
+        return oslib.synth_pid(self.proc)
 
     def _seq_has_synth(self):
         try:
@@ -175,11 +175,11 @@ class Actions:
         return self._cached(('service', unit), 2, lambda: self._service_state(unit))
 
     def _service_state(self, unit):
-        try:
-            r = subprocess.run(['systemctl', 'is-active', unit], capture_output=True, text=True, timeout=3)
-            return r.stdout.strip() or 'unknown'
-        except (OSError, subprocess.SubprocessError):
-            return 'unknown'
+        return oslib.service_state(unit)
+
+    def log(self):
+        """The system log of this boot, parsed (see oslib.read_messages); None when it cannot be read."""
+        return self._cached('log', 5, lambda: oslib.read_messages(self.log_files))
 
     def monitor(self, since=0):
         return self._monitor.get(since)
@@ -194,24 +194,17 @@ class Actions:
             return None
 
     def errors(self):
-        """Warnings, errors and the notes of our own scripts the piano services logged since the boot: [{t (ms), unit, level, text}], newest last."""
+        """Warnings, errors and the notes of our own scripts the piano services logged since the boot: [{t (ms), unit, level, text}], newest
+        last. None when the system log cannot be read."""
         return self._cached('errors', 5, self._errors)
 
     def _errors(self):
-        cmd = ['journalctl', '-b', '-p', 'info', '-n', '400', '--no-pager', '-o', 'json']
-        for unit in ERROR_UNITS:
-            cmd += ['-u', unit]
-        try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        except (OSError, subprocess.SubprocessError):
-            return []
-        found = parse_journal_errors(r.stdout)
-        try:  # the kernel's own log: it says when it killed a program for lack of memory
-            k = subprocess.run(['journalctl', '-k', '-b', '-n', '300', '--no-pager', '-o', 'json'], capture_output=True, text=True, timeout=5)
-            found = sorted(found + parse_oom(k.stdout), key=lambda e: e['t'])[-ERROR_LIMIT:]
-        except (OSError, subprocess.SubprocessError):
-            pass
-        return found
+        entries = self.log()
+        if entries is None:
+            return None
+        found = oslib.service_messages(entries, ERROR_UNITS, limit=ERROR_LIMIT)
+        # the kernel's own lines: it says when it killed a program for lack of memory
+        return sorted(found + parse_oom(oslib.kernel_messages(entries)), key=lambda e: e['t'])[-ERROR_LIMIT:]
 
     # ---- Wi-Fi (the supervisor exxpiano-wifi does the changes; this only reads its status and sends requests)
     def wifi_status(self):
@@ -257,11 +250,12 @@ class Actions:
         return wifilib.installation_id()
 
     def network_manager_active(self):
-        return self._service_state('NetworkManager') == 'active'
+        """Another network manager owns Wi-Fi (the Wi-Fi supervisor then stays out of the way)."""
+        return any(self._service_state(name) in ('active', 'activating') for name in OTHER_MANAGERS)
 
     def restart_synth(self):
-        self._forget('service', 'output')  # the answers are about to change
-        subprocess.Popen(['systemctl', '--no-block', 'restart', 'exxpiano.service'])
+        self._forget('service', 'output', 'log')  # the answers are about to change
+        oslib.restart('exxpiano')
 
     def output_volume(self, card):
         """The hardware volume of a sound card: dict(control, db, lo, hi), or None when the card has no playback volume that has a dB scale."""
@@ -289,18 +283,42 @@ class Actions:
     def set_gain(self, value):
         """Live master gain: write a shell command into the pipe FluidSynth reads (root-only, no network port).
         True on success. (`set synth.gain` is the command that really changes it; plain `gain` does not.)"""
+        return self.synth_command('set synth.gain %s' % exxpianoconf._fmt(float(value)))
+
+    def synth_command(self, line):
+        """Write one line into the command pipe of the synthesizer. False when nobody reads it (the synthesizer is down)."""
         fifo = os.environ.get('CMD_FIFO', '/run/exxpiano.cmd')
         try:
             fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)  # fails with ENXIO when nobody reads (synth is down)
         except OSError:
             return False
         try:
-            os.write(fd, ('set synth.gain %s\n' % exxpianoconf._fmt(float(value))).encode('ascii'))
+            os.write(fd, (line + '\n').encode('utf-8'))
             return True
         except OSError:
             return False
         finally:
             os.close(fd)
+
+    def loading_state(self):
+        """What exxpiano-synth says about the banks (see banklib.loading_state); None when the plain fluidsynth plays."""
+        return banklib.loading_state()
+
+    def load_bank_live(self, path, bank, prog, timeout=150):
+        """Ask exxpiano-synth to load a bank while the preview plays, and wait until it plays it. False when it failed or took too long."""
+        if '\n' in path or not self.synth_command('exxpiano-load %d %d %s' % (bank, prog, path)):
+            return False
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            time.sleep(1)
+            st = self.loading_state()
+            if st is None:
+                return False  # the synthesizer is gone
+            if st['state'] == 'ready' and st.get('playing') == path:
+                return True
+            if st['state'] == 'failed' and not st.get('loading'):
+                return False
+        return False
 
     def cards(self):
         """Sound cards that can play audio: [{id, name, usb}]."""
@@ -327,32 +345,26 @@ class Actions:
         return self._cached('output', 10, self._audio_output)
 
     def _audio_output(self):
-        try:
-            r = subprocess.run(['journalctl', '-u', 'exxpiano', '-n', '300', '--no-pager', '-o', 'cat'], capture_output=True, text=True, timeout=5)
-        except (OSError, subprocess.SubprocessError):
+        entries = self.log()
+        if not entries:
             return None
         last = None
-        for m in OUTPUT_RE.finditer(r.stdout):
+        for m in OUTPUT_RE.finditer(oslib.tagged_text(entries, 'exxpiano')):
             last = m
         if not last:
             return None
         return dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)))
 
 
-def parse_oom(text):
-    """Kernel log lines (`journalctl -k -o json`) -> one error for every program the kernel killed for lack of memory."""
+def parse_oom(kernel):
+    """The kernel's lines ([{t, text}], see oslib.kernel_messages) -> one error for every program the kernel killed for lack of memory."""
     out = []
-    for line in text.splitlines():
-        try:
-            e = json.loads(line)
-            t = int(e['__REALTIME_TIMESTAMP']) // 1000
-        except (ValueError, KeyError, TypeError):
-            continue
-        m = OOM_RE.search(e['MESSAGE']) if isinstance(e.get('MESSAGE'), str) else None
+    for e in kernel:
+        m = OOM_RE.search(e['text'])
         if m:
             out.append(
                 dict(
-                    t=t,
+                    t=e['t'],
                     unit='kernel',
                     level='error',
                     text='out of memory: the kernel killed %s, which held %d MB. Use a smaller piano bank (the Bank page) or a board with more memory'
@@ -360,35 +372,6 @@ def parse_oom(text):
                 )
             )
     return out
-
-
-def parse_journal_errors(text):
-    """`journalctl -o json` lines -> [{t, unit, level, text}]; level is error, warning, or info for the deliberate notes of our own
-    scripts ("exxpiano: ..." logged at info level: which audio output was chosen, that a service started). Kept: warnings, errors and those notes. Lines that are not JSON are skipped; a message repeated again and again is listed once with the last time."""
-    out = []
-    for line in text.splitlines():
-        try:
-            e = json.loads(line)
-            t = int(e['__REALTIME_TIMESTAMP']) // 1000
-            prio = int(e.get('PRIORITY', 4))
-        except (ValueError, KeyError, TypeError):
-            continue
-        msg = e.get('MESSAGE')
-        if isinstance(msg, list):  # journald stores binary messages as byte lists
-            msg = bytes(b & 255 for b in msg).decode('utf-8', 'replace')
-        if not isinstance(msg, str) or not msg.strip():
-            continue
-        unit = str(e.get('_SYSTEMD_UNIT', '')).replace('.service', '')
-        msg = msg.strip()
-        if prio > 4 and not msg.startswith(('exxpiano:', 'exxpiano-wifi:')):
-            continue
-        item = dict(t=t, unit=unit, level='error' if prio <= 3 else 'warning' if prio <= 4 else 'info', text=msg[:300])
-        for i, old in enumerate(out):
-            if old['unit'] == item['unit'] and old['text'] == item['text']:
-                del out[i]
-                break
-        out.append(item)
-    return out[-ERROR_LIMIT:]
 
 
 class WifiBusy(Exception):
@@ -415,7 +398,9 @@ class Switcher:
         with self.lock:
             if self.busy():
                 raise Busy()
-            self.status = dict(state='switching', message='Loading the bank, this takes about a minute', bank=bank_id)
+            live = self.app.actions.loading_state() is not None
+            message = 'Loading the bank; the preview plays meanwhile' if live else 'Loading the bank, this takes about a minute'
+            self.status = dict(state='switching', message=message, bank=bank_id)
         self.thread = threading.Thread(target=self._run, args=(path, bank_id, preset), daemon=True)
         self.thread.start()
 
@@ -428,6 +413,16 @@ class Switcher:
 
     def _per_bank(self, settings):
         return {n: settings[n] for n in exxpianoconf.PER_BANK_NAMES}
+
+    def _load(self, path, settings, live):
+        """Play the bank at `path` with `settings` (already written to the file, the bridge reads them from there). True when it plays."""
+        actions = self.app.actions
+        if live:
+            actions.set_gain(settings['gain'])
+            return actions.load_bank_live(path, settings['piano_bank'], settings['piano_prog'])
+        old_pid = actions.synth_pid()
+        actions.restart_synth()
+        return actions.wait_synth_ready(old_pid)
 
     def _run(self, path, bank_id, preset):
         app, conf, actions = self.app, self.app.conf_path, self.app.actions
@@ -446,11 +441,10 @@ class Switcher:
         if not saved or (mine['piano_bank'], mine['piano_prog']) not in usable:
             mine['piano_bank'], mine['piano_prog'] = preset
         ready = False
+        live = actions.loading_state() is not None  # exxpiano-synth: the preview plays while the bank loads, no restart
         try:
             exxpianoconf.apply_updates(mine, conf, raw={'PIANO_SF2': path})
-            old_pid = actions.synth_pid()
-            actions.restart_synth()
-            ready = actions.wait_synth_ready(old_pid)
+            ready = self._load(path, mine, live)
         except Exception as exc:  # whatever went wrong, the old bank must come back
             print('bank switch failed: %s' % exc, file=sys.stderr)
         if ready:
@@ -466,9 +460,7 @@ class Switcher:
             return
         try:  # the old bank AND its settings come back
             exxpianoconf.apply_updates(old, conf, raw={'PIANO_SF2': old_path})
-            old_pid = actions.synth_pid()
-            actions.restart_synth()
-            back = actions.wait_synth_ready(old_pid)
+            back = self._load(old_path, old, live and actions.loading_state() is not None)
         except Exception as exc:
             print('rollback failed: %s' % exc, file=sys.stderr)
             back = False
@@ -678,9 +670,15 @@ class App:
             if not isinstance(ssid, str) or not any(n['ssid'] == ssid for n in state['saved']):
                 raise ValueError('that network is not saved')
             link = state.get('link')
-            if link and link.get('ssid') == ssid and len(state['saved']) == 1 and not state.get('cable'):
-                raise ValueError('this is the only way to reach the Pi: connect to another network or plug in a cable first')
-            return dict(accepted=True, id=self.actions.wifi_request(dict(action='forget', ssid=ssid)))
+            only_way = link and link.get('ssid') == ssid and len(state['saved']) == 1 and not state.get('cable')
+            if only_way and body.get('confirm') is not True:
+                raise ValueError(
+                    'this is the only way to reach the Pi: confirm to forget it; then the Pi is reached only through its setup network, for 5 minutes'
+                )
+            request = dict(action='forget', ssid=ssid)
+            if only_way:
+                request['confirm'] = True  # the owner agreed: the Pi then keeps only its setup network, for 5 minutes
+            return dict(accepted=True, id=self.actions.wifi_request(request))
         raise ValueError('unknown action')
 
     def qr(self, query, host=''):
@@ -737,15 +735,18 @@ class App:
         conf = exxpianoconf.parse_conf(self.conf_path)
         bank_dir = conf.get('BANK_DIR') or banklib.DEFAULT_DIR
         current, mech = conf.get('PIANO_SF2'), conf.get('MECH_SF2')
-        try:
-            mech_bytes = os.path.getsize(mech) if mech else 0
-        except OSError:
-            mech_bytes = 0
-        return bank_dir, current, mech, mech_bytes
+        preview = self._preview(conf)
+        return bank_dir, current, mech, banklib.resident_bytes(mech, preview)
+
+    def _preview(self, conf=None):
+        """The preview bank, when one is set and its file exists (exxpiano-run checks it further before it uses it)."""
+        conf = conf if conf is not None else exxpianoconf.parse_conf(self.conf_path)
+        path = conf.get('PREVIEW_SF2', banklib.DEFAULT_PREVIEW)  # a file kept from before the preview has no line
+        return path if path and os.path.isfile(path) else None
 
     def banks_state(self):
         bank_dir, current, mech, mech_bytes = self._bank_context()
-        banks = banklib.list_banks(bank_dir, exclude=[mech], mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
+        banks = banklib.list_banks(bank_dir, exclude=[p for p in (mech, self._preview()) if p], mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
         for b in banks:
             b['source'] = 'installed'
         banks += banklib.list_imports(self.import_dir, mem_total=self.actions.mem_total(), mech_bytes=mech_bytes)
@@ -769,7 +770,17 @@ class App:
             presets=banklib.presets_of(current) if current else [],
             preset=dict(bank=s['piano_bank'], program=s['piano_prog']),
             switch=self.switcher.status,
+            loading=self._loading(),
         )
+
+    def _loading(self):
+        """Which bank sounds while one loads: dict(preview=bool: a preview bank is set up, state=None|preview|ready|failed, loading=bank id|None,
+        error). state None: the plain fluidsynth plays (no preview, or it could not be used): a switch is silent until the bank is loaded."""
+        st = self.actions.loading_state()
+        out = dict(preview=self._preview() is not None, state=None, loading=None, error=None)
+        if st:
+            out.update(state=st['state'], loading=os.path.basename(st['loading']) if st.get('loading') else None, error=st.get('error'))
+        return out
 
     def _bank_path(self, bank_dir, bank_id):
         try:
@@ -1061,7 +1072,8 @@ def make_handler(app):
             if url.path == '/api/errors':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))
-                return self._send(200, dict(errors=app.actions.errors()))
+                found = app.actions.errors()
+                return self._send(200, dict(errors=found or [], available=found is not None))
             if url.path == '/api/monitor':
                 if not self._authorised():
                     return self._send(401, dict(error='token required'))

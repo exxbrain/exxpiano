@@ -1,0 +1,67 @@
+# Maintainer: Denis Zakharov <noreply@exxpiano.invalid>
+# The program, its OpenRC services, the device rules and the default configuration. Sound banks: exxpiano-soundfonts.
+# scripts/build-apks.py makes the source archive from this repository and sets pkgver from the VERSION file.
+pkgname=exxpiano
+pkgver=0.0.0
+pkgrel=0
+pkgdesc="Digital piano on FluidSynth with piano mechanics (Raspberry Pi)"
+url="https://github.com/exxbrain/exxpiano"
+arch="noarch"
+license="MIT"
+# hostapd and dnsmasq: the setup access point (exxpiano-wifi starts them itself; their own services stay off)
+depends="
+	alsa-utils
+	avahi
+	bash
+	cloud-utils-growpart
+	dnsmasq
+	e2fsprogs-extra
+	eudev
+	fluidsynth
+	hostapd
+	iproute2
+	iw
+	logger
+	py3-mido
+	py3-python-rtmidi
+	python3
+	util-linux-misc
+	wpa_supplicant
+	"
+install="$pkgname.post-install $pkgname.post-upgrade $pkgname.pre-deinstall"
+# /opt/exxpiano as on every earlier installation (the configurations of devices name these paths); not a package of Alpine itself
+options="!check !fhs"
+source="$pkgname-$pkgver.tar.gz $install"
+builddir="$srcdir/$pkgname-$pkgver"
+
+package() {
+	local opt="$pkgdir"/opt/exxpiano f
+
+	for f in exxpiano-fx.py sf2info.py exxpiano-demo-midi.py exxpiano-meter.py exxpiano-usb.py deviceid.py exxpiano-wifi.py \
+		exxpiano-web.py exxpiano-synth.py exxpiano-run exxpiano-env exxpiano-respawn exxpiano-firstboot exxpiano-console.sh; do
+		install -Dm755 pi/$f "$opt"/$f
+	done
+	for f in exxpianoconf.py banklib.py bankimport.py usblib.py midilib.py midiplayer.py profiles.py sysmon.py wifilib.py qrlib.py \
+		oslib.py; do
+		install -Dm644 pi/$f "$opt"/$f
+	done
+	install -Dm644 pi/web/index.html "$opt"/web/index.html
+	install -Dm644 VERSION "$opt"/VERSION
+	install -d "$opt"/soundfonts "$pkgdir"/var/lib/exxpiano
+
+	for f in exxpiano exxpiano-fx exxpiano-web exxpiano-wifi exxpiano-firstboot; do
+		install -Dm755 pi/init.d/$f "$pkgdir"/etc/init.d/$f
+	done
+	install -Dm644 pi/exxpiano.conf "$pkgdir"/etc/exxpiano.conf
+	install -Dm644 pi/60-exxpiano-tap.conf "$pkgdir"/etc/alsa/conf.d/60-exxpiano-tap.conf
+	install -Dm644 pi/90-exxpiano.rules "$pkgdir"/usr/lib/udev/rules.d/90-exxpiano.rules
+
+	for f in assets/midi/*.mid assets/midi/NOTICE.md; do
+		install -Dm644 "$f" "$pkgdir"/usr/share/exxpiano/midi/"${f##*/}"
+	done
+	install -Dm755 packaging/exxpiano-install-banks "$pkgdir"/usr/bin/exxpiano-install-banks
+	install -Dm644 README.md "$pkgdir"/usr/share/doc/exxpiano/README.md
+	install -Dm644 docs/TROUBLESHOOTING.md "$pkgdir"/usr/share/doc/exxpiano/TROUBLESHOOTING.md
+	install -Dm644 NOTICE.md "$pkgdir"/usr/share/licenses/exxpiano/NOTICE.md
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/exxpiano/LICENSE
+}

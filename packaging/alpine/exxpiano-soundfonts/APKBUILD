@@ -1,0 +1,22 @@
+# Maintainer: Denis Zakharov <noreply@exxpiano.invalid>
+# The Salamander piano banks for exxpiano: piano.sf2 (piano), mech.sf2 (mechanics) and piano-preview.sf2 (plays while the piano loads),
+# built from Salamander Grand Piano V3 by Alexander Holm (CC-BY). scripts/build-apks.py --banks copies the three built files next to this
+# file and sets pkgver.
+pkgname=exxpiano-soundfonts
+pkgver=0.0.0
+pkgrel=0
+pkgdesc="Salamander piano sound banks for exxpiano"
+url="https://github.com/exxbrain/exxpiano"
+arch="noarch"
+license="CC-BY-3.0"
+depends="exxpiano"
+install="$pkgname.post-install"
+# /opt/exxpiano as on every earlier installation (the configurations of devices name these paths); not a package of Alpine itself
+options="!check !strip !fhs"
+source="piano.sf2 mech.sf2 piano-preview.sf2 $install"
+
+package() {
+	install -Dm644 "$srcdir"/piano.sf2 "$pkgdir"/opt/exxpiano/soundfonts/piano.sf2
+	install -Dm644 "$srcdir"/mech.sf2 "$pkgdir"/opt/exxpiano/soundfonts/mech.sf2
+	install -Dm644 "$srcdir"/piano-preview.sf2 "$pkgdir"/opt/exxpiano/soundfonts/piano-preview.sf2
+}

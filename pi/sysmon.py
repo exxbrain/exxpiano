@@ -134,7 +134,7 @@ class Monitor:
             if not name.isdigit():
                 continue
             comm = (_read(os.path.join(self.proc, name, 'comm')) or '').strip()
-            if comm == 'fluidsynth':
+            if comm in ('fluidsynth', 'exxpiano-synth'):  # exxpiano-synth.py names itself so (see oslib.SYNTH_NAMES)
                 found['synth'].append(int(name))
                 continue
             if comm.startswith('python'):

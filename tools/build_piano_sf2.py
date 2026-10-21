@@ -155,6 +155,7 @@ def main():
     ap.add_argument('--layers', required=True)
     ap.add_argument('--tail', type=float, default=8)
     ap.add_argument('--mono', action='store_true')
+    ap.add_argument('--max-mb', type=float, default=None, help='fail when the bank is bigger than this many MB (10^6 bytes); nothing is written then')
     ap.add_argument('--rate', type=int, default=44100, help='output sample rate, Hz (sources are resampled)')
     ap.add_argument('--name', default='Salamander Grand Lite')
     ap.add_argument('--gamma', type=float, default=1.0)
@@ -374,6 +375,9 @@ def main():
         + chunk(b'shdr', sh),
     )
     body = b'sfbk' + lst(b'INFO', info_blk) + sdta + pdta
+    size = 8 + len(body)
+    if args.max_mb is not None and size > args.max_mb * 1e6:
+        sys.exit('the bank would take %.1f MB, more than the limit of %g MB: nothing written (fewer layers or a shorter --tail)' % (size / 1e6, args.max_mb))
     with open(args.out, 'wb') as f:
         f.write(b'RIFF' + struct.pack('<I', len(body)) + body)
     print('samples: %d  zones: %d  sf2: %.1f MB (sample data %.1f MB)' % (len(shdr), len(zones), os.path.getsize(args.out) / 1e6, len(pcm) / 1e6))

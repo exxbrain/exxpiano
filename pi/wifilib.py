@@ -239,7 +239,13 @@ def scan_networks(run, iface, tries=3, pause=1.5, sleep=time.sleep):
     for i in range(tries):
         rc, out = run(['iw', 'dev', iface, 'scan'], 20)
         if rc == 0:
-            return parse_scan(out), None
+            found = parse_scan(out)
+            if found or i + 1 == tries:
+                return found, None
+            # right after the radio left a network a scan may succeed with nothing in it (seen after "Forget" on a Pi 3 B): again
+            reason = 'no networks were found'
+            sleep(pause)
+            continue
         reason = scan_failure_reason(rc, out)
         if 'network is down' in (out or '').lower() or '(-100)' in (out or ''):  # the interface is down (after the setup network, say): bring it up
             run(['ip', 'link', 'set', iface, 'up'], 10)
@@ -259,7 +265,7 @@ def scan_networks(run, iface, tries=3, pause=1.5, sleep=time.sleep):
 
 
 # ---- access point
-GENERIC_HOSTNAMES = ('dietpi', 'raspberrypi', 'raspberry', 'piano', 'debian', 'localhost', 'pi')
+GENERIC_HOSTNAMES = ('dietpi', 'raspberrypi', 'raspberry', 'piano', 'debian', 'alpine', 'localhost', 'pi')
 
 
 def installation_id(path=INSTALLATION_ID_PATH, random_hex=None):
@@ -354,7 +360,7 @@ def dnsmasq_conf(interface, run_dir, address=AP_ADDRESS):
             'no-hosts',
             'no-poll',
             'user=nobody',
-            'group=nogroup',  # dnsmasq-base does not create the user `dnsmasq`
+            'group=nobody',  # Alpine has no group nogroup; nobody/nobody owns nothing
             'dhcp-range=%s.10,%s.60,255.255.255.0,2h' % (base, base),
             'dhcp-option=3,' + address,
             'dhcp-option=6,' + address,
@@ -369,14 +375,22 @@ def dnsmasq_conf(interface, run_dir, address=AP_ADDRESS):
 HOSTNAME_RE = re.compile(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$')
 
 
-def apply_hostname(name, run, hosts_path='/etc/hosts'):
-    """Set the network name: hostnamectl, the 127.0.1.1 line of the hosts file, a restart of avahi (it advertises name.local).
-    `run(cmd)` returns (returncode, text). Raises ValueError for a bad name and OSError when hostnamectl fails."""
+HOSTS_PATH = '/etc/hosts'
+HOSTNAME_PATH = '/etc/hostname'
+
+
+def apply_hostname(name, run, hosts_path=None, hostname_path=None):
+    """Set the network name: /etc/hostname (read at every boot), the running name (`hostname -F`), the 127.0.1.1 line of the hosts file, a
+    restart of avahi if it runs (it advertises name.local). `run(cmd)` returns (returncode, text). Raises ValueError for a bad name and OSError
+    when the name cannot be stored or set."""
     if not isinstance(name, str) or not HOSTNAME_RE.match(name):
         raise ValueError('use lowercase letters, digits and hyphens (1 to 63 characters, no hyphen at the ends)')
-    rc, out = run(['hostnamectl', 'set-hostname', name])
+    hosts_path, hostname_path = hosts_path or HOSTS_PATH, hostname_path or HOSTNAME_PATH
+    write_secret(hostname_path, name + '\n')
+    os.chmod(hostname_path, 0o644)
+    rc, out = run(['hostname', '-F', hostname_path])
     if rc != 0:
-        raise OSError((out or 'hostnamectl failed').strip()[-200:])
+        raise OSError((out or 'hostname failed').strip()[-200:])
     try:
         with open(hosts_path, encoding='utf-8') as f:
             lines = f.read().split('\n')
@@ -388,7 +402,7 @@ def apply_hostname(name, run, hosts_path='/etc/hosts'):
         os.chmod(hosts_path, 0o644)
     except OSError:
         pass  # the name is set; a missing hosts line only slows sudo down
-    run(['systemctl', 'try-restart', 'avahi-daemon.service'])
+    run(['rc-service', '--ifstarted', 'avahi-daemon', 'restart'])
     return name
 
 

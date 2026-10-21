@@ -7,7 +7,7 @@
 
 Everything works as on the device (a USB drive with two banks is "plugged in": import one on the Piano bank page): move the sliders, change the bank, rename the device, add or forget a Wi-Fi network (a name with "fail" in it does not connect;
 "Cafe" is open), start the setup network, scan the QR codes. Nothing is written outside a temporary folder and nothing is sent anywhere.
-It runs the real code of exxpiano-web.py and the real page; only what touches the machine (systemctl, ALSA, /proc, Wi-Fi) is simulated.
+It runs the real code of exxpiano-web.py and the real page; only what touches the machine (OpenRC, the system log, ALSA, /proc, Wi-Fi) is simulated.
 """
 
 import argparse

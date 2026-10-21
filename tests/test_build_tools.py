@@ -120,6 +120,27 @@ class BuilderPackageTests(unittest.TestCase):
             self.assertEqual(zone_count(split), 3 * zone_count(plain))
             self.assertLess(os.path.getsize(split) - os.path.getsize(plain), 4096)  # only the zone tables grew
 
+    def test_a_bank_over_the_size_limit_is_not_written(self):
+        _name, folder, sep, ext, codec, rate = self.CASES[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_set(tmp, folder, sep, ext, codec, rate)
+            out = os.path.join(tmp, 'p.sf2')
+            base = [sys.executable, '-I', os.path.join(ROOT, 'tools', 'build_piano_sf2.py'), tmp, out, '--layers', '2,5', '--tail', '8']
+            r = subprocess.run(base + ['--max-mb', '0.1'], capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn('more than the limit of 0.1 MB', r.stderr)
+            self.assertFalse(os.path.exists(out))
+            subprocess.run(base + ['--max-mb', '25'], check=True, capture_output=True)
+            self.assertTrue(os.path.exists(out))
+
+    def test_the_preview_profile_is_stereo_short_and_limited(self):
+        with open(os.path.join(ROOT, 'scripts', 'make-soundfonts.sh')) as f:
+            script = f.read()
+        line = next(x for x in script.splitlines() if x.strip().startswith('preview)'))
+        for part in ('--layers 4,10,15', '--rate 22050', '--tail 3', '--max-mb 25'):
+            self.assertIn(part, line)
+        self.assertNotIn('--mono', line)  # stereo: a mono bank vanishes on an input that takes the left minus the right
+
     def test_the_release_is_longer_in_the_bass(self):
         spec = importlib.util.spec_from_file_location('build_piano_sf2', os.path.join(ROOT, 'tools', 'build_piano_sf2.py'))
         b = importlib.util.module_from_spec(spec)

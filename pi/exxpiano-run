@@ -19,7 +19,7 @@ PERIODS="${PERIODS:-3}"
 USB_PERIOD_SIZE="${USB_PERIOD_SIZE:-64}"
 USB_PERIODS="${USB_PERIODS:-3}"
 USB_WAIT="${USB_WAIT:-8}"          # the most seconds to wait for a USB card to appear at boot
-USB_SETTLE="${USB_SETTLE:-12}"      # seconds after the boot that USB devices need to show up; later nothing is waited for without a reason
+USB_SETTLE="${USB_SETTLE:-6}"       # seconds after the boot that USB devices need to show up (a Pi 3 B: all of them by 3.5 s, the USB audio driver by 4.7 s); later nothing is waited for without a reason
 USB_SYSFS="${USB_SYSFS:-/sys/bus/usb/devices}"
 UPTIME_FILE="${PROC_UPTIME:-/proc/uptime}"
 POLYPHONY="${POLYPHONY:-256}"
@@ -45,26 +45,46 @@ has_playback() {
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SF2INFO="${SF2INFO:-$HERE/sf2info.py}"
 
-# A bank that is missing or damaged (a deleted file, a half-copied one) must not leave the module silent: fall back to the
-# last bank that is known to have worked (the web interface records it after every successful switch).
-if [ -f "$SF2INFO" ] && command -v python3 >/dev/null && ! python3 "$SF2INFO" --check "${PIANO_SF2:-}" 2>/dev/null; then
-  if [ -n "${PIANO_SF2_LAST_GOOD:-}" ] && python3 "$SF2INFO" --check "$PIANO_SF2_LAST_GOOD" 2>/dev/null; then
-    echo "exxpiano: ${PIANO_SF2:-<none>} is missing or damaged, using the last good bank $PIANO_SF2_LAST_GOOD" >&2
-    PIANO_SF2="$PIANO_SF2_LAST_GOOD"
+# The preview bank plays while the piano bank loads (exxpiano-synth): the first note sounds seconds after power-on. Nothing runs before it
+# that is not needed for that first note: exxpiano-synth itself checks the piano bank (damaged: the last good one) and the memory (too big:
+# the largest smaller bank) in the background while the preview plays. A preview that did not load leaves a mark: then, until the file
+# changes, the piano bank is loaded by fluidsynth as before and the module is silent until it is in memory.
+SYNTH_PROGRAM="${SYNTH_PROGRAM:-$HERE/exxpiano-synth.py}"
+PREVIEW_SF2="${PREVIEW_SF2-/opt/exxpiano/soundfonts/piano-preview.sf2}"   # not in the file (one kept from before the preview): the installed one; empty: none
+PREVIEW_FAILED="${EXXPIANO_PREVIEW_FAILED:-/run/exxpiano-preview.failed}"
+PREVIEW=""
+if [ -n "${PREVIEW_SF2:-}" ] && [ -s "$PREVIEW_SF2" ] && [ -f "$SYNTH_PROGRAM" ] && command -v python3 >/dev/null; then
+  if [ -e "$PREVIEW_FAILED" ] && ! [ "$PREVIEW_SF2" -nt "$PREVIEW_FAILED" ]; then
+    echo "exxpiano: the preview bank $PREVIEW_SF2 did not load before: loading the piano bank without it" >&2
+  else
+    PREVIEW="$PREVIEW_SF2"
   fi
+elif [ -n "${PREVIEW_SF2:-}" ]; then
+  echo "exxpiano: the preview bank $PREVIEW_SF2 is missing: loading the piano bank without it" >&2
 fi
 
-# A bank that does not fit into the memory of this board (a Pi 3 A+ has 512 MB) would be killed by the kernel again and again: play the largest
-# smaller bank of the library instead and remember the choice, so the page shows what really plays.
-BANKLIB="${BANKLIB:-$HERE/banklib.py}"
-if [ -f "$BANKLIB" ] && command -v python3 >/dev/null && [ -n "${PIANO_SF2:-}" ]; then
-  smaller="$(python3 "$BANKLIB" "$PIANO_SF2" "${MECH_SF2:-}" "${BANK_DIR:-/opt/exxpiano/soundfonts}" 2>/dev/null || true)"
-  if [ -n "$smaller" ] && [ "$smaller" != "$PIANO_SF2" ]; then
-    echo "exxpiano: $PIANO_SF2 does not fit into the memory of this board, using the smaller bank $smaller" >&2
-    PIANO_SF2="$smaller"
-    CONF_FILE="${EXXPIANO_CONF:-/etc/exxpiano.conf}"
-    if [ -w "$CONF_FILE" ]; then
-      awk -v new="$smaller" 'index($0, "PIANO_SF2=")==1 {print "PIANO_SF2=" new; next} {print}' "$CONF_FILE" > "$CONF_FILE.tmp" && cat "$CONF_FILE.tmp" > "$CONF_FILE"; rm -f "$CONF_FILE.tmp"
+if [ -z "$PREVIEW" ]; then
+  # A bank that is missing or damaged (a deleted file, a half-copied one) must not leave the module silent: fall back to the
+  # last bank that is known to have worked (the web interface records it after every successful switch).
+  if [ -f "$SF2INFO" ] && command -v python3 >/dev/null && ! python3 "$SF2INFO" --check "${PIANO_SF2:-}" 2>/dev/null; then
+    if [ -n "${PIANO_SF2_LAST_GOOD:-}" ] && python3 "$SF2INFO" --check "$PIANO_SF2_LAST_GOOD" 2>/dev/null; then
+      echo "exxpiano: ${PIANO_SF2:-<none>} is missing or damaged, using the last good bank $PIANO_SF2_LAST_GOOD" >&2
+      PIANO_SF2="$PIANO_SF2_LAST_GOOD"
+    fi
+  fi
+
+  # A bank that does not fit into the memory of this board (a Pi 3 A+ has 512 MB) would be killed by the kernel again and again: play the
+  # largest smaller bank of the library instead and remember the choice, so the page shows what really plays.
+  BANKLIB="${BANKLIB:-$HERE/banklib.py}"
+  if [ -f "$BANKLIB" ] && command -v python3 >/dev/null && [ -n "${PIANO_SF2:-}" ]; then
+    smaller="$(python3 "$BANKLIB" "$PIANO_SF2" "${MECH_SF2:-}" "${BANK_DIR:-/opt/exxpiano/soundfonts}" 2>/dev/null || true)"
+    if [ -n "$smaller" ] && [ "$smaller" != "$PIANO_SF2" ]; then
+      echo "exxpiano: $PIANO_SF2 does not fit into the memory of this board, using the smaller bank $smaller" >&2
+      PIANO_SF2="$smaller"
+      CONF_FILE="${EXXPIANO_CONF:-/etc/exxpiano.conf}"
+      if [ -w "$CONF_FILE" ]; then
+        awk -v new="$smaller" 'index($0, "PIANO_SF2=")==1 {print "PIANO_SF2=" new; next} {print}' "$CONF_FILE" > "$CONF_FILE.tmp" && cat "$CONF_FILE.tmp" > "$CONF_FILE"; rm -f "$CONF_FILE.tmp"
+      fi
     fi
   fi
 fi
@@ -139,11 +159,31 @@ if [ "$METER" = 1 ] && [ -f "$ALSA_TAP_CONF" ] && [ -f "$METER_PROGRAM" ]; then
   OUT_DEVICE="exxpiano_tap:'$DEVICE'"
 fi
 
-cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
-     -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r 44100
-     -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -g "$GAIN"
-     "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
+if [ -n "$PREVIEW" ]; then
+  # the preset of the piano is set for the bridge (FX_ARGS): the synthesizer moves the piano channel to the same one
+  read -r -a fx_words <<< "${FX_ARGS:-}"
+  PIANO_BANK=0; PIANO_PROG=0
+  for ((i = 0; i + 1 < ${#fx_words[@]}; i++)); do
+    case "${fx_words[i]}" in
+      --piano-bank) PIANO_BANK="${fx_words[i + 1]}" ;;
+      --piano-prog) PIANO_PROG="${fx_words[i + 1]}" ;;
+    esac
+  done
+  cmd=(python3 "$SYNTH_PROGRAM" -o audio.driver=alsa -o midi.driver=alsa_seq
+       -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -o synth.sample-rate=44100
+       -o "audio.period-size=$Z" -o "audio.periods=$C" -o "synth.reverb.active=$REVERB" -o synth.chorus.active=0
+       -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -o "synth.gain=$GAIN"
+       --preview "$PREVIEW" --mech "${MECH_SF2:?MECH_SF2 is not set}" --bank "$PIANO_BANK" --prog "$PIANO_PROG"
+       --fallback "${PIANO_SF2_LAST_GOOD:-}" "${PIANO_SF2:?PIANO_SF2 is not set}")
+else
+  cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
+       -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r 44100
+       -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -g "$GAIN"
+       "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
+fi
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "${cmd[*]}"; exit 0; fi
+# the state of a background load is written by exxpiano-synth; without it the web interface switches banks by a restart
+[ -n "$PREVIEW" ] || rm -f "${EXXPIANO_BANK_STATE:-/run/exxpiano-bank.json}"
 if [ "$OUT_DEVICE" != "$DEVICE" ]; then
   # While the pipe is not read, the audio waits: this shell holds the pipe open (read+write, it never blocks and never breaks) and runs the meter in a
   # loop, so a restart of the meter takes a fraction of the 0.37 s that the pipe can hold.
@@ -151,7 +191,12 @@ if [ "$OUT_DEVICE" != "$DEVICE" ]; then
   rm -f "$METER_DIR/pcm" "$METER_DIR/levels.json"
   mkfifo -m 600 "$METER_DIR/pcm"
   exec 6<>"$METER_DIR/pcm"
-  ( while :; do python3 "$METER_PROGRAM" "$METER_DIR/pcm" "$METER_DIR/levels.json" 6<&-; sleep 0.2; done ) &
+  # The loop and the meter end with the synthesizer ($$ is the process FluidSynth replaces below): OpenRC stops only that process, and a loop
+  # left behind would read the next pipe too. The loop does not keep the pipe open itself (6<&-), so the meter sees its end.
+  SYNTH_PID=$$
+  # `|| true`: this script runs with set -e, and without it a meter that crashed or was killed would end the loop: nobody would read the pipe
+  # again and the synthesizer would wait on it for ever (silence while the MIDI player says it plays; seen on a Pi 3 B).
+  ( exec 6<&-; while kill -0 "$SYNTH_PID" 2>/dev/null; do python3 "$METER_PROGRAM" "$METER_DIR/pcm" "$METER_DIR/levels.json" "$SYNTH_PID" || true; sleep 0.2; done ) &
 fi
 rm -f "$CMD_FIFO"
 mkfifo -m 600 "$CMD_FIFO"

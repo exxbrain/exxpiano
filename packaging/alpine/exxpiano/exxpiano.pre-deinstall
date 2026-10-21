@@ -1,0 +1,11 @@
+#!/bin/sh
+# Before the package is removed: its services stop and leave the boot. The installation ID, the imported banks, the profiles, the MIDI
+# library (/var/lib/exxpiano) and the saved Wi-Fi networks stay on the disk.
+
+for service in exxpiano-wifi exxpiano-web exxpiano-fx exxpiano exxpiano-firstboot; do
+	if [ -e /run/openrc/softlevel ]; then
+		rc-service --ifstarted "$service" stop >/dev/null 2>&1 || true
+	fi
+	rc-update del "$service" >/dev/null 2>&1 || true
+done
+exit 0

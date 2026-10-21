@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Starts a program with the settings of /etc/exxpiano.conf as its environment (what systemd's EnvironmentFile did).
+
+  exxpiano-env [--optional] [--nice N] /etc/exxpiano.conf -- PROGRAM [ARG ...]
+
+The file is read, never run: a value such as $(reboot) or `id` reaches the program as these very characters. The quotes of KEY="value"
+are removed by the same parser the web interface uses (exxpianoconf.parse_conf). Like systemd, an argument that is exactly $NAME becomes
+the words of that value (FX_ARGS carries several options), and ${NAME} becomes the value as one argument.
+--optional: a missing file is not an error (the Wi-Fi supervisor starts without it); otherwise the program is not started.
+--nice N: the program runs with this nice value (the MIDI bridge: -5). OpenRC's supervise-daemon has no option for it.
+"""
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import exxpianoconf  # noqa: E402
+
+WORDS_RE = re.compile(r'^\$([A-Za-z_][A-Za-z0-9_]*)$')
+ONE_RE = re.compile(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$')
+
+
+def expand(args, env):
+    out = []
+    for arg in args:
+        m = WORDS_RE.match(arg)
+        if m:
+            out.extend(env.get(m.group(1), '').split())
+            continue
+        m = ONE_RE.match(arg)
+        out.append(env.get(m.group(1), '') if m else arg)
+    return out
+
+
+def main(argv):
+    optional, nice = False, None
+    while argv and argv[0] in ('--optional', '--nice'):
+        if argv[0] == '--optional':
+            optional, argv = True, argv[1:]
+        else:
+            try:
+                nice, argv = int(argv[1]), argv[2:]
+            except (IndexError, ValueError):
+                sys.stderr.write('exxpiano-env: --nice needs a number\n')
+                return 2
+    if len(argv) < 3 or argv[1] != '--':
+        sys.stderr.write(__doc__)
+        return 2
+    path, command = argv[0], argv[2:]
+    if not os.path.isfile(path):
+        if not optional:
+            sys.stderr.write('exxpiano-env: no such settings file: %s\n' % path)
+            return 1
+        values = {}
+    else:
+        values = exxpianoconf.parse_conf(path)
+    env = dict(os.environ)
+    env.update(values)
+    command = expand(command, env)
+    if nice is not None:
+        try:
+            os.nice(nice - os.nice(0))
+        except OSError as exc:                           # not root: the program still starts, at the usual priority
+            sys.stderr.write('exxpiano-env: cannot set nice %d: %s\n' % (nice, exc))
+    try:
+        os.execvpe(command[0], command, env)
+    except OSError as exc:
+        sys.stderr.write('exxpiano-env: cannot start %s: %s\n' % (command[0], exc))
+        return 127
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

@@ -158,5 +158,77 @@ class RawPathTests(ConfBase):
         self.assertEqual(pc.validate({'piano_bank': 3, 'piano_prog': 4}), {'piano_bank': 3, 'piano_prog': 4})
 
 
+class EnvWrapperTests(unittest.TestCase):
+    """pi/exxpiano-env: the settings file becomes the environment of a service, read literally and never run."""
+
+    WRAPPER = os.path.join(HERE, '..', 'pi', 'exxpiano-env')
+    SHOW = (
+        'import json, os, sys; print(json.dumps(dict(argv=sys.argv[1:], nice=os.nice(0), env={k: os.environ.get(k) for k in ("A", "B", "C", "D", "FX_ARGS")})))'
+    )
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.conf = os.path.join(self.tmp.name, 'exxpiano.conf')
+        self.canary = os.path.join(self.tmp.name, 'ran')
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_wrapper(self, text, *args, optional=False, conf=None, nice=None):
+        import json
+        import subprocess
+        import sys
+
+        if text is not None:
+            with open(self.conf, 'w') as f:
+                f.write(text)
+        cmd = (
+            [sys.executable, self.WRAPPER]
+            + (['--optional'] if optional else [])
+            + (['--nice', str(nice)] if nice is not None else [])
+            + [conf or self.conf, '--', sys.executable, '-c', self.SHOW]
+            + list(args)
+        )
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        return r.returncode, (json.loads(r.stdout) if r.returncode == 0 else r.stderr)
+
+    def test_quotes_are_removed_and_backslashes_unescaped(self):
+        rc, out = self.run_wrapper('A="two words"\nB=plain\nC="a \\"quoted\\" word"\n# D=commented\n')
+        self.assertEqual(rc, 0)
+        self.assertEqual(out['env']['A'], 'two words')
+        self.assertEqual(out['env']['B'], 'plain')
+        self.assertEqual(out['env']['C'], 'a "quoted" word')
+        self.assertIsNone(out['env']['D'])
+
+    def test_shell_characters_reach_the_program_literally(self):
+        text = 'A="$(touch %s)"\nB="`touch %s`"\nC="x; touch %s"\n' % (self.canary, self.canary, self.canary)
+        rc, out = self.run_wrapper(text)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out['env']['A'], '$(touch %s)' % self.canary)
+        self.assertEqual(out['env']['B'], '`touch %s`' % self.canary)
+        self.assertEqual(out['env']['C'], 'x; touch %s' % self.canary)
+        self.assertFalse(os.path.exists(self.canary))
+
+    def test_dollar_name_becomes_words_and_braces_one_argument(self):
+        rc, out = self.run_wrapper('FX_ARGS="--hammer-boost 1.5 --random 1.6"\n', '$FX_ARGS', '${FX_ARGS}', 'last')
+        self.assertEqual(rc, 0)
+        self.assertEqual(out['argv'], ['--hammer-boost', '1.5', '--random', '1.6', '--hammer-boost 1.5 --random 1.6', 'last'])
+
+    def test_nice_is_applied_before_the_program_starts(self):
+        base = os.nice(0)
+        rc, out = self.run_wrapper('A=1\n', nice=base + 3)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out['nice'], base + 3)
+
+    def test_a_missing_file_stops_the_start_unless_optional(self):
+        missing = os.path.join(self.tmp.name, 'none.conf')
+        rc, err = self.run_wrapper(None, conf=missing)
+        self.assertEqual(rc, 1)
+        self.assertIn('no such settings file', err)
+        rc, out = self.run_wrapper(None, '$FX_ARGS', optional=True, conf=missing)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out['argv'], [])
+
+
 if __name__ == '__main__':
     unittest.main()
