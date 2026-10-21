@@ -1012,12 +1012,16 @@ class MonitorEndpointTests(ServerCase):
         self.assertEqual(found, [dict(t=5000, unit='kernel', level='error', text=found[0]['text'])])
         self.assertIn('killed fluidsynth, which held 361 MB', found[0]['text'])
 
-    def system_log(self, text):
+    def system_log(self, text, cards=('Headphones',)):
         folder = tempfile.mkdtemp()
         self.addCleanup(__import__('shutil').rmtree, folder)
         path = os.path.join(folder, 'messages')
         with open(path, 'w') as f:
             f.write(text)
+        with open(os.path.join(folder, 'cards'), 'w') as f:  # the sound cards that are there now, each with a playback device
+            for n, cid in enumerate(cards):
+                f.write(' %d [%-15s]: card %s\n' % (n, cid, cid))
+                os.makedirs(os.path.join(folder, 'card%d' % n, 'pcm0p'))
         return web.Actions(asound=folder, log_files=(path,))
 
     def test_the_system_log_becomes_the_service_messages(self):
@@ -1039,7 +1043,29 @@ class MonitorEndpointTests(ServerCase):
                 ('kernel', 'error', 'out of memory: the k'),
             ],
         )
-        self.assertEqual(actions.audio_output(), dict(device='plughw:CARD=Headphones', kind='onboard', period=64, periods=3))
+        self.assertEqual(actions.audio_output(), dict(device='plughw:CARD=Headphones', kind='onboard', period=64, periods=3, missing=False))
+
+    def test_a_usb_card_pulled_out_is_not_shown_as_the_output_any_more(self):
+        start = 'Oct 19 13:37:27 h syslog.info syslogd started: BusyBox v1.37.0\n'
+        usb = 'Oct 19 13:37:28 h daemon.info exxpiano: exxpiano: audio output plughw:CARD=U24 (usb), period 64 x 3\n'
+        # a Pi 5 without its card: the synthesizer restarted by the udev rule finds nothing
+        gone = 'Oct 19 13:40:02 h daemon.info exxpiano: exxpiano: no sound card found (a Raspberry Pi 5 has no 3.5 mm jack: connect a USB sound card)\n'
+        out = self.system_log(start + usb + gone, cards=()).audio_output()
+        self.assertEqual((out['device'], out['missing']), (None, True))
+        # the card was plugged in again: its new line counts
+        again = 'Oct 19 13:41:10 h daemon.info exxpiano: exxpiano: audio output plughw:CARD=U24 (usb), period 64 x 3\n'
+        out = self.system_log(start + usb + gone + again, cards=('U24',)).audio_output()
+        self.assertEqual((out['device'], out['missing']), ('plughw:CARD=U24', False))
+        # the synthesizer was not restarted (the udev rule did not fire), but the card is not there any more
+        out = self.system_log(start + usb, cards=('Headphones',)).audio_output()
+        self.assertEqual((out['device'], out['missing']), ('plughw:CARD=U24', True))
+
+    def test_the_page_shows_a_missing_output_as_such(self):
+        self.start()
+        page = self.call('/')[1].decode()
+        self.assertIn('if (st.output && st.output.missing) item(tr("output"), false,', page)
+        for key in ('o_none', 'o_gone'):
+            self.assertEqual(page.count(' %s: "' % key), 2, key)  # English and Russian
 
     def test_an_unreadable_log_is_said_so(self):
         actions = web.Actions(asound=tempfile.mkdtemp(), log_files=('/nonexistent/messages',))

@@ -2,6 +2,10 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## Unreleased
+
+- **A USB sound card pulled out is no longer shown as the output.** The page took the output from the last "audio output" line of the synthesizer; after the card was pulled out (a Pi 5, which has no 3.5 mm jack) the restarted synthesizer found no card and logged no new such line, so the page went on showing the card that was gone. The output now reads "no sound card" when the synthesizer said so afterwards, or "… is gone" when that card is not there any more. Reported on a Raspberry Pi 5 with a USB card; the fix is not tried on the device yet.
+
 ## 2.0.0
 
 The device on Alpine Linux, with the preview piano and the first note within 15 s of power-on. **Checked before the release on the image of 2.0.0-rc1, written to a clean card, on a Raspberry Pi 3 Model B (1 GB) with a KeyLab Essential 49 mk3** (docs/BUILDING.md, "Before a major release"): the piano with the full bank and the mechanics, a bank switch and the MIDI player; the first note within 15 s of power-on, the preview heard, the move to the full bank without a pause; the setup network, joining a home network, forgetting it and the 5 minutes of the setup network.

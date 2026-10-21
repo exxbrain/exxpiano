@@ -401,7 +401,7 @@ const T = {
     reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)", meter_clip: "CLIP", meter_ok: "The level at the output (dBFS) of each channel, the line is the held peak. No clipping since the synthesizer started.", meter_total: "Samples that hit full scale (clipping) since the synthesizer started: left {l}, right {r}. If this grows while you play, lower the volume.", out_vol: "Sound card volume", out_vol_hint: "The volume of the card itself (the headphone jack). Lower it if the headphones are too loud; the volume of the synthesizer on Home is separate and does not change this. Applied at once and kept after a reboot.", cpu_cores: "Synthesizer threads (processor cores)", cpu_hint: "1 = the whole synthesis in one thread. A Raspberry Pi has 4 cores: with 3 threads a dense piece can use a higher polyphony without the processor running out. Applied with the restart.",
     apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/exxpiano.conf).", token_btn: "Sign in",
     auto: "Automatic (USB card if present, otherwise the jack)", usb: "USB", onboard: "onboard",
-    synth: "Synthesizer", bridge: "Mechanics bridge", output: "Output", unknown: "unknown",
+    synth: "Synthesizer", bridge: "Mechanics bridge", output: "Output", unknown: "unknown", o_none: "no sound card (plug in a USB sound card; a Pi 5 has no 3.5 mm jack)", o_gone: "{device} is gone",
     saved: "Saved", restart_needed: "Press \"Apply and restart\" for the audio changes.", restarting: "Restarting the synthesizer, about 45 seconds…",
     gain_not_live: "Saved, but the live volume could not be changed (applies after a restart).", err: "Error", denied: "Wrong or missing token",
     s_velocity_curve: ["Touch curve", "1 = unchanged · below 1: soft touches sound louder · above 1: you must play harder", ""],
@@ -463,7 +463,7 @@ const T = {
     reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)", meter_clip: "СРЕЗ", meter_ok: "Уровень на выходе (дБ от максимума) по каждому каналу, линия — удержанный пик. С запуска синтезатора срезов не было.", meter_total: "Отсчётов, достигших максимума (срез), с запуска синтезатора: слева {l}, справа {r}. Если число растёт, пока вы играете, уменьшите громкость.", out_vol: "Громкость звуковой карты", out_vol_hint: "Громкость самой карты (разъёма наушников). Уменьшите, если наушники слишком громкие; громкость синтезатора на «Главной» отдельная и её не меняет. Применяется сразу и сохраняется после перезагрузки.", cpu_cores: "Потоки синтезатора (ядра процессора)", cpu_hint: "1 = весь синтез в одном потоке. У Raspberry Pi 4 ядра: с 3 потоками плотная пьеса может использовать большую полифонию, и процессор не кончится. Применяется с перезапуском.",
     apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/exxpiano.conf).", token_btn: "Войти",
     auto: "Автоматически (USB-карта, если есть, иначе штатный выход)", usb: "USB", onboard: "штатный",
-    synth: "Синтезатор", bridge: "Мост механики", output: "Выход", unknown: "неизвестно",
+    synth: "Синтезатор", bridge: "Мост механики", output: "Выход", unknown: "неизвестно", o_none: "нет звуковой карты (подключите USB-карту; у Pi 5 нет разъёма 3,5 мм)", o_gone: "{device} отключена",
     saved: "Сохранено", restart_needed: "Нажмите «Применить и перезапустить», чтобы изменения звука вступили в силу.", restarting: "Перезапуск синтезатора, около 45 секунд…",
     gain_not_live: "Сохранено, но громкость «на лету» изменить не удалось (применится после перезапуска).", err: "Ошибка", denied: "Неверный или отсутствующий ключ",
     s_velocity_curve: ["Кривая чувствительности", "1 = без изменений · меньше 1: тихие нажатия звучат громче · больше 1: надо играть сильнее", ""],
@@ -904,7 +904,8 @@ function renderStatus() {
     dot.className = "dot " + (ok === true ? "ok" : ok === false ? "bad" : ""); d.append(dot, document.createTextNode(label + ": " + text)); box.append(d);
   };
   item(tr("synth"), st.synth === "active", st.synth); item(tr("bridge"), st.bridge === "active", st.bridge);
-  if (st.output) item(tr("output"), true, st.output.device + " · " + st.output.period + "×" + st.output.periods);
+  if (st.output && st.output.missing) item(tr("output"), false, st.output.device ? fmt(tr("o_gone"), { device: st.output.device }) : tr("o_none"));
+  else if (st.output) item(tr("output"), true, st.output.device + " · " + st.output.period + "×" + st.output.periods);
   else item(tr("output"), null, tr("unknown"));
 }
 
@@ -915,7 +916,7 @@ function kindOf(device) {
   const cards = state.status.cards || [];
   if (device === "auto") {
     const o = state.status.output;
-    if (o && o.kind) return o.kind;
+    if (o && o.kind && !o.missing) return o.kind;
     return cards.some(c => c.usb) ? "usb" : "onboard";
   }
   const card = cards.find(c => "plughw:CARD=" + c.id === device);
