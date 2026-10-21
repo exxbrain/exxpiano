@@ -58,6 +58,7 @@ OTHER_MANAGERS = ('networkmanager', 'iwd', 'connman')  # OpenRC services of netw
 ERROR_LIMIT = 40
 OOM_RE = re.compile(r'Out of memory: Killed process \d+ \(([^)]*)\).*?anon-rss:(\d+)kB')
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
+NO_CARD_RE = re.compile(r'no sound card found')
 
 MIXER_CONTROLS = ('PCM', 'Speaker', 'Headphone', 'Master')  # the playback volume controls of a sound card, in the order they are tried
 MIXER_RE = re.compile(r'Playback\s+(-?\d+)\s+\[(\d+)%\]\s+\[(-?[\d.]+)dB\]')
@@ -345,15 +346,28 @@ class Actions:
         return self._cached('output', 10, self._audio_output)
 
     def _audio_output(self):
+        """The output the synthesizer chose last (from its log line), dict(device, kind, period, periods, missing). missing: the synthesizer
+        said afterwards that it found no sound card, or the card of that line is not there any more (a USB card pulled out: seen on a Pi 5,
+        whose page went on showing the card that was gone)."""
         entries = self.log()
         if not entries:
             return None
+        text = oslib.tagged_text(entries, 'exxpiano')
         last = None
-        for m in OUTPUT_RE.finditer(oslib.tagged_text(entries, 'exxpiano')):
+        for m in OUTPUT_RE.finditer(text):
             last = m
+        gone = None
+        for m in NO_CARD_RE.finditer(text):
+            gone = m
+        if gone and (not last or gone.start() > last.start()):
+            return dict(device=None, kind='none', period=None, periods=None, missing=True)
         if not last:
             return None
-        return dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)))
+        out = dict(device=last.group(1), kind=last.group(2), period=int(last.group(3)), periods=int(last.group(4)), missing=False)
+        card = CARD_RE.search(out['device'])
+        if card and card.group(1) not in [c['id'] for c in self.cards()]:
+            out['missing'] = True
+        return out
 
 
 def parse_oom(kernel):
@@ -558,7 +572,7 @@ class App:
     def output_card(self):
         """The id of the sound card that plays now: the one the synthesizer logged, else the first card that can play."""
         out = self.actions.audio_output()
-        m = CARD_RE.search(out['device']) if out else None
+        m = CARD_RE.search(out['device']) if out and out.get('device') and not out.get('missing') else None
         if m:
             return m.group(1)
         cards = self.actions.cards()
