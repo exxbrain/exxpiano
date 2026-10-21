@@ -90,8 +90,8 @@ before anything changes; your development key needs `EXXPIANO_DEV_UNTRUSTED=1`. 
 
 ## Where things live
 
-Everything is in this one folder. Git ignores the large generated parts, so they can never be committed (the pre-commit hook also refuses any
-staged file over 5 MB):
+Everything is in this one folder. Git ignores the large generated parts, so they can never be committed (the CI check `scripts/lint.sh` also
+fails on any committed file over 5 MB):
 
 | Folder | What | In git |
 |---|---|---|
