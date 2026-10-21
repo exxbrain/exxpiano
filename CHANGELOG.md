@@ -2,7 +2,10 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
-## Unreleased: Alpine Linux
+## 2.0.0-rc1
+
+The release candidate of 2.0.0: the device on Alpine Linux, with the preview piano and the first note within 15 s of power-on. It is published as a pre-release, so the latest release stays 1.10.22 until the checks before a major release (docs/BUILDING.md) are done on this image.
+
 
 - **The device runs on Alpine Linux 3.24 (64-bit) instead of DietPi.** One image for the Raspberry Pi 3, 4 and 5 (`exxpiano-rpi-v<VERSION>-alpine-<ALPINE_VERSION>-sd.zip`, `manifest.json`, `README.txt`), built from Alpine's packages of a pinned branch and mirror and checked with Alpine's keys; no ready-made image of a distribution is used any more. **The Raspberry Pi 2 is no longer supported.**
 - **OpenRC instead of systemd:** the services restart after a crash (`supervise-daemon`), the Wi-Fi supervisor only after a failure; `/etc/exxpiano.conf` is read as the environment of the services by `exxpiano-env` and never run by a shell. The devices are handled by eudev, the console `tty1` shows the status screen from `/etc/inittab`, the first start (growing the card, the name, the `lite` bank on 512 MB) is the OpenRC service `exxpiano-firstboot`.

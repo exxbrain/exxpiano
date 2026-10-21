@@ -82,13 +82,16 @@ jobs:
           if [ -n "$MIRROR_URL" ]; then mirror=(--mirror "$MIRROR_URL" dist/sd/*.zip); fi
           python3 scripts/release-notes.py "$(tr -d '\n' < VERSION)" "${mirror[@]}" > build/release-notes.md
           title="exxpiano ${GITHUB_REF_NAME} — SD card image for Raspberry Pi 3/4/5"
+          # a release candidate (v2.0.0-rc1) is a pre-release: "latest" stays on the last real release until it has been checked
+          pre=()
+          case "$GITHUB_REF_NAME" in *-rc*|*-beta*|*-alpha*) pre=(--prerelease) ;; esac
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --title "$title" \
+            gh release edit "$GITHUB_REF_NAME" --title "$title" "${pre[@]}" \
               --notes-file build/release-notes.md
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}"
           else
             gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
-              --verify-tag --title "$title" \
+              --verify-tag --title "$title" "${pre[@]}" \
               --notes-file build/release-notes.md
           fi
 
