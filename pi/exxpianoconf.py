@@ -152,6 +152,20 @@ def _raw_line(key, value):
     return '%s="%s"' % (key, value)
 
 
+def _sync_dir(directory):
+    """After a rename: the new name must reach the card too, or a power cut brings the old file back."""
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def apply_updates(updates, path=None, raw=None):
     """Validate and store `updates` in the conf file (atomic replace, comments and other lines are kept).
 
@@ -195,8 +209,11 @@ def apply_updates(updates, path=None, raw=None):
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             f.write(text)
+            f.flush()
+            os.fsync(f.fileno())  # durable: a setting changed a moment before a power cut is kept
         os.chmod(tmp, 0o644)
         os.replace(tmp, path)
+        _sync_dir(directory)
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)

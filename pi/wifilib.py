@@ -143,8 +143,24 @@ def remove_network(text, ssid):
     return _join(items)
 
 
+def _sync_dir(directory):
+    """After a rename: the new name must reach the card too, or a power cut brings the old file back."""
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def write_secret(path, text, backup=None):
-    """Atomic write with mode 0600; the previous file is kept as `backup` when given."""
+    """Atomic and durable write with mode 0600; the previous file is kept as `backup` when given. Durable: the data and the new name are
+    on the card before it returns (fsync), so a network saved a moment before the power is pulled is still there at the next start (seen
+    on a Pi 5: the saved network was gone after a power cut)."""
     directory = os.path.dirname(os.path.abspath(path))
     if backup and os.path.exists(path):
         with open(path, 'rb') as src:
@@ -152,14 +168,19 @@ def write_secret(path, text, backup=None):
         fd, tmp = tempfile.mkstemp(prefix='.bak.', dir=directory)
         with os.fdopen(fd, 'wb') as f:
             f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
         os.chmod(tmp, 0o600)
         os.replace(tmp, backup)
     fd, tmp = tempfile.mkstemp(prefix='.wifi.', dir=directory)
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
+        _sync_dir(directory)
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)

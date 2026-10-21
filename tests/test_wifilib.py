@@ -280,3 +280,37 @@ class AccessPointTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class DurableWriteTests(unittest.TestCase):
+    """A network saved, a setting or a bank profile changed a moment before the power is pulled must still be there at the next start
+    (seen on a Pi 5: the saved network was gone after a power cut). Every write of settings on the card ends with fsync of the file and of
+    its folder."""
+
+    def test_the_wifi_file_the_settings_file_and_the_profiles_are_written_to_the_card_before_returning(self):
+        import exxpianoconf
+        import profiles
+
+        real = os.fsync
+        calls = []
+
+        def counting(fd):
+            calls.append(fd)
+            return real(fd)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = os.path.join(tmp, 'exxpiano.conf')
+            with open(conf, 'w') as f:
+                f.write('PIANO_SF2=/p/full.sf2\n')
+            for write in (
+                lambda: wifilib.write_secret(os.path.join(tmp, 'wpa_supplicant.conf'), 'network={}\n', backup=os.path.join(tmp, 'wpa.bak')),
+                lambda: exxpianoconf.apply_updates(None, conf, raw={'PIANO_SF2': '/p/lite.sf2'}),
+                lambda: profiles.save(os.path.join(tmp, 'profiles.json'), 'full.sf2', dict(gain=0.6)),
+            ):
+                calls.clear()
+                os.fsync = counting
+                try:
+                    write()
+                finally:
+                    os.fsync = real
+                self.assertGreaterEqual(len(calls), 2, write)  # the file, then its folder

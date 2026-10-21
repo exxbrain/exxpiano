@@ -49,6 +49,20 @@ def get(path, key, names=None):
     return load(path, names).get(key)
 
 
+def _sync_dir(directory):
+    """After a rename: the new name must reach the card too, or a power cut brings the old file back."""
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def save(path, key, values, names=None):
     """Remember `values` (a dict of typed settings; only `names` are kept) under `key`: a bank's file name or an audio device."""
     names = exxpianoconf.PER_BANK_NAMES if names is None else names
@@ -61,8 +75,11 @@ def save(path, key, values, names=None):
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=1, sort_keys=True)
             f.write('\n')
+            f.flush()
+            os.fsync(f.fileno())  # durable: the settings of a bank survive a power cut right after they were changed
         os.chmod(tmp, 0o644)
         os.replace(tmp, path)
+        _sync_dir(directory)
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)
