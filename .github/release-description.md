@@ -1,4 +1,4 @@
-A ready-to-flash **exxpiano** digital piano image for a clean SD card: one image `exxpiano-rpi-…` for the Raspberry Pi 3, 4 and 5 (64-bit Alpine Linux). **The Alpine Linux image has been tried on a Raspberry Pi 3 Model B, not yet on a Pi 4 or Pi 5**; the Pi 5 has no 3.5 mm jack, so it needs a USB sound card or an audio interface.
+A ready-to-flash **exxpiano** digital piano image for a clean SD card: one image `exxpiano-rpi-…` for the Raspberry Pi 3, 4 and 5 (64-bit Alpine Linux). **The Alpine Linux image has been tried on a Raspberry Pi 3 Model B and a Raspberry Pi 5 (with a USB sound card), not yet on a Pi 4**; the Pi 5 has no 3.5 mm jack, so it needs a USB sound card or an audio interface.
 
 The image already includes:
 

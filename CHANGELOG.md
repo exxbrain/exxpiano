@@ -2,10 +2,11 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
-## Unreleased
+## 2.0.1
 
-- **A saved Wi-Fi network survives a power cut.** The network, `/etc/exxpiano.conf` and the profiles of the banks were written to a temporary file and renamed, without `fsync`: when the power was pulled soon after, ext4 could bring the old file back, and the Pi had forgotten the network (reported on a Raspberry Pi 5). Every write of settings on the card now waits until the file and its folder are on the card. Not tried on the device yet.
-- **A USB sound card pulled out is no longer shown as the output.** The page took the output from the last "audio output" line of the synthesizer; after the card was pulled out (a Pi 5, which has no 3.5 mm jack) the restarted synthesizer found no card and logged no new such line, so the page went on showing the card that was gone. The output now reads "no sound card" when the synthesizer said so afterwards, or "… is gone" when that card is not there any more. Reported on a Raspberry Pi 5 with a USB card; the fix is not tried on the device yet.
+- **The Alpine image tried on a Raspberry Pi 5 with a USB sound card** (by the owner, with the 2.0 image): it boots, the card is chosen by itself, the piano sounds natural, with beautiful hammers and string resonance; pulling the card out is shown on the page (below).
+- **A saved Wi-Fi network survives a power cut.** The network, `/etc/exxpiano.conf` and the profiles of the banks were written to a temporary file and renamed, without `fsync`: when the power was pulled soon after, ext4 could bring the old file back, and the Pi had forgotten the network (reported on a Raspberry Pi 5). Every write of settings on the card now waits until the file and its folder are on the card. Tried on the device: the network is still there after the power is pulled right after joining it.
+- **A USB sound card pulled out is no longer shown as the output.** The page took the output from the last "audio output" line of the synthesizer; after the card was pulled out (a Pi 5, which has no 3.5 mm jack) the restarted synthesizer found no card and logged no new such line, so the page went on showing the card that was gone. The output now reads "no sound card" when the synthesizer said so afterwards, or "… is gone" when that card is not there any more. Reported and tried on a Raspberry Pi 5 with a USB card.
 
 ## 2.0.0
 
