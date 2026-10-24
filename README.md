@@ -21,7 +21,7 @@ You need a Raspberry Pi 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microS
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline. While the full bank loads, a small **preview piano** plays: on a Pi 3 Model B the first note sounds within 15 s of power-on (14.5 s with a stopwatch), and the full bank follows about 32 s after the preview. The piano moves over to the full bank at a moment with no key and no pedal down, without a pause. The preview is plainer: 3 velocity layers, 22 kHz, and notes held longer than 3 s stop with the end of their sample.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. The setup network is on for **5 minutes** after the Pi is switched on while it has no saved network (as long as a phone is connected to it, it stays): if you missed it, unplug the power and plug it in again. With an Ethernet cable there is no setup network: open that address directly.
 
-<video src="https://github.com/user-attachments/assets/ae4281f9-c2b6-44b3-a345-25aa33e72d09" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/b1c3d651-384a-4afa-83c2-de545a81e27e" controls width="100%"></video>
 
 *The four steps on a real Pi 3 Model B, from the download to the settings on a phone (2:53, the waiting sped up; [1080p](https://exxbrain.github.io/exxpiano/exxpiano-setup.mp4)).*
 
