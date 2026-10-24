@@ -21,7 +21,7 @@ You need a Raspberry Pi 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microS
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline. While the full bank loads, a small **preview piano** plays: on a Pi 3 Model B the first note sounds within 15 s of power-on (14.5 s with a stopwatch), and the full bank follows about 32 s after the preview. The piano moves over to the full bank at a moment with no key and no pedal down, without a pause. The preview is plainer: 3 velocity layers, 22 kHz, and notes held longer than 3 s stop with the end of their sample.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. The setup network is on for **5 minutes** after the Pi is switched on while it has no saved network (as long as a phone is connected to it, it stays): if you missed it, unplug the power and plug it in again. With an Ethernet cable there is no setup network: open that address directly.
 
-<video src="https://github.com/user-attachments/assets/d3b3bbea-cd44-4b90-b8d4-8329660f76c3" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/ae4281f9-c2b6-44b3-a345-25aa33e72d09" controls width="100%"></video>
 
 *The four steps on a real Pi 3 Model B, from the download to the settings on a phone (2:53, the waiting sped up; [1080p](https://exxbrain.github.io/exxpiano/exxpiano-setup.mp4)).*
 
@@ -57,13 +57,13 @@ Not yet tried on real hardware: the import from a USB drive (see "Tested on" bel
 <tr><th width="50%">Full bank</th><th width="50%">Lite bank</th></tr>
 <tr><th colspan="2"><i>La Campanella</i> (from 1:48)</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/e30bf8d4-e23f-4d33-af55-7920b6415295" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/105e2e73-9ea3-41ec-88cc-cbb54723492f" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/ed38b688-a0c3-4dd1-9f60-c69b75b97188" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/2143e2ff-5f1c-4d69-8303-2ad6272d8107" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
 </tr>
 <tr><th colspan="2"><i>Un Sospiro</i></th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/594f2fda-4e93-4e42-a167-298a8cdcdb95" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/f3df778b-da01-4978-b9be-40175566e7a9" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/f805db33-6a42-4462-bb08-bb2ccb2b3917" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/b120f9a7-37c8-40de-9d94-99739a298258" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
 </tr>
 </table>
 

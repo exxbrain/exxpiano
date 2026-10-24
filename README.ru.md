@@ -21,7 +21,7 @@
 3. **Включите:** вставьте карту в Pi, подключите клавиатуру и наушники (разъём 3.5 мм или USB-звуковая карта) и подайте питание. Первый запуск идёт без сети. Пока грузится полный банк, играет небольшой **рояль-превью**: на Pi 3 Model B первая нота звучит не позже 15 с от включения (14,5 с по секундомеру), а полный банк — примерно через 32 с после превью. Пианино переходит на полный банк без паузы, в момент, когда отпущены все клавиши и педаль. Превью звучит проще: 3 слоя громкости, 22 кГц, а ноты дольше 3 с обрываются концом сэмпла.
 4. **Откройте с телефона:** подключитесь к Wi-Fi сети **`exxpiano-Setup-<ID>`** (пароль **`exxpianosetup`**); web-интерфейс откроется сам или по адресу `http://10.42.0.1:8080/`. В его разделе **Wi-Fi** подключите Pi к домашней сети, затем откройте `http://exxpiano-<id>.local:8080/`. Пока у Pi нет сохранённых сетей, сеть настройки работает **5 минут** после включения (пока к ней подключён телефон, она не выключается): если не успели, выньте и снова вставьте питание. С кабелем Ethernet сети настройки нет: сразу откройте этот адрес.
 
-<video src="https://github.com/user-attachments/assets/d3b3bbea-cd44-4b90-b8d4-8329660f76c3" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/ae4281f9-c2b6-44b3-a345-25aa33e72d09" controls width="100%"></video>
 
 *Те же четыре шага на настоящем Pi 3 Model B, от скачивания до настроек на телефоне (2:53, ожидание ускорено; [1080p](https://exxbrain.github.io/exxpiano/exxpiano-setup.mp4)).*
 
@@ -57,13 +57,13 @@
 <tr><th width="50%">Банк full</th><th width="50%">Банк lite</th></tr>
 <tr><th colspan="2">«Кампанелла» (с 1:48)</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/e30bf8d4-e23f-4d33-af55-7920b6415295" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/105e2e73-9ea3-41ec-88cc-cbb54723492f" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/ed38b688-a0c3-4dd1-9f60-c69b75b97188" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/2143e2ff-5f1c-4d69-8303-2ad6272d8107" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
 </tr>
 <tr><th colspan="2">«Вздох»</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/594f2fda-4e93-4e42-a167-298a8cdcdb95" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/f3df778b-da01-4978-b9be-40175566e7a9" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/f805db33-6a42-4462-bb08-bb2ccb2b3917" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/b120f9a7-37c8-40de-9d94-99739a298258" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
 </tr>
 </table>
 
