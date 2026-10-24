@@ -21,6 +21,10 @@ You need a Raspberry Pi 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microS
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline. While the full bank loads, a small **preview piano** plays: on a Pi 3 Model B the first note sounds within 15 s of power-on (14.5 s with a stopwatch), and the full bank follows about 32 s after the preview. The piano moves over to the full bank at a moment with no key and no pedal down, without a pause. The preview is plainer: 3 velocity layers, 22 kHz, and notes held longer than 3 s stop with the end of their sample.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. The setup network is on for **5 minutes** after the Pi is switched on while it has no saved network (as long as a phone is connected to it, it stays): if you missed it, unplug the power and plug it in again. With an Ethernet cable there is no setup network: open that address directly.
 
+<video src="https://github.com/user-attachments/assets/d3b3bbea-cd44-4b90-b8d4-8329660f76c3" controls width="100%"></video>
+
+*The four steps on a real Pi 3 Model B, from the download to the settings on a phone (2:53, the waiting sped up; [1080p](https://exxbrain.github.io/exxpiano/exxpiano-setup.mp4)).*
+
 Then play. More about the setup network: [Connecting to a new Wi-Fi](docs/USING.md#connecting-to-a-new-wi-fi); and read "Power supply" below. Building the banks and the image yourself is only for developers: [docs/BUILDING.md](docs/BUILDING.md).
 
 ## What it can do
@@ -53,17 +57,17 @@ Not yet tried on real hardware: the import from a USB drive (see "Tested on" bel
 <tr><th width="50%">Full bank</th><th width="50%">Lite bank</th></tr>
 <tr><th colspan="2"><i>La Campanella</i> (from 1:48)</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/5af2d54a-346b-4e7b-b226-b4280eef114d" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/c361e8f3-9bf6-4876-bbb2-815873b3b06a" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/e30bf8d4-e23f-4d33-af55-7920b6415295" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/105e2e73-9ea3-41ec-88cc-cbb54723492f" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
 </tr>
 <tr><th colspan="2"><i>Un Sospiro</i></th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/c7ed836e-0145-4758-84f3-e3ed269441a2" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/7e61fa66-f521-474f-8c34-18ba92c9312f" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/594f2fda-4e93-4e42-a167-298a8cdcdb95" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/f3df778b-da01-4978-b9be-40175566e7a9" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
 </tr>
 </table>
 
-*The two pieces that come with the device, played by its MIDI player on a Raspberry Pi 3 Model B running exxpiano 1.10.21 and recorded from the device: the `full` bank on the left, the `lite` bank on the right, both with the mechanics and 256 voices. Nothing was added to the sound but one gain per recording to bring them all to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
+*The two pieces that come with the device, played by its MIDI player on a Raspberry Pi 3 Model B running exxpiano 2.0.1 and recorded digitally from the stream the device sends to its sound card: the `full` bank on the left, the `lite` bank on the right, both with the mechanics and 256 voices. Nothing was added to the sound but one gain per recording to bring them all to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 
 ## What you need
 
@@ -127,4 +131,4 @@ The repository's scripts are MIT ([LICENSE](LICENSE)). The [Salamander Grand Pia
 ([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
 attribution.
 
-The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The demonstration videos (the pre-release [demo-videos](https://github.com/exxbrain/exxpiano/releases/tag/demo-videos)) are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. Alpine Linux and its packages in the image keep their own licenses.
+The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The demonstration videos ([exxbrain.github.io/exxpiano](https://exxbrain.github.io/exxpiano/)) are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. Alpine Linux and its packages in the image keep their own licenses.

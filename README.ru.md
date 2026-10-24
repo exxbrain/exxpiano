@@ -21,6 +21,10 @@
 3. **Включите:** вставьте карту в Pi, подключите клавиатуру и наушники (разъём 3.5 мм или USB-звуковая карта) и подайте питание. Первый запуск идёт без сети. Пока грузится полный банк, играет небольшой **рояль-превью**: на Pi 3 Model B первая нота звучит не позже 15 с от включения (14,5 с по секундомеру), а полный банк — примерно через 32 с после превью. Пианино переходит на полный банк без паузы, в момент, когда отпущены все клавиши и педаль. Превью звучит проще: 3 слоя громкости, 22 кГц, а ноты дольше 3 с обрываются концом сэмпла.
 4. **Откройте с телефона:** подключитесь к Wi-Fi сети **`exxpiano-Setup-<ID>`** (пароль **`exxpianosetup`**); web-интерфейс откроется сам или по адресу `http://10.42.0.1:8080/`. В его разделе **Wi-Fi** подключите Pi к домашней сети, затем откройте `http://exxpiano-<id>.local:8080/`. Пока у Pi нет сохранённых сетей, сеть настройки работает **5 минут** после включения (пока к ней подключён телефон, она не выключается): если не успели, выньте и снова вставьте питание. С кабелем Ethernet сети настройки нет: сразу откройте этот адрес.
 
+<video src="https://github.com/user-attachments/assets/d3b3bbea-cd44-4b90-b8d4-8329660f76c3" controls width="100%"></video>
+
+*Те же четыре шага на настоящем Pi 3 Model B, от скачивания до настроек на телефоне (2:53, ожидание ускорено; [1080p](https://exxbrain.github.io/exxpiano/exxpiano-setup.mp4)).*
+
 Можно играть. Подробнее о сети настройки: [«Подключение к новой Wi-Fi»](docs/USING.ru.md#подключение-к-новой-wi-fi); и прочитайте «Питание» ниже. Собирать банки и образ самому нужно только разработчикам: [docs/BUILDING.ru.md](docs/BUILDING.ru.md).
 
 ## Возможности
@@ -53,17 +57,17 @@
 <tr><th width="50%">Банк full</th><th width="50%">Банк lite</th></tr>
 <tr><th colspan="2">«Кампанелла» (с 1:48)</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/5af2d54a-346b-4e7b-b226-b4280eef114d" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/c361e8f3-9bf6-4876-bbb2-815873b3b06a" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-la-campanella-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/e30bf8d4-e23f-4d33-af55-7920b6415295" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/105e2e73-9ea3-41ec-88cc-cbb54723492f" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
 </tr>
 <tr><th colspan="2">«Вздох»</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/c7ed836e-0145-4758-84f3-e3ed269441a2" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/7e61fa66-f521-474f-8c34-18ba92c9312f" controls width="100%"></video><br><a href="https://github.com/exxbrain/exxpiano/releases/download/demo-videos/exxpiano-un-sospiro-lite.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/594f2fda-4e93-4e42-a167-298a8cdcdb95" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
+<td><video src="https://github.com/user-attachments/assets/f3df778b-da01-4978-b9be-40175566e7a9" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
 </tr>
 </table>
 
-*Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi 3 Model B с exxpiano 1.10.21, звук записан с устройства: слева банк `full`, справа `lite`, оба с механикой и 256 голосами. К звуку ничего не добавлено, кроме одного усиления на запись, чтобы все записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
+*Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi 3 Model B с exxpiano 2.0.1, звук записан цифровой копией потока, который устройство отдаёт на звуковую карту: слева банк `full`, справа `lite`, оба с механикой и 256 голосами. К звуку ничего не добавлено, кроме одного усиления на запись, чтобы все записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
 
 ## Что понадобится
 
@@ -128,4 +132,4 @@ Pi 4 нужен блок 5.1 В / 3 А, а Pi 5 — 5.1 В / 5 А (официа�
 ([NOTICE.md](NOTICE.md)). Собранные из них файлы `.sf2` — производные работы, их распространение требует
 указания авторства.
 
-Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Демонстрационные видео (pre-release [demo-videos](https://github.com/exxbrain/exxpiano/releases/tag/demo-videos)) сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. Alpine Linux и её пакеты в образе остаются под своими лицензиями.
+Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Демонстрационные видео ([exxbrain.github.io/exxpiano](https://exxbrain.github.io/exxpiano/)) сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. Alpine Linux и её пакеты в образе остаются под своими лицензиями.
