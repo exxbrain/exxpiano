@@ -49,6 +49,10 @@ Not yet tried on real hardware: the import from a USB drive (see "Tested on" bel
 |---|---|---|
 | ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
 
+| Effects (reverb) |
+|---|
+| ![Effects](docs/images/ui-fx.png) |
+
 *The pictures are made by `scripts/make-screenshots.py` from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the banks are made up; the pieces are the real recordings of `assets/midi/`), at the width of a phone.*
 
 ## What it sounds like

@@ -49,6 +49,10 @@
 |---|---|---|
 | ![Монитор](docs/images/ui-mon-ru.png) | ![Wi-Fi](docs/images/ui-wifi-ru.png) | ![MIDI-файлы](docs/images/ui-midi-ru.png) |
 
+| Эффекты (реверберация) |
+|---|
+| ![Эффекты](docs/images/ui-fx-ru.png) |
+
 *Картинки делает `scripts/make-screenshots.py` из демо `scripts/demo-web.py` (имитация устройства: цифры, сети и банки выдуманы; пьесы настоящие, записи из `assets/midi/`), в ширину телефона.*
 
 ## Как это звучит
