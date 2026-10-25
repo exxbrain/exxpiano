@@ -1336,6 +1336,31 @@ class CardsTests(unittest.TestCase):
             cards = web.Actions(asound=a).cards()
             self.assertEqual([(c['id'], c['usb']) for c in cards], [('Headphones', False), ('U24', True)])
 
+    def test_an_i2s_dac_is_marked_and_hdmi_of_the_firmware_driver_is_skipped(self):
+        with tempfile.TemporaryDirectory() as a:
+            rows = [
+                (0, 'Headphones', 'bcm2835_headphon - bcm2835 Headphones'),
+                (1, 'b1', 'bcm2835_hdmi - bcm2835 HDMI 1'),
+                (2, 'sndrpihifiberry', 'RPi-simple - snd_rpi_hifiberry_dac'),
+                (3, 'Dummy', 'Dummy - Dummy'),
+            ]
+            text = ''
+            for n, cid, desc in rows:
+                text += ' %d [%-15s]: %s\n' % (n, cid, desc)
+                os.makedirs(os.path.join(a, 'card%d' % n, 'pcm0p'))
+            with open(os.path.join(a, 'cards'), 'w') as f:
+                f.write(text)
+            cards = web.Actions(asound=a).cards()
+            self.assertEqual([(c['id'], c['num'], c['i2s']) for c in cards], [('Headphones', 0, False), ('sndrpihifiberry', 2, True), ('Dummy', 3, False)])
+
+    def test_the_page_keeps_one_buffer_pair_for_usb_and_i2s(self):
+        with open(os.path.join(HERE, '..', 'pi', 'web', 'index.html'), encoding='utf-8') as f:
+            page = f.read()
+        self.assertIn('kind === "usb" || kind === "i2s"', page)
+        self.assertIn('card.usb || card.i2s', page)
+        # an explicit device is read the way exxpiano-run reads it, so the buffer field writes the pair the synthesizer uses
+        self.assertIn('c.id === name || String(c.num) === name', page)
+
 
 if __name__ == '__main__':
     unittest.main()

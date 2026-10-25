@@ -135,6 +135,31 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
   plug or unplug a card is done by an eudev rule that was written from the documentation and **not tested on hardware**;
   if it does not work, run `rc-service exxpiano restart` after changing the interface.
 
+### I2S DAC on the GPIO header
+
+A small DAC board on the GPIO header plays with the same small buffer as a USB card and costs a few euros. Supported (by the kernel
+overlays of the Raspberry Pi firmware):
+
+| Board | Line for `/boot/usercfg.txt` |
+|---|---|
+| PCM5102A board (the common purple "GY-PCM5102" and the like), HiFiBerry DAC / DAC+ Light | `dtoverlay=hifiberry-dac` |
+| HiFiBerry DAC+ / DAC+ Pro and its clones (InnoMaker HiFi DAC and others with a PCM5122) | `dtoverlay=hifiberry-dacplus` |
+| Raspberry Pi DAC+ (formerly IQaudio DAC+) | `dtoverlay=rpi-dacplus` (older firmware: `dtoverlay=iqaudio-dacplus`) |
+
+`/boot/usercfg.txt` is on the boot partition of the card (FAT, readable on any computer); add the line at the end, `config.txt`
+itself belongs to the boot loader package and is rewritten by its upgrades. `dtparam=audio=on` may stay: the jack is still there,
+the DAC is simply preferred. Then `reboot`; `aplay -l` should list the DAC (for example `sndrpihifiberry`).
+
+Wiring of a PCM5102A board (pins of the 40-pin header): VIN to 5 V (pin 2), GND to pin 6, BCK to GPIO18 (pin 12), LCK to GPIO19
+(pin 35), DIN to GPIO21 (pin 40), SCK to GND (the board makes its own clock). The solder jumpers on its back: H1L, H2L, H3H, H4L
+(normal filter, no de-emphasis, not muted, I2S format).
+
+The choice is automatic: with `ALSA_DEVICE=auto` a USB card wins, then an I2S DAC, then the jack. The DAC gets
+`USB_PERIOD_SIZE` x `USB_PERIODS` (64 x 2 by default; the `USB_` settings are the buffer of any external card, USB or I2S); the
+service log says `audio output plughw:CARD=sndrpihifiberry (i2s), period 64 x 2`. HDMI and virtual cards (snd-dummy, snd-aloop)
+are never taken for a DAC. A PCM5102A board has no volume control of its own: the master volume of the synthesizer is the one.
+**Not yet tried on hardware**: the choice is covered by tests with the card names these overlays give.
+
 ## Configuration
 
 Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano restart; rc-service exxpiano-fx restart`.
@@ -145,8 +170,8 @@ Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano resta
 | `POLYPHONY` | number of voices (default 256, the most); stereo uses two voices per note, and the mechanics add more |
 | `METER` | 1 = the output goes through the level meter: the **Home** section shows the peak of the left and the right channel and counts the samples at full scale (clipping). It costs about 3% of one core; 0 plays to the card directly |
 | `CPU_CORES` | synthesis threads of FluidSynth (1-4, default 3; one core always stays free): the voices of a dense piece are shared between the cores of the board, so a higher `POLYPHONY` (192 or 256) becomes possible (also in the **Audio output** section) |
-| `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
-| `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
+| `ALSA_DEVICE` | `auto` (a USB card, then an I2S DAC, otherwise onboard) or an explicit device such as `plughw:U24` |
+| `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output (600 x 2 by default) / for an external card, USB or I2S DAC, chosen automatically or by name (64 x 2), and how long to wait for a USB card at boot |
 | `SAMPLE_RATE`, `CPU_GOVERNOR` | sample rate of the synthesizer (44100 by default, 48000 for a card that plays only 48 kHz) / CPU frequency governor while it plays (`performance` by default, so a small buffer does not click while a core speeds up; empty leaves the kernel's choice) |
 | `REVERB` | 1 enables FluidSynth's reverb (higher CPU load) |
 | `FX_ARGS` | mechanics options, see below |
