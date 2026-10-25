@@ -96,7 +96,7 @@ class MeterTests(unittest.TestCase):
                     time.sleep(0.05)
                 with open(out) as f:
                     s = json.load(f)
-                self.assertEqual(s['rate'], 44100)
+                self.assertEqual(s['rate'], meter.RATE)
                 self.assertGreater(s['right']['clipped'], 0)
                 self.assertEqual(s['left']['clipped'], 0)
                 self.assertGreater(s['right']['hold'], s['left']['hold'])

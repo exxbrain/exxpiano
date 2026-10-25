@@ -19,6 +19,32 @@ sys.path.insert(0, os.path.join(ROOT, 'pi'))
 import banklib  # noqa: E402
 import oslib  # noqa: E402
 
+# exxpiano settings the tests expect at their defaults unless a test sets them: none may come from the environment the suite runs in
+SETTINGS = (
+    'ALSA_DEVICE',
+    'CPU_CORES',
+    'CPU_COUNT',
+    'CPU_GOVERNOR',
+    'CPUFREQ_DIR',
+    'EXXPIANO_CONF',
+    'FX_ARGS',
+    'GAIN',
+    'METER',
+    'PERIOD_SIZE',
+    'PERIODS',
+    'POLYPHONY',
+    'REVERB',
+    'SAMPLE_RATE',
+    'USB_PERIOD_SIZE',
+    'USB_PERIODS',
+    'USB_SETTLE',
+)
+
+
+def clean_environ():
+    return {k: v for k, v in os.environ.items() if k not in SETTINGS}
+
+
 spec = importlib.util.spec_from_file_location('exxpiano_synth', os.path.join(ROOT, 'pi', 'exxpiano-synth.py'))
 synth = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(synth)
@@ -387,7 +413,7 @@ class LaunchTests(unittest.TestCase):
             with open(good, 'wb') as f:
                 f.write(b'x')
             env = dict(
-                os.environ,
+                clean_environ(),
                 ASOUND_DIR=asound,
                 DRY_RUN='1',
                 USB_WAIT='0',
