@@ -21,7 +21,7 @@ The pictures of every section are in the README, under [What it looks like](../R
 - **Monitor section**: live, once a second. **Service messages**: warnings and errors the piano services logged since the boot (for example "no sound card found"), the notes of the piano's own scripts (grey: which audio output was chosen, that a service started; not the whole log), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web interface, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
-  chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
+  chose (the onboard jack rounds 64 up to 444 at 44.1 kHz, 480 at 48 kHz) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
 - **Wi-Fi section**: the connection (network, address, signal), the saved networks (with *Forget*), and **Connect to a network**: pick one from the scan (or type a
   hidden network's name), type the password, press *Connect*. The Pi tries the network for up to a minute and keeps the previous settings if it does not work.
   See *Connecting to a new Wi-Fi* below.
@@ -124,10 +124,10 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
 ## Audio output and latency
 
 - **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/usercfg.txt`), device
-  `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
-  30 ms with `PERIODS=3`. The driver never takes a period under 10 ms and learns from the GPU only every ~10 ms how much it has played, so `444 x 2` (20 ms) clicks all the time, even with the CPU idle (100-160 xruns a minute on a Pi 3 B). The default is the smallest buffer that played clean there: `PERIOD_SIZE=600` x `PERIODS=2` (27 ms; 5 minutes of a dense piece without a single xrun); with 2 periods `exxpiano-run` raises a smaller period to 600 by itself. The GPU adds its own delay on top of the buffer. The output is somewhat noisy.
+  `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself (480 at 48 kHz), so the latency is about
+  30 ms with `PERIODS=3`. The driver never takes a period under 10 ms and learns from the GPU only every ~10 ms how much it has played, so `444 x 2` (20 ms) clicks all the time, even with the CPU idle (100-160 xruns a minute on a Pi 3 B). The default is the smallest buffer that played clean there: `PERIOD_SIZE=600` x `PERIODS=2` (27 ms at 44.1 kHz; 5 minutes of a dense piece without a single xrun); with 2 periods `exxpiano-run` raises a smaller period to 600 by itself (654 at `SAMPLE_RATE=48000`, the same 27 ms). The GPU adds its own delay on top of the buffer. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
-  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=2` (64 frames = 1.45 ms per period, ~2.9 ms of buffering; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
+  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=2` (at 44.1 kHz 64 frames = 1.45 ms per period, ~2.9 ms of buffering; at 48 kHz 1.33 ms and ~2.7 ms; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
   matters: many interfaces accept only 24/32-bit audio or 4 channels, and opening them directly (`hw:`) fails with
   `Failed to find an audio format supported by alsa`.
   Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 B with `64 x 2`: three 5-minute runs of
@@ -137,7 +137,7 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
 
 ### Which USB card to get
 
-If you want low latency, use an external card. The same goes for a Pi 4 or Pi 5: the Pi 4's 3.5 mm jack runs on the same bcm2835 driver as the Pi 3 (about 27 ms), and the Pi 5 has no jack at all. Any USB card that works without drivers (USB Audio Class) will do: exxpiano finds it by itself and switches to the `64 x 2` buffer (about 2.9 ms).
+If you want low latency, use an external card. The same goes for a Pi 4 or Pi 5: the Pi 4's 3.5 mm jack runs on the same bcm2835 driver as the Pi 3 (about 27 ms), and the Pi 5 has no jack at all. Any USB card that works without drivers (USB Audio Class) will do: exxpiano finds it by itself and switches to the `64 x 2` buffer (about 2.9 ms at 44.1 kHz, 2.7 ms at 48 kHz).
 
 | What | Rough price | Things to know |
 |---|---|---|
@@ -147,7 +147,7 @@ If you want low latency, use an external card. The same goes for a Pi 4 or Pi 5:
 | Behringer UCA202 / UCA222 | 30-40 € | RCA line out for speakers or a mixer |
 | Audio interface (Zoom U-24 and the like) | more | tested: `64 x 2` without a single xrun on a Pi 3 B |
 
-Only the Zoom U-24 has been tested on hardware; exxpiano has not been measured with dongles. If a card clicks, set `USB_PERIODS=3` (about 4.4 ms). Another option without USB: an I2S DAC on the GPIO header (below).
+Only the Zoom U-24 has been tested on hardware; exxpiano has not been measured with dongles. If a card clicks, set `USB_PERIODS=3` (about 4.4 ms at 44.1 kHz, 4.0 ms at 48 kHz). Another option without USB: an I2S DAC on the GPIO header (below).
 
 ### I2S DAC on the GPIO header
 
