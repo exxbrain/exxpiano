@@ -12,32 +12,8 @@ import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 RUN = os.path.join(ROOT, 'pi', 'exxpiano-run')
-
-# exxpiano settings the tests expect at their defaults unless a test sets them: none may come from the environment the suite runs in
-SETTINGS = (
-    'ALSA_DEVICE',
-    'CPU_CORES',
-    'CPU_COUNT',
-    'CPU_GOVERNOR',
-    'CPUFREQ_DIR',
-    'EXXPIANO_CONF',
-    'FX_ARGS',
-    'GAIN',
-    'METER',
-    'PERIOD_SIZE',
-    'PERIODS',
-    'POLYPHONY',
-    'REVERB',
-    'SAMPLE_RATE',
-    'USB_PERIOD_SIZE',
-    'USB_PERIODS',
-    'USB_SETTLE',
-)
-
-
-def clean_environ():
-    return {k: v for k, v in os.environ.items() if k not in SETTINGS}
-
+sys.path.insert(0, os.path.join(ROOT, 'tests'))
+from runfixture import clean_environ  # noqa: E402
 
 HEADPHONES = (0, 'Headphones', 'bcm2835_headphon - bcm2835 Headphones', False)
 HDMI = (1, 'vc4hdmi', 'vc4-hdmi - vc4-hdmi', False)
@@ -77,7 +53,9 @@ class AudioSelectTests(unittest.TestCase):
                         f.write('1686:0090\n')
             with open(os.path.join(asound, 'cards'), 'w') as f:
                 f.write('\n'.join(lines) + '\n')
-            e = dict(clean_environ(), ASOUND_DIR=asound, DRY_RUN='1', USB_WAIT='0', PIANO_SF2='/p.sf2', MECH_SF2='/m.sf2', FLUIDSYNTH='/usr/bin/fluidsynth')
+            e = dict(
+                clean_environ(asound), ASOUND_DIR=asound, DRY_RUN='1', USB_WAIT='0', PIANO_SF2='/p.sf2', MECH_SF2='/m.sf2', FLUIDSYNTH='/usr/bin/fluidsynth'
+            )
             e.update({k: str(v) for k, v in env.items()})
             return subprocess.run(['bash', RUN], env=e, capture_output=True, text=True)
 
@@ -437,7 +415,7 @@ class LastGoodBankTests(unittest.TestCase):
 
     def run_script(self, piano, last_good=''):
         env = dict(
-            clean_environ(),
+            clean_environ(self.tmp.name),
             ASOUND_DIR=self.asound,
             DRY_RUN='1',
             USB_WAIT='0',
@@ -486,7 +464,7 @@ class PipePlumbingTests(unittest.TestCase):
             with open(os.path.join(asound, 'cards'), 'w') as f:
                 f.write(' 0 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n')
             fifo = os.path.join(tmp, 'cmd')
-            env = dict(clean_environ(), ASOUND_DIR=asound, USB_WAIT='0', PIANO_SF2='/p', MECH_SF2='/m', FLUIDSYNTH=fake, CMD_FIFO=fifo)
+            env = dict(clean_environ(tmp), ASOUND_DIR=asound, USB_WAIT='0', PIANO_SF2='/p', MECH_SF2='/m', FLUIDSYNTH=fake, CMD_FIFO=fifo)
             proc = subprocess.Popen(['bash', RUN], env=env, stderr=subprocess.DEVNULL)
             try:
                 for _ in range(50):  # wait for the pipe to appear
