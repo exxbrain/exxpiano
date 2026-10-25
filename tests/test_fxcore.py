@@ -279,7 +279,7 @@ class BridgeMappingTests(unittest.TestCase):
 
     def test_the_reverb_send_is_set_on_the_piano_and_the_mechanics(self):
         b = self.make_bridge(1.0)
-        b.setup_programs()
+        b.setup_programs(new=True)
         self.assertEqual(reverb_sends(b.sent), dict.fromkeys(range(7), 252))  # 64 of 127: 25.2 %
         ch0 = [(m.control, m.value) for m in b.sent if m.channel == 0 and m.type == 'control_change'][2:]
         # CC91 to 0 (its modulator adds no more), the NRPN of reverbEffectsSend (8192 + 252 = 65 * 128 + 124), then the RPN null
@@ -318,6 +318,13 @@ class BridgeMappingTests(unittest.TestCase):
         b.sent.clear()
         b.setup_programs()  # a restarted synthesizer gets the new value
         self.assertEqual(set(reverb_sends(b.sent).values()), {354})
+
+    def test_a_change_of_the_send_keeps_the_cc91_of_a_keyboard(self):
+        b = self.make_bridge(1.0)
+        b.reverb_send = 90
+        b.send_reverb()
+        self.assertEqual(reverb_sends(b.sent), dict.fromkeys(range(7), 354))
+        self.assertNotIn(91, {getattr(m, 'control', None) for m in b.sent})
 
     def test_the_reverb_knob_of_a_keyboard_passes(self):
         b = self.make_bridge(1.0)
@@ -367,6 +374,28 @@ class BridgeMappingTests(unittest.TestCase):
         b.scan()
         progs = {m.channel: m.program for m in b.sent if m.type == 'program_change'}
         self.assertEqual(progs, {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6})
+        self.assertEqual(set(reverb_sends(b.sent).values()), {252})  # the send again too
+        self.assertNotIn(91, {getattr(m, 'control', None) for m in b.sent})  # but the reverb knob of a keyboard stays
+
+    def test_a_synthesizer_met_for_the_first_time_gets_cc91_0(self):
+        import types
+
+        b = self.make_bridge(1.0)
+        name = 'FLUID Synth (123):Synth input port (123:0) 128:0'
+        b.out, b.out_name = None, None
+        b.mido = types.SimpleNamespace(
+            Message=FakeMsg,
+            get_output_names=lambda: [name],
+            get_input_names=list,
+            open_output=lambda n: types.SimpleNamespace(send=b.sent.append, close=lambda: None),
+        )
+        b.scan()
+        cc91 = {m.channel: m.value for m in b.sent if m.type == 'control_change' and m.control == 91}
+        self.assertEqual(cc91, dict.fromkeys(range(7), 0))
+        self.assertEqual(set(reverb_sends(b.sent).values()), {252})
+        b.sent.clear()
+        b.scan()  # the same synthesizer again
+        self.assertNotIn(91, {getattr(m, 'control', None) for m in b.sent})
 
 
 if __name__ == '__main__':

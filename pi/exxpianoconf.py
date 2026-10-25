@@ -30,7 +30,7 @@ SETTINGS = {
     'pedal_boost': dict(kind='float', lo=-30.0, hi=30.0, default=4.5, scope='fx', key='FX_ARGS', flag='--pedal-boost'),
     'gain': dict(kind='float', lo=0.01, hi=2.0, default=0.6, scope='gain', key='GAIN'),
     # Reverb is applied live: the switch and the room through the command pipe of FluidSynth (scope 'effects'), the send (0..127 -> 0..50 %
-    # for banks without reverbEffectsSend; otherwise NRPN may be an offset) by the bridge, which re-reads this file and clears CC91.
+    # for banks without reverbEffectsSend; otherwise NRPN may be an offset) by the bridge, which re-reads this file.
     'reverb': dict(kind='int', lo=0, hi=1, default=0, scope='effects', key='REVERB'),
     'reverb_send': dict(kind='int', lo=0, hi=127, default=64, scope='fx', key='REVERB_SEND'),
     'reverb_room': dict(kind='float', lo=0.0, hi=1.0, default=0.6, scope='effects', key='REVERB_ROOM', synth='synth.reverb.room-size'),
