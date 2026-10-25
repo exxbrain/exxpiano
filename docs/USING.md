@@ -152,7 +152,7 @@ Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano resta
 | `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
 | `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
 | `REVERB` | 1 enables FluidSynth's reverb (higher CPU load; also in the **Effects** section, applied without a restart) |
-| `REVERB_SEND` | how much of the piano and the mechanics goes into the reverb, 0-127 = 0-50 % (default 64, a quarter; set by the bridge through the SoundFont NRPN, CC91 alone reaches only 20 %) |
+| `REVERB_SEND` | how much of the piano and the mechanics goes into the reverb, 0-127 = 0-50 % for banks without their own `reverbEffectsSend`, including the project banks (default 64, about a quarter; set by the bridge through the SoundFont NRPN with CC91 = 0). For imported banks with this generator, FluidSynth may treat NRPN as an offset: the final send can differ, and 0 does not guarantee dry sound |
 | `REVERB_ROOM`, `REVERB_DAMP`, `REVERB_WIDTH`, `REVERB_LEVEL` | the room of the reverb, each 0-1: size (default 0.6), damping of the high frequencies (0.4), stereo width (0.8), output level (0.7) |
 | `FX_ARGS` | mechanics options, see below |
 
