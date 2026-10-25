@@ -29,10 +29,10 @@ SETTINGS = {
     'res_boost': dict(kind='float', lo=-30.0, hi=30.0, default=0.0, scope='fx', key='FX_ARGS', flag='--res-boost'),
     'pedal_boost': dict(kind='float', lo=-30.0, hi=30.0, default=4.5, scope='fx', key='FX_ARGS', flag='--pedal-boost'),
     'gain': dict(kind='float', lo=0.01, hi=2.0, default=0.6, scope='gain', key='GAIN'),
-    # Reverb is applied live: the switch and the room through the command pipe of FluidSynth (scope 'effects'), the send (CC91 on every
-    # channel of the bridge: FluidSynth starts with 0, which leaves the reverb silent) by the bridge, which re-reads this file.
+    # Reverb is applied live: the switch and the room through the command pipe of FluidSynth (scope 'effects'), the send (0..127 -> 0..100 %
+    # on every channel of the bridge, through the SoundFont NRPN: CC91 reaches only 20 %) by the bridge, which re-reads this file.
     'reverb': dict(kind='int', lo=0, hi=1, default=0, scope='effects', key='REVERB'),
-    'reverb_send': dict(kind='int', lo=0, hi=127, default=40, scope='fx', key='REVERB_SEND'),
+    'reverb_send': dict(kind='int', lo=0, hi=127, default=64, scope='fx', key='REVERB_SEND'),
     'reverb_room': dict(kind='float', lo=0.0, hi=1.0, default=0.6, scope='effects', key='REVERB_ROOM', synth='synth.reverb.room-size'),
     'reverb_damp': dict(kind='float', lo=0.0, hi=1.0, default=0.4, scope='effects', key='REVERB_DAMP', synth='synth.reverb.damp'),
     'reverb_width': dict(kind='float', lo=0.0, hi=1.0, default=0.8, scope='effects', key='REVERB_WIDTH', synth='synth.reverb.width'),

@@ -230,6 +230,17 @@ class FakeMsg:
         return FakeMsg(**d)
 
 
+def reverb_sends(sent):
+    """{channel: the reverb send in 0.1 %} from the NRPN data entries (CC38, then CC6) the bridge sent."""
+    lsb, out = {}, {}
+    for m in sent:
+        if m.type == 'control_change' and m.control == 38:
+            lsb[m.channel] = m.value
+        elif m.type == 'control_change' and m.control == 6:
+            out[m.channel] = (m.value << 7 | lsb[m.channel]) - 8192
+    return out
+
+
 class BridgeMappingTests(unittest.TestCase):
     """The bridge must apply the touch curve to what reaches the piano (and the mechanics see the same value)."""
 
@@ -263,14 +274,24 @@ class BridgeMappingTests(unittest.TestCase):
         b.core.configure(piano_bank=2, piano_prog=9)
         b.setup_programs()
         ch0 = [(m.type, getattr(m, 'control', None), getattr(m, 'value', getattr(m, 'program', None))) for m in b.sent if m.channel == 0]
-        self.assertEqual(ch0, [('control_change', 0, 2), ('control_change', 32, 0), ('program_change', None, 9), ('control_change', 91, 40)])
+        self.assertEqual(ch0[:3], [('control_change', 0, 2), ('control_change', 32, 0), ('program_change', None, 9)])  # then the reverb send
         self.assertEqual({m.program for m in b.sent if m.type == 'program_change' and m.channel > 0}, {1, 2, 3, 4, 5, 6})
 
     def test_the_reverb_send_is_set_on_the_piano_and_the_mechanics(self):
         b = self.make_bridge(1.0)
         b.setup_programs()
-        sends = {m.channel: m.value for m in b.sent if m.type == 'control_change' and m.control == 91}
-        self.assertEqual(sends, dict.fromkeys(range(7), 40))  # FluidSynth starts with 0: the reverb would be silent
+        self.assertEqual(reverb_sends(b.sent), dict.fromkeys(range(7), 504))  # 64 of 127: 50.4 %
+        ch0 = [(m.control, m.value) for m in b.sent if m.channel == 0 and m.type == 'control_change'][2:]
+        # CC91 to 0 (its modulator adds no more), the NRPN of reverbEffectsSend (8192 + 504 = 67 * 128 + 120), then the RPN null
+        self.assertEqual(ch0, [(91, 0), (99, 120), (98, 16), (38, 120), (6, 67), (101, 127), (100, 127)])
+
+    def test_the_reverb_send_spans_the_whole_range(self):
+        b = self.make_bridge(1.0)
+        for send, sent in ((0, 0), (127, 1000), (1, 8)):
+            b.sent.clear()
+            b.reverb_send = send
+            b.send_reverb()
+            self.assertEqual(reverb_sends(b.sent), dict.fromkeys(range(7), sent))
 
     def test_changing_the_reverb_send_in_the_config_sets_it_live(self):
         import tempfile
@@ -287,8 +308,7 @@ class BridgeMappingTests(unittest.TestCase):
                 f.write('REVERB_SEND=90\n')
             os.utime(conf, (1, 1))
             b.reload_settings()
-            sends = {m.channel: m.value for m in b.sent if m.type == 'control_change' and m.control == 91}
-            self.assertEqual(sends, dict.fromkeys(range(7), 90))
+            self.assertEqual(reverb_sends(b.sent), dict.fromkeys(range(7), 709))  # 90 of 127
             b.sent.clear()
             with open(conf, 'w') as f:
                 f.write('REVERB_SEND=90\nFX_ARGS="--hammer-boost 2"\n')
@@ -297,7 +317,7 @@ class BridgeMappingTests(unittest.TestCase):
             self.assertEqual(b.sent, [])
         b.sent.clear()
         b.setup_programs()  # a restarted synthesizer gets the new value
-        self.assertEqual({m.value for m in b.sent if getattr(m, 'control', None) == 91}, {90})
+        self.assertEqual(set(reverb_sends(b.sent).values()), {709})
 
     def test_the_reverb_knob_of_a_keyboard_passes(self):
         b = self.make_bridge(1.0)

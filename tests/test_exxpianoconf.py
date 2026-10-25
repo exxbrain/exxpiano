@@ -99,12 +99,12 @@ class ConfTests(ConfBase):
         self.assertEqual(scopes, set())  # nothing changed -> nothing to do
         _, scopes = pc.apply_updates({'reverb': 1, 'reverb_room': 0.8}, self.path)
         self.assertEqual(scopes, {'effects'})  # applied live, no restart
-        _, scopes = pc.apply_updates({'reverb_send': 64}, self.path)
+        _, scopes = pc.apply_updates({'reverb_send': 90}, self.path)
         self.assertEqual(scopes, {'fx'})  # the bridge picks the send up from the file
 
     def test_reverb_settings(self):
         s = pc.get_settings(self.path)  # a file without the reverb lines: the defaults
-        self.assertEqual((s['reverb'], s['reverb_send'], s['reverb_room'], s['reverb_damp']), (0, 40, 0.6, 0.4))
+        self.assertEqual((s['reverb'], s['reverb_send'], s['reverb_room'], s['reverb_damp']), (0, 64, 0.6, 0.4))
         self.assertEqual((s['reverb_width'], s['reverb_level']), (0.8, 0.7))
         pc.apply_updates({'reverb_send': 0, 'reverb_room': 1, 'reverb_damp': 0}, self.path)
         text = open(self.path).read()
