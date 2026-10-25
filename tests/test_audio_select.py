@@ -122,9 +122,10 @@ class AudioSelectTests(unittest.TestCase):
         self.assertIn('-z 64 -c 3', r.stdout)
 
     def test_usb_card_is_preferred_and_uses_small_buffer(self):
+        # 64 x 2 (2.9 ms): a Zoom U-24 on a Pi 3 B played 3 x 5 minutes of La Campanella with it without an xrun
         r = self.run_script([HEADPHONES, usb(1, 'U24')])
         self.assertIn('audio.alsa.device=plughw:CARD=U24', r.stdout)
-        self.assertIn('-z 64 -c 3', r.stdout)
+        self.assertIn('-z 64 -c 2', r.stdout)
 
     def test_hdmi_is_never_chosen_over_onboard(self):
         r = self.run_script([HDMI, HEADPHONES])
@@ -196,6 +197,56 @@ class AudioSelectTests(unittest.TestCase):
                 r = self.run_script([usb(1, 'U24')], **env)
                 self.assertIn('synth.cpu-cores=%d' % want, r.stdout)
 
+    def test_the_sample_rate_reaches_fluidsynth_and_a_wrong_one_falls_back_to_44100(self):
+        self.assertIn('-r 44100', self.run_script([usb(1, 'U24')]).stdout)
+        self.assertIn('-r 48000', self.run_script([usb(1, 'U24')], SAMPLE_RATE=48000).stdout)
+        r = self.run_script([usb(1, 'U24')], SAMPLE_RATE=22050)
+        self.assertIn('-r 44100', r.stdout)
+        self.assertIn('sample rate 22050', r.stderr)
+
+    def make_cpufreq(self, d, cores=4, governor='ondemand', available='conservative ondemand userspace powersave performance schedutil'):
+        for n in range(cores):
+            folder = os.path.join(d, 'cpu%d' % n, 'cpufreq')
+            os.makedirs(folder)
+            with open(os.path.join(folder, 'scaling_governor'), 'w') as f:
+                f.write(governor + '\n')
+            with open(os.path.join(folder, 'scaling_available_governors'), 'w') as f:
+                f.write(available + '\n')
+        os.makedirs(os.path.join(d, 'cpufreq'))  # not a core: left alone
+
+    def governors(self, d):
+        cores = [n for n in os.listdir(d) if n.startswith('cpu') and n[3:].isdigit()]
+        found = set()
+        for n in cores:
+            with open(os.path.join(d, n, 'cpufreq', 'scaling_governor')) as f:
+                found.add(f.read().strip())
+        return sorted(found)
+
+    def test_every_core_runs_at_full_speed_by_default(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.make_cpufreq(d)
+            r = self.run_script([usb(1, 'U24')], CPUFREQ_DIR=d)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(self.governors(d), ['performance'])
+
+    def test_the_governor_is_left_alone_when_it_is_switched_off_or_unknown(self):
+        for why, env, available in (
+            ('empty', dict(CPU_GOVERNOR=''), None),
+            ('not offered by the kernel', dict(), 'ondemand powersave'),
+            ('not a name', dict(CPU_GOVERNOR='performance; reboot'), None),
+        ):
+            with self.subTest(why), tempfile.TemporaryDirectory() as d:
+                self.make_cpufreq(d, **({} if available is None else dict(available=available)))
+                r = self.run_script([usb(1, 'U24')], CPUFREQ_DIR=d, **env)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(self.governors(d), ['ondemand'])
+
+    def test_a_board_without_frequency_control_still_plays(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.run_script([usb(1, 'U24')], CPUFREQ_DIR=d)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('-z 64 -c 2', r.stdout)
+
     def test_usb_card_without_playback_is_ignored(self):
         # regression: the keyboard's own USB audio card (capture only) was chosen instead of the jack
         r = self.run_script([HEADPHONES, keyboard(1)])
@@ -211,8 +262,26 @@ class AudioSelectTests(unittest.TestCase):
         # regression: USB_PERIOD_SIZE=32 made FluidSynth exit ("audio.period-size out of range"), so no sound at all
         r = self.run_script([usb(1, 'U24')], USB_PERIOD_SIZE=32)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn('-z 64 -c 3', r.stdout)
+        self.assertIn('-z 64 -c 2', r.stdout)
         self.assertIn('using 64', r.stderr)
+
+    def test_the_onboard_jack_with_two_periods_gets_a_period_it_can_keep_up_with(self):
+        for env, want in (
+            (dict(PERIOD_SIZE=64, PERIODS=2), '-z 600 -c 2'),
+            (dict(PERIOD_SIZE=600, PERIODS=2), '-z 600 -c 2'),
+            (dict(PERIOD_SIZE=1024, PERIODS=2), '-z 1024 -c 2'),
+            (dict(PERIOD_SIZE=64, PERIODS=3), '-z 64 -c 3'),  # 444 x 3 plays clean
+            (dict(PERIOD_SIZE=64, PERIODS=2, SAMPLE_RATE=48000), '-z 654 -c 2'),
+            (dict(PERIOD_SIZE=64, PERIODS=2, ALSA_DEVICE='plughw:CARD=Headphones'), '-z 600 -c 2'),
+        ):
+            with self.subTest(**env):
+                r = self.run_script([HEADPHONES], **env)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(want, r.stdout)
+
+    def test_a_usb_card_with_two_small_periods_is_left_alone(self):
+        r = self.run_script([HEADPHONES, usb(1, 'U24')], USB_PERIOD_SIZE=64, USB_PERIODS=2, PERIOD_SIZE=64, PERIODS=2)
+        self.assertIn('-z 64 -c 2', r.stdout)
 
     def test_period_above_maximum_is_clamped(self):
         r = self.run_script([HEADPHONES], PERIOD_SIZE=100000)

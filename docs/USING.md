@@ -125,13 +125,13 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
 
 - **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/usercfg.txt`), device
   `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
-  30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The default `PERIOD_SIZE=64` x `PERIODS=3` (the smallest value FluidSynth accepts, the driver rounds it up) played without clicks on a Pi 3; raise `PERIOD_SIZE` in the web interface if you hear any. The output is somewhat noisy.
+  30 ms with `PERIODS=3`. The driver never takes a period under 10 ms and learns from the GPU only every ~10 ms how much it has played, so `444 x 2` (20 ms) clicks all the time, even with the CPU idle (100-160 xruns a minute on a Pi 3 B). The default is the smallest buffer that played clean there: `PERIOD_SIZE=600` x `PERIODS=2` (27 ms; 5 minutes of a dense piece without a single xrun); with 2 periods `exxpiano-run` raises a smaller period to 600 by itself. The GPU adds its own delay on top of the buffer. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
-  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (64 frames = 1.45 ms per period, ~4.4 ms of buffering; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
+  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=2` (64 frames = 1.45 ms per period, ~2.9 ms of buffering; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
   matters: many interfaces accept only 24/32-bit audio or 4 channels, and opening them directly (`hw:`) fails with
   `Failed to find an audio format supported by alsa`.
-  Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 with `64 x 3`: no clicks by ear, latency not
-  measured; on a Pi 5 the same interface was picked by itself and ran with `64 x 3` without underruns. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
+  Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 B with `64 x 2`: three 5-minute runs of
+  La Campanella without a single xrun (`64 x 3` is clean too; if another card clicks, set `USB_PERIODS=3`); on a Pi 5 the same interface was picked by itself and ran with `64 x 3` without underruns. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
   plug or unplug a card is done by an eudev rule that was written from the documentation and **not tested on hardware**;
   if it does not work, run `rc-service exxpiano restart` after changing the interface.
 
@@ -147,6 +147,7 @@ Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano resta
 | `CPU_CORES` | synthesis threads of FluidSynth (1-4, default 3; one core always stays free): the voices of a dense piece are shared between the cores of the board, so a higher `POLYPHONY` (192 or 256) becomes possible (also in the **Audio output** section) |
 | `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
 | `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
+| `SAMPLE_RATE`, `CPU_GOVERNOR` | sample rate of the synthesizer (44100 by default, 48000 for a card that plays only 48 kHz) / CPU frequency governor while it plays (`performance` by default, so a small buffer does not click while a core speeds up; empty leaves the kernel's choice) |
 | `REVERB` | 1 enables FluidSynth's reverb (higher CPU load) |
 | `FX_ARGS` | mechanics options, see below |
 

@@ -17,7 +17,7 @@ ALSA_DEVICE="${ALSA_DEVICE:-auto}"
 PERIOD_SIZE="${PERIOD_SIZE:-64}"
 PERIODS="${PERIODS:-3}"
 USB_PERIOD_SIZE="${USB_PERIOD_SIZE:-64}"
-USB_PERIODS="${USB_PERIODS:-3}"
+USB_PERIODS="${USB_PERIODS:-2}"
 USB_WAIT="${USB_WAIT:-8}"          # the most seconds to wait for a USB card to appear at boot
 USB_SETTLE="${USB_SETTLE:-6}"       # seconds after the boot that USB devices need to show up (a Pi 3 B: all of them by 3.5 s, the USB audio driver by 4.7 s); later nothing is waited for without a reason
 USB_SYSFS="${USB_SYSFS:-/sys/bus/usb/devices}"
@@ -28,6 +28,15 @@ CPU_COUNT="${CPU_COUNT:-$(nproc 2>/dev/null || echo 1)}"
 if [ "$CPU_CORES" -ge "$CPU_COUNT" ]; then          # one core always stays for the system, the bridge and the web interface
   CPU_CORES=$(( CPU_COUNT > 1 ? CPU_COUNT - 1 : 1 ))
 fi
+SAMPLE_RATE="${SAMPLE_RATE:-44100}"     # 48000 for a card that plays 48 kHz natively (plughw then has nothing to convert)
+case "$SAMPLE_RATE" in
+  44100|48000|88200|96000) ;;
+  *) echo "exxpiano: sample rate $SAMPLE_RATE is not one of 44100 48000 88200 96000, using 44100" >&2; SAMPLE_RATE=44100 ;;
+esac
+export SAMPLE_RATE                    # the level meter reads it too
+# The CPU frequency governor for the time FluidSynth runs. With a small buffer a core that is still speeding up misses a period (a click):
+# "performance" keeps every core at its top frequency. Empty: the kernel's own choice is left as it is.
+CPU_GOVERNOR="${CPU_GOVERNOR-performance}"
 GAIN="${GAIN:-0.6}"
 REVERB="${REVERB:-0}"
 FLUIDSYNTH="${FLUIDSYNTH:-/usr/bin/fluidsynth}"
@@ -36,6 +45,26 @@ METER="${METER:-1}"                 # 1 = the output goes through the level mete
 METER_DIR="${METER_DIR:-/run/exxpiano-meter}"
 ALSA_TAP_CONF="${ALSA_TAP_CONF:-/etc/alsa/conf.d/60-exxpiano-tap.conf}"
 METER_PROGRAM="${METER_PROGRAM:-$(dirname "$0")/exxpiano-meter.py}"
+
+# Writes CPU_GOVERNOR for every core that has frequency control (CPUFREQ_DIR: a fake /sys/devices/system/cpu for tests). Never fatal: a board
+# or a kernel without cpufreq just plays at the speed it has.
+set_governor() {
+  local dir="${CPUFREQ_DIR:-/sys/devices/system/cpu}" f done=0
+  [ -n "$CPU_GOVERNOR" ] || return 0
+  if [[ ! "$CPU_GOVERNOR" =~ ^[a-z]+$ ]]; then
+    echo "exxpiano: CPU_GOVERNOR=$CPU_GOVERNOR is not a governor name, the CPU frequency is left as it is" >&2
+    return 0
+  fi
+  for f in "$dir"/cpu[0-9]*/cpufreq/scaling_governor; do
+    [ -f "$f" ] || continue
+    if ! grep -qw -- "$CPU_GOVERNOR" "${f%/*}/scaling_available_governors" 2>/dev/null; then
+      echo "exxpiano: the CPU frequency governor $CPU_GOVERNOR is not available, keeping $(cat "$f" 2>/dev/null)" >&2
+      return 0
+    fi
+    if echo "$CPU_GOVERNOR" 2>/dev/null > "$f"; then done=1; fi
+  done
+  [ "$done" = 0 ] || echo "exxpiano: CPU frequency governor $CPU_GOVERNOR" >&2
+}
 
 # true if the card has a playback device (MIDI keyboards often show up as capture-only USB audio cards)
 has_playback() {
@@ -152,6 +181,19 @@ if [ "$Z" -lt 64 ] || [ "$Z" -gt 8192 ]; then
   Z="$clamped"
 fi
 
+# The onboard jack (bcm2835) never takes a period under 10 ms (444 frames at 44.1 kHz), learns from the GPU only every ~10 ms how much it
+# has played, and stops the stream itself when one such report covers the whole buffer. With 2 periods a buffer under ~27 ms therefore
+# runs dry again and again, whatever the load (a Pi 3 B: 444 x 2 gave 100-160 xruns a minute even in silence, 560 x 2 about one,
+# 600 x 2 none in 5 minutes of a dense piece). 3 periods of 444 (30 ms) are fine; 2 periods get at least 600 frames (27 ms at 44.1 kHz).
+case "$DEVICE" in
+  *Headphones*)
+    min2=$(( (600 * SAMPLE_RATE + 44099) / 44100 ))
+    if [ "$C" -le 2 ] && [ "$Z" -lt "$min2" ]; then
+      echo "exxpiano: the onboard jack clicks with 2 periods under $min2 frames, using $min2 x $C" >&2
+      Z="$min2"
+    fi ;;
+esac
+
 # The level meter: the device is wrapped into `exxpiano_tap` (a copy of the stream goes into a pipe). Without the ALSA file or the program, or with METER=0,
 # the card is used directly and nothing else changes.
 OUT_DEVICE="$DEVICE"
@@ -170,17 +212,19 @@ if [ -n "$PREVIEW" ]; then
     esac
   done
   cmd=(python3 "$SYNTH_PROGRAM" -o audio.driver=alsa -o midi.driver=alsa_seq
-       -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -o synth.sample-rate=44100
+       -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -o "synth.sample-rate=$SAMPLE_RATE"
        -o "audio.period-size=$Z" -o "audio.periods=$C" -o "synth.reverb.active=$REVERB" -o synth.chorus.active=0
        -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -o "synth.gain=$GAIN"
        --preview "$PREVIEW" --mech "${MECH_SF2:?MECH_SF2 is not set}" --bank "$PIANO_BANK" --prog "$PIANO_PROG"
        --fallback "${PIANO_SF2_LAST_GOOD:-}" "${PIANO_SF2:?PIANO_SF2 is not set}")
 else
   cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
-       -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r 44100
+       -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r "$SAMPLE_RATE"
        -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -g "$GAIN"
        "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
 fi
+# a dry run on a development machine leaves its CPU alone unless a fake one is given
+if [ "${DRY_RUN:-0}" != 1 ] || [ -n "${CPUFREQ_DIR:-}" ]; then set_governor; fi
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "${cmd[*]}"; exit 0; fi
 # the state of a background load is written by exxpiano-synth; without it the web interface switches banks by a restart
 [ -n "$PREVIEW" ] || rm -f "${EXXPIANO_BANK_STATE:-/run/exxpiano-bank.json}"
