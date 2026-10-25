@@ -2,6 +2,10 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## Unreleased
+
+- **The reverb is heard, and it has its own section, Effects.** Turned on, it stayed silent: FluidSynth starts every channel with a reverb send (MIDI CC91) of 0, the banks set no send of their own and nothing else sent one. The bridge now sets the send on the piano channel and on the channels of the mechanics (so both sound in the same room) whenever it meets the synthesizer and whenever the setting changes; imported banks get it too. The section **Effects** has the switch, the amount (`REVERB_SEND`, 0-127, default 40), the room size and the damping (`REVERB_ROOM`, `REVERB_DAMP`; `REVERB_WIDTH` and `REVERB_LEVEL` in the file only). They apply at once, through FluidSynth's command pipe, without a restart; when the synthesizer does not take them, they are kept and the page asks for a restart. Whoever had `REVERB=1` will now hear it. The reverb stays off by default. **Not tried on the device yet:** that the reverb is heard, that FluidSynth 2.4 of Alpine changes it while it plays, the load and clicks on the 3.5 mm jack (`PERIODS=3`) and on a USB card; the default room is to be chosen by ear.
+
 ## 2.0.1
 
 - **The Alpine image tried on a Raspberry Pi 5 with a USB sound card** (by the owner, with the 2.0 image): it boots, the card is chosen by itself, the piano sounds natural, with beautiful hammers and string resonance; pulling the card out is shown on the page (below).

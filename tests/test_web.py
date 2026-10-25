@@ -40,6 +40,8 @@ class FakeActions:
         self.restarts = 0
         self.gains = []
         self.gain_ok = True
+        self.effects = []
+        self.effects_ok = True
         self.mem = 954 << 20
         self.mem_free = 300 << 20
         self.level_answer = dict(t=1.0, rate=44100, left=dict(peak=-12.0, hold=-6.0, clipped=0), right=dict(peak=0.0, hold=0.0, clipped=7), clip_ago=1.5)
@@ -110,6 +112,10 @@ class FakeActions:
     def set_gain(self, value):
         self.gains.append(value)
         return self.gain_ok
+
+    def set_effects(self, settings):
+        self.effects.append({n: settings[n] for n in ('reverb', 'reverb_room', 'reverb_damp')})
+        return self.effects_ok
 
     def version(self):
         return '9.9.9'
@@ -261,9 +267,29 @@ class WebTests(ServerCase):
         self.assertEqual((code, r['applied']['gain']), (200, False))
         self.assertIn('GAIN=2', self.conf_text())  # still stored for the next start
 
+    def test_reverb_is_applied_live(self):
+        self.start()
+        code, r = self.jcall('/api/settings', {'reverb': 1, 'reverb_room': 0.9})
+        self.assertEqual((code, r['applied']['effects'], r['restart_required']), (200, True, False))
+        self.assertEqual(self.actions.effects, [dict(reverb=1, reverb_room=0.9, reverb_damp=0.4)])
+        self.assertIn('REVERB_ROOM=0.9', self.conf_text())
+        code, r = self.jcall('/api/settings', {'reverb_send': 70})  # the send: the bridge reads it from the file
+        self.assertEqual((code, r['applied']['fx'], r['applied']['effects'], r['restart_required']), (200, True, None, False))
+        self.assertIn('REVERB_SEND=70', self.conf_text())
+        self.assertEqual(len(self.actions.effects), 1)
+        self.assertEqual(self.actions.restarts, 0)
+
+    def test_reverb_that_cannot_be_applied_live_asks_for_a_restart(self):
+        self.start()
+        self.actions.effects_ok = False
+        code, r = self.jcall('/api/settings', {'reverb': 1})
+        self.assertEqual((code, r['applied']['effects'], r['restart_required']), (200, False, True))
+        self.assertIn('REVERB=1', self.conf_text())
+        self.assertEqual(self.actions.restarts, 0)
+
     def test_audio_setting_asks_for_a_restart_but_does_not_do_it(self):
         self.start()
-        code, r = self.jcall('/api/settings', {'alsa_device': 'plughw:U24', 'reverb': 1})
+        code, r = self.jcall('/api/settings', {'alsa_device': 'plughw:U24', 'polyphony': 128})
         self.assertEqual(code, 200)
         self.assertTrue(r['restart_required'])
         self.assertEqual(self.actions.restarts, 0)

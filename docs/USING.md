@@ -25,7 +25,9 @@ The pictures of every section are in the README, under [What it looks like](../R
 - **Wi-Fi section**: the connection (network, address, signal), the saved networks (with *Forget*), and **Connect to a network**: pick one from the scan (or type a
   hidden network's name), type the password, press *Connect*. The Pi tries the network for up to a minute and keeps the previous settings if it does not work.
   See *Connecting to a new Wi-Fi* below.
-- **Audio output**: the output card, the buffer (size and number) of the selected interface, reverb and polyphony. The buffers are remembered **per audio interface**
+- **Effects**: the reverb of the piano and its mechanics: on or off, the amount (how much of the piano goes into the room), the room size and the damping of the
+  tail. Changes apply at once, without a restart. The reverb adds a steady load to the processor; if the onboard jack clicks with it, raise the number of buffers.
+- **Audio output**: the output card, the buffer (size and number) of the selected interface and polyphony. The buffers are remembered **per audio interface**
   (`/var/lib/exxpiano/devices.json`, keyed by the `ALSA_DEVICE` value): choose another interface and the web interface fills in the buffers it was
   last used with; an interface never used before keeps the current ones. These need a restart of the synthesizer (~45 s), so they are
   applied with a separate button.
@@ -56,7 +58,7 @@ instead of staying silent. Only file names that the library folder lists can be 
 **Settings follow the instrument.** The touch curve, master volume, mechanics levels, randomness and the preset are remembered **per bank** (in
 `/var/lib/exxpiano/profiles.json`, keyed by the bank's file name, so renaming a file starts it afresh). Change a slider and it is stored for the bank
 that is playing; choose another bank and that bank's own settings come back, then back again when you return. A bank that was never played
-starts from the settings in force at that moment. The audio output, buffers, polyphony and reverb switch belong to the device and are the same
+starts from the settings in force at that moment. The audio output, buffers, polyphony and the effects belong to the device and are the same
 for every bank. If a switch fails, the old bank and its settings are restored.
 
 To add a bank, copy a `.sf2` into `BANK_DIR` (for example `scp my.sf2 root@<Pi>:/opt/exxpiano/soundfonts/`).
@@ -147,7 +149,9 @@ Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano resta
 | `CPU_CORES` | synthesis threads of FluidSynth (1-4, default 3; one core always stays free): the voices of a dense piece are shared between the cores of the board, so a higher `POLYPHONY` (192 or 256) becomes possible (also in the **Audio output** section) |
 | `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
 | `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
-| `REVERB` | 1 enables FluidSynth's reverb (higher CPU load) |
+| `REVERB` | 1 enables FluidSynth's reverb (higher CPU load; also in the **Effects** section, applied without a restart) |
+| `REVERB_SEND` | how much of the piano and the mechanics goes into the reverb, 0-127 (default 40; MIDI CC91, set by the bridge) |
+| `REVERB_ROOM`, `REVERB_DAMP`, `REVERB_WIDTH`, `REVERB_LEVEL` | the room of the reverb, each 0-1: size (default 0.6), damping of the high frequencies (0.4), stereo width (0.8), output level (0.7) |
 | `FX_ARGS` | mechanics options, see below |
 
 ### Tuning the mechanics (`FX_ARGS`)

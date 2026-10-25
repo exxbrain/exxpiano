@@ -358,6 +358,7 @@ class Bridge:
         self.out = None
         self.out_name = None
         self.inputs = {}
+        self.reverb_send = exxpianoconf.SETTINGS['reverb_send']['default']
 
     def send(self, msg):
         out = self.out
@@ -393,12 +394,19 @@ class Bridge:
         self.send(self.mido.Message('control_change', channel=0, control=32, value=0))
         self.send(self.mido.Message('program_change', channel=0, program=prog))
 
+    def send_reverb(self):
+        """The reverb send (CC91) of the piano and of the mechanics: they sound in the same room. FluidSynth starts every channel with 0,
+        and the banks set no send of their own, so without it the reverb stays silent."""
+        for ch in (0,) + tuple(PROGRAMS):
+            self.send(self.mido.Message('control_change', channel=ch, control=91, value=self.reverb_send))
+
     def setup_programs(self):
         self.select_piano()
         for ch, prog in PROGRAMS.items():
             self.send(self.mido.Message('control_change', channel=ch, control=0, value=0))
             self.send(self.mido.Message('control_change', channel=ch, control=32, value=0))
             self.send(self.mido.Message('program_change', channel=ch, program=prog))
+        self.send_reverb()
 
     def on_msg(self, msg):
         mido = self.mido
@@ -502,6 +510,10 @@ class Bridge:
             )
             if preset_changed and not first:
                 self.select_piano()
+            send_changed = s['reverb_send'] != self.reverb_send
+            self.reverb_send = s['reverb_send']
+            if send_changed and not first:
+                self.send_reverb()
         if not first:
             print(
                 'settings reloaded: curve %.2f, hammer %+.1f dB, exp %.2f, random %.1f, res %+.1f, pedal %+.1f'
