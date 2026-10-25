@@ -344,6 +344,10 @@ SYNTH_RE = re.compile(r'FLUID Synth', re.I)
 SKIP_RE = re.compile(r'Through|DINTHRU|MCU|HUI|ALV|FLUID|Timer|Announce|System|RtMidi|Client', re.I)
 
 
+# The reverb send at REVERB_SEND = 127, in 0.1 % (the unit of the SoundFont generator reverbEffectsSend).
+REVERB_SEND_MAX = 500
+
+
 class Bridge:
     def __init__(self, core):
         import exxpianoconf
@@ -358,6 +362,7 @@ class Bridge:
         self.out = None
         self.out_name = None
         self.inputs = {}
+        self.reverb_send = exxpianoconf.SETTINGS['reverb_send']['default']
 
     def send(self, msg):
         out = self.out
@@ -393,12 +398,30 @@ class Bridge:
         self.send(self.mido.Message('control_change', channel=0, control=32, value=0))
         self.send(self.mido.Message('program_change', channel=0, program=prog))
 
-    def setup_programs(self):
+    def send_reverb(self, reset_cc91=False):
+        """The reverb send of the piano and of the mechanics: they sound in the same room. Not through CC91 alone: FluidSynth's default
+        modulator turns even CC91 = 127 into a send of 20 %, too little to hear. The SoundFont NRPN (CC99 = 120, CC98 = 16, the generator
+        reverbEffectsSend in 0.1 %, 8192 = zero offset) maps 0..127 -> 0..50 % for banks without their own reverbEffectsSend, including
+        the project banks (the whole 100 % drowned the piano on the device; 64 is about a quarter), whichever way FluidSynth runs.
+        For imported banks with reverbEffectsSend, the NRPN adds an offset to the bank's send without compensation: the final send can
+        differ, even at 0. The RPN null closes the NRPN: a later data entry of a keyboard changes nothing. CC91 goes to 0 (clearing its
+        contribution) only with reset_cc91, when the bridge meets a synthesizer: the presets are selected again on every scan, and a
+        keyboard's reverb knob (up to 20 % on top) must survive that."""
+        value = 8192 + round(self.reverb_send * REVERB_SEND_MAX / 127)
+        for ch in (0,) + tuple(PROGRAMS):
+            if reset_cc91:
+                self.send(self.mido.Message('control_change', channel=ch, control=91, value=0))
+            for control, v in ((99, 120), (98, 16), (38, value & 127), (6, value >> 7), (101, 127), (100, 127)):
+                self.send(self.mido.Message('control_change', channel=ch, control=control, value=v))
+
+    def setup_programs(self, new=False):
+        """The presets and the reverb send of every channel of the bridge; new: a synthesizer just met (CC91 goes to 0 too)."""
         self.select_piano()
         for ch, prog in PROGRAMS.items():
             self.send(self.mido.Message('control_change', channel=ch, control=0, value=0))
             self.send(self.mido.Message('control_change', channel=ch, control=32, value=0))
             self.send(self.mido.Message('program_change', channel=ch, program=prog))
+        self.send_reverb(reset_cc91=new)
 
     def on_msg(self, msg):
         mido = self.mido
@@ -452,7 +475,7 @@ class Bridge:
                     try:
                         self.out = mido.open_output(synth)
                         self.out_name = synth
-                        self.setup_programs()
+                        self.setup_programs(new=True)
                         print('synth:', synth, flush=True)
                     except Exception as exc:
                         print('open synth failed:', exc, file=sys.stderr)
@@ -502,6 +525,10 @@ class Bridge:
             )
             if preset_changed and not first:
                 self.select_piano()
+            send_changed = s['reverb_send'] != self.reverb_send
+            self.reverb_send = s['reverb_send']
+            if send_changed and not first:
+                self.send_reverb()
         if not first:
             print(
                 'settings reloaded: curve %.2f, hammer %+.1f dB, exp %.2f, random %.1f, res %+.1f, pedal %+.1f'

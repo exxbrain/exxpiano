@@ -49,6 +49,10 @@ Not yet tried on real hardware: the import from a USB drive (see "Tested on" bel
 |---|---|---|
 | ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
 
+| Effects (reverb) |
+|---|
+| ![Effects](docs/images/ui-fx.png) |
+
 *The pictures are made by `scripts/make-screenshots.py` from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the banks are made up; the pieces are the real recordings of `assets/midi/`), at the width of a phone.*
 
 ## What it sounds like
@@ -100,6 +104,8 @@ A Pi 4 needs a 5.1 V / 3 A supply and a Pi 5 a 5.1 V / 5 A one (the official USB
 Other boards, keyboards and sound cards were not tested. I recommend a USB sound card; its delay was not measured. The full list with versions and numbers: [docs/ABOUT.md](docs/ABOUT.md#tested-on).
 
 **Start time** (measured on a Pi 3 Model B with the full bank): **the first note within 15 s of power-on** (14.5 s with a stopwatch; a small preview piano plays until the full bank has loaded, about 37 s after the start of the synthesizer). The very first start of a freshly written card also grows the partition to the card and takes longer; it has not been timed with 2.0. Loading the full bank is reading 729 MB from the card at 23 MB/s, the limit of the Pi 3, so a faster card does not help.
+
+**Reverb and the processor** (Pi 3 Model B, Zoom U-24 at 64x2, *La Campanella* from the MIDI player): the reverb roughly doubles the work of the synthesizer. The thread that hands the sound to the card went from 18 % to 33 % of a core, each of the two mixing threads from 12 % to 22 %; the four cores from 16-20 % to 22-30 % on average, the busiest second from 29 % to 58 %. No underruns. The heavier cases with the reverb on, at the same 64x2, also had no underruns: the finale of *La Campanella* peaked at 83 % of a core (31-38 % on average); a synthetic 256 voices at once peaked at 80 % (54-67 % on average); 256 voices with the web page polling often brought 3 of the 4 cores to 100 % at peaks (74-77 % on average, up to 75 °C), which leaves almost no headroom. The reverb is computed all the time it is on, even when no key is down, so it is off by default. Not measured yet: the 3.5 mm jack with the reverb. If the sound clicks with the reverb on, raise the number of buffers in **Audio output** or turn the reverb off.
 
 ## Choosing the piano bank
 
