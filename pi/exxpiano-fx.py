@@ -403,7 +403,7 @@ class Bridge:
         modulator turns even CC91 = 127 into a send of 20 %, too little to hear. The SoundFont NRPN (CC99 = 120, CC98 = 16, the generator
         reverbEffectsSend in 0.1 %, 8192 = zero offset) maps 0..127 -> 0..50 % for banks without their own reverbEffectsSend, including
         the project banks (the whole 100 % drowned the piano on the device; 64 is about a quarter), whichever way FluidSynth runs.
-        For imported banks with reverbEffectsSend, FluidSynth may treat the NRPN as an offset: the final send can differ, even at 0.
+        For imported banks with reverbEffectsSend, the NRPN adds an offset to the bank's send without compensation: the final send can differ, even at 0.
         CC91 goes to 0 to clear its contribution (a keyboard's reverb knob still adds its 20 % on top), and the RPN null closes the NRPN:
         a later data entry of a keyboard changes nothing."""
         value = 8192 + round(self.reverb_send * REVERB_SEND_MAX / 127)
