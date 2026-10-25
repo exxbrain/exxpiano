@@ -919,10 +919,13 @@ function kindOf(device) {
     if (o && o.kind && !o.missing) return o.kind;
     return cards.some(c => c.usb || c.i2s) ? "usb" : "onboard";
   }
-  // the card the device names, read the way exxpiano-run reads it (plughw:CARD=U24, plughw:U24, hw:1,0): the field writes what it uses
+  // the card the device names, read the way exxpiano-run reads it (plughw:CARD=U24, plughw:U24, hw:1,0): the field writes what it uses.
+  // The jack is the card Headphones however it is named (plughw:0, hw:0,0); a device that names no known card is the jack by its name only
   const name = device.slice(device.indexOf(":") + 1).split(",")[0].replace(/^CARD=/, "");
   const card = cards.find(c => c.id === name || String(c.num) === name);
-  return card && (card.usb || card.i2s) ? "usb" : "onboard";
+  if (!card) return device.includes("Headphones") ? "onboard" : "other";
+  if (card.usb || card.i2s) return card.usb ? "usb" : "i2s";
+  return card.id.startsWith("Headphones") ? "onboard" : "other";
 }
 const external = kind => kind === "usb" || kind === "i2s";
 const bufferKeys = kind => (external(kind) ? ["usb_period_size", "usb_periods"] : ["period_size", "periods"]);

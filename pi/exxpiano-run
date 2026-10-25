@@ -227,14 +227,19 @@ fi
 # has played, and stops the stream itself when one such report covers the whole buffer. With 2 periods a buffer under ~27 ms therefore
 # runs dry again and again, whatever the load (a Pi 3 B: 444 x 2 gave 100-160 xruns a minute even in silence, 560 x 2 about one,
 # 600 x 2 none in 5 minutes of a dense piece). 3 periods of 444 (30 ms) are fine; 2 periods get at least 600 frames (27 ms at 44.1 kHz).
-case "$DEVICE" in
-  *Headphones*)
-    min2=$(( (600 * SAMPLE_RATE + 44099) / 44100 ))
-    if [ "$C" -le 2 ] && [ "$Z" -lt "$min2" ]; then
-      echo "exxpiano: the onboard jack clicks with 2 periods under $min2 frames, using $min2 x $C" >&2
-      Z="$min2"
-    fi ;;
-esac
+# The card is the one the choice or the explicit device resolved to (plughw:0 and hw:0,0 are the jack too); only a device that names no
+# card of /proc/asound is taken for the jack by its name.
+onboard=0
+if [ "$kind" = onboard ]; then onboard=1
+elif [ -z "$kind" ] && [[ "$DEVICE" == *Headphones* ]]; then onboard=1
+fi
+if [ "$onboard" = 1 ]; then
+  min2=$(( (600 * SAMPLE_RATE + 44099) / 44100 ))
+  if [ "$C" -le 2 ] && [ "$Z" -lt "$min2" ]; then
+    echo "exxpiano: the onboard jack clicks with 2 periods under $min2 frames, using $min2 x $C" >&2
+    Z="$min2"
+  fi
+fi
 
 # The level meter: the device is wrapped into `exxpiano_tap` (a copy of the stream goes into a pipe). Without the ALSA file or the program, or with METER=0,
 # the card is used directly and nothing else changes.

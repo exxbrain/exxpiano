@@ -343,6 +343,33 @@ class AudioSelectTests(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertIn(want, r.stdout)
 
+    def test_the_jack_guard_follows_the_card_an_explicit_device_names(self):
+        small = dict(PERIOD_SIZE=64, PERIODS=2, USB_PERIOD_SIZE=64, USB_PERIODS=2)
+        cards = [HEADPHONES, usb(1, 'U24'), HIFIBERRY_DAC]
+        for device, rate, want in (
+            ('plughw:0', 44100, '-z 600 -c 2'),
+            ('hw:0,0', 44100, '-z 600 -c 2'),
+            ('plughw:CARD=Headphones', 44100, '-z 600 -c 2'),
+            ('plughw:Headphones', 44100, '-z 600 -c 2'),
+            ('plughw:0', 48000, '-z 654 -c 2'),
+            ('hw:0,0', 48000, '-z 654 -c 2'),
+            ('plughw:CARD=U24', 44100, '-z 64 -c 2'),
+            ('hw:1,0', 44100, '-z 64 -c 2'),
+            ('plughw:CARD=sndrpihifiberry', 44100, '-z 64 -c 2'),
+            ('hw:2,0', 48000, '-z 64 -c 2'),
+        ):
+            with self.subTest(device=device, rate=rate):
+                r = self.run_script(cards, ALSA_DEVICE=device, SAMPLE_RATE=rate, **small)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(want, r.stdout)
+
+    def test_a_device_that_names_no_known_card_gets_the_jack_guard_by_its_name(self):
+        r = self.run_script([usb(1, 'U24')], ALSA_DEVICE='plughw:CARD=Headphones', PERIOD_SIZE=64, PERIODS=2)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('-z 600 -c 2', r.stdout)
+        r = self.run_script([usb(1, 'U24')], ALSA_DEVICE='plughw:CARD=Other', PERIOD_SIZE=64, PERIODS=2)
+        self.assertIn('-z 64 -c 2', r.stdout)
+
     def test_a_usb_card_with_two_small_periods_is_left_alone(self):
         r = self.run_script([HEADPHONES, usb(1, 'U24')], USB_PERIOD_SIZE=64, USB_PERIODS=2, PERIOD_SIZE=64, PERIODS=2)
         self.assertIn('-z 64 -c 2', r.stdout)

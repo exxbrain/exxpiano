@@ -1360,6 +1360,9 @@ class CardsTests(unittest.TestCase):
         self.assertIn('card.usb || card.i2s', page)
         # an explicit device is read the way exxpiano-run reads it, so the buffer field writes the pair the synthesizer uses
         self.assertIn('c.id === name || String(c.num) === name', page)
+        # the jack is the card exxpiano-run takes for it (and raises a 2-period buffer for): by its id, by its name only when no card matches
+        self.assertIn('card.id.startsWith("Headphones")', page)
+        self.assertIn('if (!card) return device.includes("Headphones")', page)
 
 
 if __name__ == '__main__':
