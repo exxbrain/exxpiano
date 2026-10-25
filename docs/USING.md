@@ -135,6 +135,20 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
   plug or unplug a card is done by an eudev rule that was written from the documentation and **not tested on hardware**;
   if it does not work, run `rc-service exxpiano restart` after changing the interface.
 
+### Which USB card to get
+
+If you want low latency, use an external card. The same goes for a Pi 4 or Pi 5: the Pi 4's 3.5 mm jack runs on the same bcm2835 driver as the Pi 3 (about 27 ms), and the Pi 5 has no jack at all. Any USB card that works without drivers (USB Audio Class) will do: exxpiano finds it by itself and switches to the `64 x 2` buffer (about 2.9 ms).
+
+| What | Rough price | Things to know |
+|---|---|---|
+| USB "dongle" with a C-Media chip (CM108, CM119 and the like) | a few euros | 16-bit / 48 kHz, noisier; 3.5 mm headphone out |
+| Branded USB adapter (UGREEN, for example) | 15-25 € | the same, better built |
+| Apple USB-C to 3.5 mm adapter | 10-20 € | 24-bit, good sound; needs a USB-A to USB-C adapter; fakes are common |
+| Behringer UCA202 / UCA222 | 30-40 € | RCA line out for speakers or a mixer |
+| Audio interface (Zoom U-24 and the like) | more | tested: `64 x 2` without a single xrun on a Pi 3 B |
+
+Only the Zoom U-24 has been tested on hardware; exxpiano has not been measured with dongles. If a card clicks, set `USB_PERIODS=3` (about 4.4 ms). Another option without USB: an I2S DAC on the GPIO header (below).
+
 ### I2S DAC on the GPIO header
 
 A small DAC board on the GPIO header plays with the same small buffer as a USB card and costs a few euros. Supported (by the kernel
