@@ -402,9 +402,9 @@ class Bridge:
         """The reverb send of the piano and of the mechanics: they sound in the same room. Not through CC91 alone: FluidSynth's default
         modulator turns even CC91 = 127 into a send of 20 %, too little to hear. The SoundFont NRPN (CC99 = 120, CC98 = 16, the generator
         reverbEffectsSend in 0.1 %, 8192 = none) sets the send itself, 0..127 -> 0..50 % (the whole 100 % drowned the piano on the
-        device; 64 is a quarter), whichever way FluidSynth runs. CC91 goes to 0,
-        so the amount is exactly this one (a keyboard's reverb knob still adds its 20 % on top), and the RPN null closes the NRPN: a later
-        data entry of a keyboard changes nothing."""
+        device; 64 is a quarter), whichever way FluidSynth runs. CC91 goes to 0, so the amount is exactly this one for a bank without a
+        reverbEffectsSend of its own, as ours (an imported bank that has one keeps it under this value: the NRPN is an offset to it); a
+        keyboard's reverb knob still adds its 20 % on top. The RPN null closes the NRPN: a later data entry of a keyboard changes nothing."""
         value = 8192 + round(self.reverb_send * REVERB_SEND_MAX / 127)
         for ch in (0,) + tuple(PROGRAMS):
             for control, v in ((91, 0), (99, 120), (98, 16), (38, value & 127), (6, value >> 7), (101, 127), (100, 127)):
