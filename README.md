@@ -105,6 +105,8 @@ Other boards, keyboards and sound cards were not tested. I recommend a USB sound
 
 **Start time** (measured on a Pi 3 Model B with the full bank): **the first note within 15 s of power-on** (14.5 s with a stopwatch; a small preview piano plays until the full bank has loaded, about 37 s after the start of the synthesizer). The very first start of a freshly written card also grows the partition to the card and takes longer; it has not been timed with 2.0. Loading the full bank is reading 729 MB from the card at 23 MB/s, the limit of the Pi 3, so a faster card does not help.
 
+**Reverb and the processor** (Pi 3 Model B, Zoom U-24 at 64x2, *La Campanella* from the MIDI player): the reverb roughly doubles the work of the synthesizer. The thread that hands the sound to the card went from 18 % to 33 % of a core, each of the two mixing threads from 12 % to 22 %; the four cores from 16-20 % to 22-30 % on average, the busiest second from 29 % to 58 %. No underruns. The reverb is computed all the time it is on, even when no key is down, so it is off by default. Not measured yet: the 3.5 mm jack with the reverb, and the heaviest case (256 voices at once), where the cores were already near 100 % without it; if the sound clicks with the reverb on, raise the number of buffers in **Audio output** or turn the reverb off.
+
 ## Choosing the piano bank
 
 The images carry two banks of the same Salamander piano:

@@ -26,7 +26,8 @@ The pictures of every section are in the README, under [What it looks like](../R
   hidden network's name), type the password, press *Connect*. The Pi tries the network for up to a minute and keeps the previous settings if it does not work.
   See *Connecting to a new Wi-Fi* below.
 - **Effects**: the reverb of the piano and its mechanics: on or off, the amount (how much of the piano goes into the room), the room size and the damping of the
-  tail. Changes apply at once, without a restart. The reverb adds a steady load to the processor; if the onboard jack clicks with it, raise the number of buffers.
+  tail. Changes apply at once, without a restart. The reverb adds a steady load to the processor, even when no key is down (on a Pi 3 B the synthesizer works about twice as hard: the
+  audio thread from 18 % to 33 % of a core); if the sound clicks with it, raise the number of buffers.
 - **Audio output**: the output card, the buffer (size and number) of the selected interface and polyphony. The buffers are remembered **per audio interface**
   (`/var/lib/exxpiano/devices.json`, keyed by the `ALSA_DEVICE` value): choose another interface and the web interface fills in the buffers it was
   last used with; an interface never used before keeps the current ones. These need a restart of the synthesizer (~45 s), so they are
