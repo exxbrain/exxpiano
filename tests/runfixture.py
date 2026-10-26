@@ -44,12 +44,15 @@ VARIABLES = (
     'USB_WAIT',
 )
 
+# files bash itself reads before the script when these are set: they could change the settings above or print into the output
+SHELL_STARTUP = ('BASH_ENV', 'ENV')
+
 
 def clean_environ(tmp):
     """The caller's environment without those variables, and the host paths whose files change what exxpiano-run does moved into `tmp`, where
     nothing exists unless a test makes it. On a Pi the defaults are real files: the ALSA file of the level meter (the output would go through
     exxpiano_tap), the preview bank (exxpiano-synth would start instead of fluidsynth), /proc/uptime and the USB devices (a wait at boot)."""
-    env = {k: v for k, v in os.environ.items() if k not in VARIABLES}
+    env = {k: v for k, v in os.environ.items() if k not in VARIABLES and k not in SHELL_STARTUP}
     env.update(
         ALSA_TAP_CONF=os.path.join(tmp, 'no-tap.conf'),
         METER_PROGRAM=os.path.join(tmp, 'no-meter.py'),
