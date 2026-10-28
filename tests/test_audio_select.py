@@ -207,6 +207,14 @@ class AudioSelectTests(unittest.TestCase):
         self.assertIn('-R 1', r.stdout)
         self.assertTrue(r.stdout.strip().endswith('/p.sf2 /m.sf2'))
 
+    def test_the_room_of_the_reverb_reaches_fluidsynth(self):
+        r = self.run_script([usb(1, 'U24')], REVERB_ROOM='0.9', REVERB_DAMP='0.1', REVERB_WIDTH='1', REVERB_LEVEL='0.5')
+        for part in ('synth.reverb.room-size=0.9', 'synth.reverb.damp=0.1', 'synth.reverb.width=1', 'synth.reverb.level=0.5'):
+            self.assertIn(part, r.stdout)
+        r = self.run_script([usb(1, 'U24')])  # a file of an earlier version has none of these lines
+        for part in ('-R 0', 'synth.reverb.room-size=0.6', 'synth.reverb.damp=0.4', 'synth.reverb.width=0.8', 'synth.reverb.level=0.7'):
+            self.assertIn(part, r.stdout)
+
     def test_the_output_goes_through_the_level_meter_only_when_it_can(self):
         with tempfile.TemporaryDirectory() as d:
             conf = os.path.join(d, 'tap.conf')

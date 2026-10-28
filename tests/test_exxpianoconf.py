@@ -93,10 +93,29 @@ class ConfTests(ConfBase):
     def test_scopes(self):
         _, scopes = pc.apply_updates({'gain': 1.5}, self.path)
         self.assertEqual(scopes, {'gain'})
-        _, scopes = pc.apply_updates({'reverb': 1, 'gain': 1.5}, self.path)
+        _, scopes = pc.apply_updates({'polyphony': 200, 'gain': 1.5}, self.path)
         self.assertEqual(scopes, {'synth'})  # gain unchanged this time
-        _, scopes = pc.apply_updates({'reverb': 1}, self.path)
+        _, scopes = pc.apply_updates({'polyphony': 200}, self.path)
         self.assertEqual(scopes, set())  # nothing changed -> nothing to do
+        _, scopes = pc.apply_updates({'reverb': 1, 'reverb_room': 0.8}, self.path)
+        self.assertEqual(scopes, {'effects'})  # applied live, no restart
+        _, scopes = pc.apply_updates({'reverb_send': 90}, self.path)
+        self.assertEqual(scopes, {'fx'})  # the bridge picks the send up from the file
+
+    def test_reverb_settings(self):
+        s = pc.get_settings(self.path)  # a file without the reverb lines: the defaults
+        self.assertEqual((s['reverb'], s['reverb_send'], s['reverb_room'], s['reverb_damp']), (0, 64, 0.6, 0.4))
+        self.assertEqual((s['reverb_width'], s['reverb_level']), (0.8, 0.7))
+        pc.apply_updates({'reverb_send': 0, 'reverb_room': 1, 'reverb_damp': 0}, self.path)
+        text = open(self.path).read()
+        for line in ('REVERB_SEND=0', 'REVERB_ROOM=1', 'REVERB_DAMP=0'):
+            self.assertIn(line + '\n', text)
+        for bad in ({'reverb_send': 128}, {'reverb_send': -1}, {'reverb_room': 1.5}, {'reverb_damp': -0.1}, {'reverb_level': 'x'}):
+            with self.assertRaises(ValueError):
+                pc.apply_updates(bad, self.path)
+        self.assertEqual(pc.get_settings(self.path)['reverb_send'], 0)
+        self.assertEqual(next(iter(pc.EFFECT_SYNTH_KEYS)), 'reverb')  # the switch goes first
+        self.assertEqual(pc.EFFECT_SYNTH_KEYS['reverb_room'], 'synth.reverb.room-size')
 
     def test_new_key_is_appended(self):
         pc.apply_updates({'periods': 4}, self.path)

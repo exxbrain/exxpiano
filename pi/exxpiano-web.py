@@ -6,7 +6,7 @@
   POST /api/settings       {"velocity_curve": 0.8, ...}  - validated, stored in /etc/exxpiano.conf, applied
   GET  /api/levels         the level of the left and the right channel at the output (peak, held peak, clipped samples), when the meter runs
   POST /api/output-volume  {"db": -12}  - the hardware volume of the sound card that plays (dB, stored for the next boot); the state tells it as output_volume
-  POST /api/restart        restart exxpiano (needed after changing audio output / buffer / reverb / polyphony)
+  POST /api/restart        restart exxpiano (needed after changing audio output / buffer / polyphony)
   POST /api/bank           {"id": "<file name in the bank library>"}  - switch the piano bank (rolls back if it does not come up)
                            {"action": "delete", "id": "<bank>"}  - remove a bank that is not in use (not the current one, the last good one or the mechanics bank)
   GET  /api/usb            the USB drive (label, state, the SoundFont files of piano-banks/) and the state of the import
@@ -295,6 +295,12 @@ class Actions:
         """Live master gain: write a shell command into the pipe FluidSynth reads (root-only, no network port).
         True on success. (`set synth.gain` is the command that really changes it; plain `gain` does not.)"""
         return self.synth_command('set synth.gain %s' % exxpianoconf._fmt(float(value)))
+
+    def set_effects(self, settings):
+        """Live reverb: the switch and the room as `set synth.reverb.*` lines in the command pipe (FluidSynth 2.2+ changes them while it
+        plays). One write, so they arrive together. True on success; False when the synthesizer is down (the file has them for its start)."""
+        lines = ['set %s %s' % (key, exxpianoconf._fmt(settings[name])) for name, key in exxpianoconf.EFFECT_SYNTH_KEYS.items()]
+        return self.synth_command('\n'.join(lines))
 
     def synth_command(self, line):
         """Write one line into the command pipe of the synthesizer. False when nobody reads it (the synthesizer is down)."""
@@ -1008,10 +1014,12 @@ class App:
             self.remember(self.current_key(), {n: settings[n] for n in exxpianoconf.PER_BANK_NAMES})
         if isinstance(body, dict) and ('alsa_device' in body or any(k in exxpianoconf.PER_DEVICE_NAMES for k in body)):
             self.remember_device(settings['alsa_device'], {n: settings[n] for n in exxpianoconf.PER_DEVICE_NAMES})
-        done = dict(fx='fx' in scopes, gain=None)  # gain: True live, False failed, None unchanged
+        done = dict(fx='fx' in scopes, gain=None, effects=None)  # gain, effects: True live, False failed, None unchanged
         if 'gain' in scopes:
             done['gain'] = bool(self.actions.set_gain(settings['gain']))
-        return dict(settings=settings, applied=done, restart_required='synth' in scopes)
+        if 'effects' in scopes:
+            done['effects'] = bool(self.actions.set_effects(settings))
+        return dict(settings=settings, applied=done, restart_required='synth' in scopes or done['effects'] is False)
 
 
 def make_handler(app):

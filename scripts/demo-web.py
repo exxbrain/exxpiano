@@ -93,6 +93,12 @@ class DemoActions(web.Actions):
         self.gain_now = float(value)
         return True
 
+    def set_effects(self, settings):
+        print(
+            'demo: reverb %s, send %s, room %.2f, damp %.2f' % (settings['reverb'], settings['reverb_send'], settings['reverb_room'], settings['reverb_damp'])
+        )
+        return True
+
     def cards(self):
         return [dict(id='U24', name='ZOOM U-24', usb=True), dict(id='Headphones', name='bcm2835 Headphones', usb=False)]
 

@@ -433,6 +433,8 @@ class LaunchTests(unittest.TestCase):
             'audio.period-size=600',  # the jack's default, 600 x 2
             'audio.periods=2',
             'synth.reverb.active=0',
+            'synth.reverb.room-size=0.6',
+            'synth.reverb.damp=0.4',
             'synth.chorus.active=0',
             'synth.polyphony=256',
             'synth.cpu-cores=3',

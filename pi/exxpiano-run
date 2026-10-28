@@ -40,6 +40,12 @@ export SAMPLE_RATE                    # the level meter reads it too
 CPU_GOVERNOR="${CPU_GOVERNOR-performance}"
 GAIN="${GAIN:-0.6}"
 REVERB="${REVERB:-0}"
+# The room of the reverb (FluidSynth's synth.reverb.*, each 0..1; the web interface changes them while FluidSynth plays). How much of the
+# piano goes into it is the send (REVERB_SEND), which the MIDI bridge sets.
+REVERB_ROOM="${REVERB_ROOM:-0.6}"
+REVERB_DAMP="${REVERB_DAMP:-0.4}"
+REVERB_WIDTH="${REVERB_WIDTH:-0.8}"
+REVERB_LEVEL="${REVERB_LEVEL:-0.7}"
 FLUIDSYNTH="${FLUIDSYNTH:-/usr/bin/fluidsynth}"
 CMD_FIFO="${CMD_FIFO:-/run/exxpiano.cmd}"
 METER="${METER:-1}"                 # 1 = the output goes through the level meter (the web interface shows the peak of each channel and clipping)
@@ -261,13 +267,16 @@ if [ -n "$PREVIEW" ]; then
   cmd=(python3 "$SYNTH_PROGRAM" -o audio.driver=alsa -o midi.driver=alsa_seq
        -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -o "synth.sample-rate=$SAMPLE_RATE"
        -o "audio.period-size=$Z" -o "audio.periods=$C" -o "synth.reverb.active=$REVERB" -o synth.chorus.active=0
+       -o "synth.reverb.room-size=$REVERB_ROOM" -o "synth.reverb.damp=$REVERB_DAMP" -o "synth.reverb.width=$REVERB_WIDTH" -o "synth.reverb.level=$REVERB_LEVEL"
        -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -o "synth.gain=$GAIN"
        --preview "$PREVIEW" --mech "${MECH_SF2:?MECH_SF2 is not set}" --bank "$PIANO_BANK" --prog "$PIANO_PROG"
        --fallback "${PIANO_SF2_LAST_GOOD:-}" "${PIANO_SF2:?PIANO_SF2 is not set}")
 else
   cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
        -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r "$SAMPLE_RATE"
-       -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -g "$GAIN"
+       -z "$Z" -c "$C" -R "$REVERB" -C 0
+       -o "synth.reverb.room-size=$REVERB_ROOM" -o "synth.reverb.damp=$REVERB_DAMP" -o "synth.reverb.width=$REVERB_WIDTH" -o "synth.reverb.level=$REVERB_LEVEL"
+       -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -g "$GAIN"
        "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
 fi
 # a dry run on a development machine leaves its CPU alone unless a fake one is given

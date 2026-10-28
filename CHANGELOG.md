@@ -2,6 +2,10 @@
 
 Every release needs a section `## <VERSION>` here: the release workflow puts it into the description of the GitHub Release and stops without it.
 
+## Unreleased
+
+- **The reverb is heard, and it has its own section, Effects.** Turned on, it stayed silent: FluidSynth starts every channel with a reverb send (MIDI CC91) of 0, the banks set no send of their own and nothing else sent one. The bridge now sets the send on the piano channel and on the channels of the mechanics (so both sound in the same room) whenever it meets the synthesizer and whenever the setting changes; imported banks get it too. CC91 itself would not do: FluidSynth's default modulator turns even CC91 = 127 into a send of 20 %, which was hardly heard on the device (about +0.5 dB in the pauses of La Campanella at 40). The bridge sets the send through the SoundFont NRPN of the generator reverbEffectsSend, 0-127 = 0-50 % (the whole 100 % drowned the piano), on both ways FluidSynth starts, and CC91 to 0; a keyboard's reverb knob still adds its 20 % on top. The section **Effects** has the switch, the amount (`REVERB_SEND`, 0-127, default 64, a quarter), the room size and the damping (`REVERB_ROOM`, `REVERB_DAMP`; `REVERB_WIDTH` and `REVERB_LEVEL` in the file only). They apply at once, through FluidSynth's command pipe, without a restart; when the synthesizer does not take them, they are kept and the page asks for a restart. Whoever had `REVERB=1` will now hear it. The reverb stays off by default. **Tried on a Pi 3 B with the Zoom U-24 at 64x2:** the switch and the room change while FluidSynth 2.4 plays, without a restart; at a send of 50 % the tail of a chord is 6-11 dB above the dry one; La Campanella with the reverb on: no xrun, the cores at 25-30 % on average, the audio thread from 18 % to 33 %. **Not tried yet:** the 3.5 mm jack, the plain-fluidsynth way; the default room is to be chosen by ear.
+
 ## 2.0.1
 
 - **The Alpine image tried on a Raspberry Pi 5 with a USB sound card** (by the owner, with the 2.0 image): it boots, the card is chosen by itself, the piano sounds natural, with beautiful hammers and string resonance; pulling the card out is shown on the page (below).

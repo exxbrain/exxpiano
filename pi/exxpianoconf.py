@@ -29,7 +29,14 @@ SETTINGS = {
     'res_boost': dict(kind='float', lo=-30.0, hi=30.0, default=0.0, scope='fx', key='FX_ARGS', flag='--res-boost'),
     'pedal_boost': dict(kind='float', lo=-30.0, hi=30.0, default=4.5, scope='fx', key='FX_ARGS', flag='--pedal-boost'),
     'gain': dict(kind='float', lo=0.01, hi=2.0, default=0.6, scope='gain', key='GAIN'),
-    'reverb': dict(kind='int', lo=0, hi=1, default=0, scope='synth', key='REVERB'),
+    # Reverb is applied live: the switch and the room through the command pipe of FluidSynth (scope 'effects'), the send (0..127 -> 0..50 %
+    # for banks without reverbEffectsSend; otherwise NRPN may be an offset) by the bridge, which re-reads this file.
+    'reverb': dict(kind='int', lo=0, hi=1, default=0, scope='effects', key='REVERB'),
+    'reverb_send': dict(kind='int', lo=0, hi=127, default=64, scope='fx', key='REVERB_SEND'),
+    'reverb_room': dict(kind='float', lo=0.0, hi=1.0, default=0.6, scope='effects', key='REVERB_ROOM', synth='synth.reverb.room-size'),
+    'reverb_damp': dict(kind='float', lo=0.0, hi=1.0, default=0.4, scope='effects', key='REVERB_DAMP', synth='synth.reverb.damp'),
+    'reverb_width': dict(kind='float', lo=0.0, hi=1.0, default=0.8, scope='effects', key='REVERB_WIDTH', synth='synth.reverb.width'),
+    'reverb_level': dict(kind='float', lo=0.0, hi=1.0, default=0.7, scope='effects', key='REVERB_LEVEL', synth='synth.reverb.level'),
     'polyphony': dict(kind='int', lo=16, hi=256, default=256, scope='synth', key='POLYPHONY'),
     'cpu_cores': dict(kind='int', lo=1, hi=4, default=3, scope='synth', key='CPU_CORES'),
     'alsa_device': dict(kind='device', default='auto', scope='synth', key='ALSA_DEVICE'),
@@ -39,6 +46,8 @@ SETTINGS = {
     'periods': dict(kind='int', lo=2, hi=8, default=2, scope='synth', key='PERIODS'),
 }
 FX_NAMES = [n for n, s in SETTINGS.items() if s['key'] == 'FX_ARGS']
+# The effects and the FluidSynth setting each one is (the switch first: a room changed while it is off is ready when it is turned on).
+EFFECT_SYNTH_KEYS = dict([('reverb', 'synth.reverb.active')] + [(n, s['synth']) for n, s in SETTINGS.items() if 'synth' in s])
 # Settings that belong to the instrument and are remembered per bank (see profiles.py). The audio output, the buffers and the polyphony
 # belong to the device and stay the same whichever bank plays.
 PER_BANK_NAMES = ('piano_bank', 'piano_prog', 'velocity_curve', 'gain', 'hammer_boost', 'hammer_exp', 'random', 'res_boost', 'pedal_boost')

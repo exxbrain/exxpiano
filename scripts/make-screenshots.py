@@ -25,6 +25,7 @@ SHOTS = (
     ('home', 'ui-home', 825),
     ('bank', 'ui-bank', 900),
     ('sound', 'ui-sound', 825),
+    ('fx', 'ui-fx', 825),
     ('mon', 'ui-mon', 825),
     ('wifi', 'ui-wifi', 825),
     ('midi', 'ui-midi', 825),
