@@ -60,11 +60,21 @@ OOM_RE = re.compile(r'Out of memory: Killed process \d+ \(([^)]*)\).*?anon-rss:(
 OUTPUT_RE = re.compile(r'audio output (\S+) \((\w+)\), period (\d+) x (\d+)')
 NO_CARD_RE = re.compile(r'no sound card found')
 
-MIXER_CONTROLS = ('PCM', 'Speaker', 'Headphone', 'Master')  # the playback volume controls of a sound card, in the order they are tried
+# the playback volume controls of a sound card, in the order they are tried ("Digital": the PCM512x of a HiFiBerry DAC+ / RPi DAC+; a PCM5102A has none)
+MIXER_CONTROLS = ('PCM', 'Speaker', 'Headphone', 'Master', 'Digital')
 MIXER_RE = re.compile(r'Playback\s+(-?\d+)\s+\[(\d+)%\]\s+\[(-?[\d.]+)dB\]')
 MIXER_LIMITS_RE = re.compile(r'Limits:\s*Playback\s+(-?\d+)\s*-\s*(-?\d+)')
 CARD_RE = re.compile(r'CARD=([A-Za-z0-9_.-]+)')
 VOLUME_FLOOR_DB = -60.0  # the slider does not go down to -102 dB: there is nothing to hear below this
+
+
+def is_i2s(card_id, name):
+    """True for a card that is an I2S / SoC DAC on the GPIO header (hifiberry-dac, hifiberry-dacplus, rpi-dacplus, ...), given that it is not
+    USB and not the onboard jack: not HDMI, nothing else of the bcm2835 driver, not a virtual card. The same rule as is_i2s in exxpiano-run."""
+    cid, text = card_id.lower(), name.lower()
+    if cid.startswith('headphones') or re.search(r'hdmi|bcm2835|vc4', cid + ' ' + text):
+        return False
+    return cid not in ('dummy', 'loopback') and not re.match(r'(dummy|loopback) ', text)
 
 
 def parse_amixer(text):
@@ -328,7 +338,7 @@ class Actions:
         return False
 
     def cards(self):
-        """Sound cards that can play audio: [{id, name, usb}]."""
+        """Sound cards that can play audio: [{id, num, name, usb, i2s}]."""
         result = []
         try:
             with open(os.path.join(self.asound, 'cards'), encoding='utf-8') as f:
@@ -343,9 +353,10 @@ class Actions:
                     continue  # no playback (a keyboard's own USB audio, ...)
             except OSError:
                 continue
-            if 'hdmi' in cid.lower():
+            if 'hdmi' in cid.lower() or 'hdmi' in name.lower():
                 continue
-            result.append(dict(id=cid, name=name, usb=os.path.exists(os.path.join(card, 'usbid'))))
+            usb = os.path.exists(os.path.join(card, 'usbid'))
+            result.append(dict(id=cid, num=int(num), name=name, usb=usb, i2s=not usb and is_i2s(cid, name)))
         return result
 
     def audio_output(self):

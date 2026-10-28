@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location('meter', os.path.join(HERE, '..', 'pi', 'exxpiano-meter.py'))
@@ -60,6 +61,15 @@ class MeterTests(unittest.TestCase):
         self.assertAlmostEqual(second['left']['hold'], -6.0 - 0.5 * meter.HOLD_FALL, delta=0.5)
         self.assertEqual(second['right']['hold'], meter.SILENCE_DB)
 
+    def test_the_rate_in_the_status_is_the_one_the_synthesizer_plays_at(self):
+        for value, want in (('48000', 48000), (None, 44100), ('22050', 44100), ('fast', 44100)):
+            with self.subTest(value):
+                env = {k: v for k, v in os.environ.items() if k != 'SAMPLE_RATE'}
+                if value is not None:
+                    env['SAMPLE_RATE'] = value
+                with unittest.mock.patch.dict(os.environ, env, clear=True):
+                    self.assertEqual(meter._rate(), want)
+
     def test_a_block_that_ends_inside_a_frame_does_not_shift_the_channels(self):
         m = meter.Meter()
         data = pcm([1000, 2000], [30000, 4000])
@@ -86,7 +96,7 @@ class MeterTests(unittest.TestCase):
                     time.sleep(0.05)
                 with open(out) as f:
                     s = json.load(f)
-                self.assertEqual(s['rate'], 44100)
+                self.assertEqual(s['rate'], meter.RATE)
                 self.assertGreater(s['right']['clipped'], 0)
                 self.assertEqual(s['left']['clipped'], 0)
                 self.assertGreater(s['right']['hold'], s['left']['hold'])

@@ -306,7 +306,7 @@ def main():
         'GAIN=0.6',
         'POLYPHONY=128',
         'USB_PERIOD_SIZE=64',
-        'USB_PERIODS=3',
+        'USB_PERIODS=2',
         'REVERB=0',
         'FX_ARGS="--velocity-curve 1 --hammer-boost 1.5 --hammer-exp 0.8 --random 1.6 --res-boost 0 --pedal-boost 4.5"',
         'PROFILE_FILE=%s' % os.path.join(tmp, 'profiles.json'),

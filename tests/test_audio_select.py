@@ -12,9 +12,21 @@ import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 RUN = os.path.join(ROOT, 'pi', 'exxpiano-run')
+sys.path.insert(0, os.path.join(ROOT, 'tests'))
+from runfixture import clean_environ  # noqa: E402
 
 HEADPHONES = (0, 'Headphones', 'bcm2835_headphon - bcm2835 Headphones', False)
 HDMI = (1, 'vc4hdmi', 'vc4-hdmi - vc4-hdmi', False)
+# I2S DACs on the GPIO header, as /proc/asound/cards shows them: ALSA makes the id from the card name (letters and digits, at most 15)
+HIFIBERRY_DAC = (2, 'sndrpihifiberry', 'RPi-simple - snd_rpi_hifiberry_dac', False)  # dtoverlay=hifiberry-dac (a PCM5102A board)
+HIFIBERRY_DACPLUS = (2, 'sndrpihifiberry', 'HifiberryDacp - snd_rpi_hifiberry_dacplus', False)  # dtoverlay=hifiberry-dacplus
+IQAUDIO_DACPLUS = (2, 'IQaudIODAC', 'IQaudIODAC - IQaudIODAC', False)  # dtoverlay=iqaudio-dacplus
+RPI_DACPLUS = (2, 'RPiDAC', 'RPi-DAC+ - RPi-DAC+', False)  # dtoverlay=rpi-dacplus
+# never an I2S DAC: HDMI of the firmware driver, the old single card of the bcm2835 driver, virtual cards (snd-dummy, snd-aloop)
+FIRMWARE_HDMI = (1, 'b1', 'bcm2835_hdmi - bcm2835 HDMI 1', False)
+BCM2835_ALSA = (1, 'ALSA', 'bcm2835_alsa - bcm2835 ALSA', False)
+DUMMY = (3, 'Dummy', 'Dummy - Dummy', False)
+LOOPBACK = (4, 'Loopback', 'Loopback - Loopback', False)
 
 
 def usb(num, card_id, name='USB-Audio - Some card', playback=True):
@@ -41,7 +53,9 @@ class AudioSelectTests(unittest.TestCase):
                         f.write('1686:0090\n')
             with open(os.path.join(asound, 'cards'), 'w') as f:
                 f.write('\n'.join(lines) + '\n')
-            e = dict(os.environ, ASOUND_DIR=asound, DRY_RUN='1', USB_WAIT='0', PIANO_SF2='/p.sf2', MECH_SF2='/m.sf2', FLUIDSYNTH='/usr/bin/fluidsynth')
+            e = dict(
+                clean_environ(asound), ASOUND_DIR=asound, DRY_RUN='1', USB_WAIT='0', PIANO_SF2='/p.sf2', MECH_SF2='/m.sf2', FLUIDSYNTH='/usr/bin/fluidsynth'
+            )
             e.update({k: str(v) for k, v in env.items()})
             return subprocess.run(['bash', RUN], env=e, capture_output=True, text=True)
 
@@ -119,12 +133,13 @@ class AudioSelectTests(unittest.TestCase):
         r = self.run_script([HEADPHONES])
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('audio.alsa.device=plughw:CARD=Headphones', r.stdout)
-        self.assertIn('-z 64 -c 3', r.stdout)
+        self.assertIn('-z 600 -c 2', r.stdout)  # the jack's smallest clean buffer
 
     def test_usb_card_is_preferred_and_uses_small_buffer(self):
+        # 64 x 2 (2.9 ms): a Zoom U-24 on a Pi 3 B played 3 x 5 minutes of La Campanella with it without an xrun
         r = self.run_script([HEADPHONES, usb(1, 'U24')])
         self.assertIn('audio.alsa.device=plughw:CARD=U24', r.stdout)
-        self.assertIn('-z 64 -c 3', r.stdout)
+        self.assertIn('-z 64 -c 2', r.stdout)
 
     def test_hdmi_is_never_chosen_over_onboard(self):
         r = self.run_script([HDMI, HEADPHONES])
@@ -145,9 +160,37 @@ class AudioSelectTests(unittest.TestCase):
         self.assertIn('Raspberry Pi 5 has no 3.5 mm jack', r.stderr)
 
     def test_explicit_device_wins(self):
-        r = self.run_script([HEADPHONES, usb(1, 'U24')], ALSA_DEVICE='plughw:Headphones', PERIOD_SIZE=512)
+        r = self.run_script([HEADPHONES, usb(1, 'U24')], ALSA_DEVICE='plughw:Headphones', PERIOD_SIZE=512, PERIODS=3)
         self.assertIn('audio.alsa.device=plughw:Headphones', r.stdout)
-        self.assertIn('-z 512 -c 3', r.stdout)
+        self.assertIn('-z 512 -c 3', r.stdout)  # the jack's own pair, not USB_*
+
+    def test_an_explicit_external_card_uses_the_buffer_the_page_writes_for_it(self):
+        # regression: the page writes usb_period_size / usb_periods for a USB card chosen by name, the script read PERIOD_SIZE / PERIODS
+        cards = [HEADPHONES, HDMI, HIFIBERRY_DAC, usb(3, 'U24')]
+        env = dict(PERIOD_SIZE=1024, PERIODS=4, USB_PERIOD_SIZE=128, USB_PERIODS=3)
+        for device, kind in (
+            ('plughw:CARD=U24', 'usb'),
+            ('plughw:U24', 'usb'),
+            ('plughw:CARD=U24,DEV=0', 'usb'),
+            ('hw:3,0', 'usb'),
+            ('plughw:CARD=sndrpihifiberry', 'i2s'),
+            ('plughw:2', 'i2s'),
+        ):
+            with self.subTest(device):
+                r = self.run_script(cards, ALSA_DEVICE=device, **env)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn('audio.alsa.device=%s ' % device, r.stdout)
+                self.assertIn('-z 128 -c 3', r.stdout)
+                self.assertIn('(%s), period 128 x 3' % kind, r.stderr)
+
+    def test_an_explicit_device_that_is_not_an_external_card_keeps_period_size(self):
+        cards = [HEADPHONES, HDMI, usb(3, 'U24')]
+        env = dict(PERIOD_SIZE=1024, PERIODS=4, USB_PERIOD_SIZE=128, USB_PERIODS=3)
+        for device in ('plughw:CARD=Headphones', 'plughw:Gone', 'plughw:CARD=vc4hdmi', 'plughw:7'):
+            with self.subTest(device):
+                r = self.run_script(cards, ALSA_DEVICE=device, **env)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn('-z 1024 -c 4', r.stdout)
 
     def test_usb_buffer_is_configurable(self):
         r = self.run_script([usb(2, 'Interface')], USB_PERIOD_SIZE=128, USB_PERIODS=4)
@@ -204,12 +247,62 @@ class AudioSelectTests(unittest.TestCase):
                 r = self.run_script([usb(1, 'U24')], **env)
                 self.assertIn('synth.cpu-cores=%d' % want, r.stdout)
 
+    def test_the_sample_rate_reaches_fluidsynth_and_a_wrong_one_falls_back_to_44100(self):
+        self.assertIn('-r 44100', self.run_script([usb(1, 'U24')]).stdout)
+        self.assertIn('-r 48000', self.run_script([usb(1, 'U24')], SAMPLE_RATE=48000).stdout)
+        r = self.run_script([usb(1, 'U24')], SAMPLE_RATE=22050)
+        self.assertIn('-r 44100', r.stdout)
+        self.assertIn('sample rate 22050', r.stderr)
+
+    def make_cpufreq(self, d, cores=4, governor='ondemand', available='conservative ondemand userspace powersave performance schedutil'):
+        for n in range(cores):
+            folder = os.path.join(d, 'cpu%d' % n, 'cpufreq')
+            os.makedirs(folder)
+            with open(os.path.join(folder, 'scaling_governor'), 'w') as f:
+                f.write(governor + '\n')
+            with open(os.path.join(folder, 'scaling_available_governors'), 'w') as f:
+                f.write(available + '\n')
+        os.makedirs(os.path.join(d, 'cpufreq'))  # not a core: left alone
+
+    def governors(self, d):
+        cores = [n for n in os.listdir(d) if n.startswith('cpu') and n[3:].isdigit()]
+        found = set()
+        for n in cores:
+            with open(os.path.join(d, n, 'cpufreq', 'scaling_governor')) as f:
+                found.add(f.read().strip())
+        return sorted(found)
+
+    def test_every_core_runs_at_full_speed_by_default(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.make_cpufreq(d)
+            r = self.run_script([usb(1, 'U24')], CPUFREQ_DIR=d)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(self.governors(d), ['performance'])
+
+    def test_the_governor_is_left_alone_when_it_is_switched_off_or_unknown(self):
+        for why, env, available in (
+            ('empty', dict(CPU_GOVERNOR=''), None),
+            ('not offered by the kernel', dict(), 'ondemand powersave'),
+            ('not a name', dict(CPU_GOVERNOR='performance; reboot'), None),
+        ):
+            with self.subTest(why), tempfile.TemporaryDirectory() as d:
+                self.make_cpufreq(d, **({} if available is None else dict(available=available)))
+                r = self.run_script([usb(1, 'U24')], CPUFREQ_DIR=d, **env)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(self.governors(d), ['ondemand'])
+
+    def test_a_board_without_frequency_control_still_plays(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.run_script([usb(1, 'U24')], CPUFREQ_DIR=d)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('-z 64 -c 2', r.stdout)
+
     def test_usb_card_without_playback_is_ignored(self):
         # regression: the keyboard's own USB audio card (capture only) was chosen instead of the jack
         r = self.run_script([HEADPHONES, keyboard(1)])
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('plughw:CARD=Headphones', r.stdout)
-        self.assertIn('-z 64 -c 3', r.stdout)
+        self.assertIn('-z 600 -c 2', r.stdout)
 
     def test_interface_wins_over_keyboard_audio(self):
         r = self.run_script([HEADPHONES, keyboard(1), usb(2, 'U24')])
@@ -219,8 +312,84 @@ class AudioSelectTests(unittest.TestCase):
         # regression: USB_PERIOD_SIZE=32 made FluidSynth exit ("audio.period-size out of range"), so no sound at all
         r = self.run_script([usb(1, 'U24')], USB_PERIOD_SIZE=32)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn('-z 64 -c 3', r.stdout)
+        self.assertIn('-z 64 -c 2', r.stdout)
         self.assertIn('using 64', r.stderr)
+
+    def test_the_onboard_jack_with_two_periods_gets_a_period_it_can_keep_up_with(self):
+        for env, want in (
+            (dict(PERIOD_SIZE=64, PERIODS=2), '-z 600 -c 2'),
+            (dict(PERIOD_SIZE=600, PERIODS=2), '-z 600 -c 2'),
+            (dict(PERIOD_SIZE=1024, PERIODS=2), '-z 1024 -c 2'),
+            (dict(PERIOD_SIZE=64, PERIODS=3), '-z 64 -c 3'),  # 444 x 3 plays clean
+            (dict(PERIOD_SIZE=64, PERIODS=2, SAMPLE_RATE=48000), '-z 654 -c 2'),
+            (dict(PERIOD_SIZE=64, PERIODS=2, ALSA_DEVICE='plughw:CARD=Headphones'), '-z 600 -c 2'),
+        ):
+            with self.subTest(**env):
+                r = self.run_script([HEADPHONES], **env)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(want, r.stdout)
+
+    def test_the_jack_guard_follows_the_card_an_explicit_device_names(self):
+        small = dict(PERIOD_SIZE=64, PERIODS=2, USB_PERIOD_SIZE=64, USB_PERIODS=2)
+        cards = [HEADPHONES, usb(1, 'U24'), HIFIBERRY_DAC]
+        for device, rate, want in (
+            ('plughw:0', 44100, '-z 600 -c 2'),
+            ('hw:0,0', 44100, '-z 600 -c 2'),
+            ('plughw:CARD=Headphones', 44100, '-z 600 -c 2'),
+            ('plughw:Headphones', 44100, '-z 600 -c 2'),
+            ('plughw:0', 48000, '-z 654 -c 2'),
+            ('hw:0,0', 48000, '-z 654 -c 2'),
+            ('plughw:CARD=U24', 44100, '-z 64 -c 2'),
+            ('hw:1,0', 44100, '-z 64 -c 2'),
+            ('plughw:CARD=sndrpihifiberry', 44100, '-z 64 -c 2'),
+            ('hw:2,0', 48000, '-z 64 -c 2'),
+        ):
+            with self.subTest(device=device, rate=rate):
+                r = self.run_script(cards, ALSA_DEVICE=device, SAMPLE_RATE=rate, **small)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(want, r.stdout)
+
+    def test_a_device_that_names_no_known_card_gets_the_jack_guard_by_its_name(self):
+        r = self.run_script([usb(1, 'U24')], ALSA_DEVICE='plughw:CARD=Headphones', PERIOD_SIZE=64, PERIODS=2)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('-z 600 -c 2', r.stdout)
+        r = self.run_script([usb(1, 'U24')], ALSA_DEVICE='plughw:CARD=Other', PERIOD_SIZE=64, PERIODS=2)
+        self.assertIn('-z 64 -c 2', r.stdout)
+
+    def test_a_usb_card_with_two_small_periods_is_left_alone(self):
+        r = self.run_script([HEADPHONES, usb(1, 'U24')], USB_PERIOD_SIZE=64, USB_PERIODS=2, PERIOD_SIZE=64, PERIODS=2)
+        self.assertIn('-z 64 -c 2', r.stdout)
+
+    def test_an_i2s_dac_is_chosen_over_the_jack_and_gets_the_small_buffer(self):
+        for dac in (HIFIBERRY_DAC, HIFIBERRY_DACPLUS, IQAUDIO_DACPLUS, RPI_DACPLUS):
+            with self.subTest(dac[1]):
+                r = self.run_script([HEADPHONES, HDMI, dac], PERIOD_SIZE=600, PERIODS=2)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn('audio.alsa.device=plughw:CARD=%s ' % dac[1], r.stdout)
+                self.assertIn('-z 64 -c 2', r.stdout)  # no 600-frame floor: that belongs to the jack
+                self.assertIn('(i2s), period 64 x 2', r.stderr)
+
+    def test_an_i2s_dac_takes_the_usb_buffer_settings(self):
+        r = self.run_script([HEADPHONES, HIFIBERRY_DAC], USB_PERIOD_SIZE=128, USB_PERIODS=3)
+        self.assertIn('-z 128 -c 3', r.stdout)
+
+    def test_a_usb_card_still_wins_over_an_i2s_dac(self):
+        r = self.run_script([HEADPHONES, HDMI, HIFIBERRY_DAC, usb(3, 'U24')])
+        self.assertIn('audio.alsa.device=plughw:CARD=U24 ', r.stdout)
+        self.assertIn('(usb)', r.stderr)
+
+    def test_hdmi_and_virtual_cards_are_never_taken_for_an_i2s_dac(self):
+        for card in (HDMI, FIRMWARE_HDMI, BCM2835_ALSA, DUMMY, LOOPBACK):
+            with self.subTest(card[1]):
+                r = self.run_script([HEADPHONES, card], PERIOD_SIZE=600, PERIODS=2)
+                self.assertIn('audio.alsa.device=plughw:CARD=Headphones ', r.stdout)
+                self.assertIn('-z 600 -c 2', r.stdout)
+                self.assertNotIn('(i2s)', r.stderr)
+
+    def test_the_jack_keeps_its_own_buffer_when_it_is_chosen(self):
+        r = self.run_script([HEADPHONES, HDMI], PERIOD_SIZE=600, PERIODS=2, USB_PERIOD_SIZE=64, USB_PERIODS=2)
+        self.assertIn('(onboard), period 600 x 2', r.stderr)
+        self.assertIn('-z 600 -c 2', r.stdout)
 
     def test_period_above_maximum_is_clamped(self):
         r = self.run_script([HEADPHONES], PERIOD_SIZE=100000)
@@ -254,7 +423,7 @@ class LastGoodBankTests(unittest.TestCase):
 
     def run_script(self, piano, last_good=''):
         env = dict(
-            os.environ,
+            clean_environ(self.tmp.name),
             ASOUND_DIR=self.asound,
             DRY_RUN='1',
             USB_WAIT='0',
@@ -303,7 +472,7 @@ class PipePlumbingTests(unittest.TestCase):
             with open(os.path.join(asound, 'cards'), 'w') as f:
                 f.write(' 0 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n')
             fifo = os.path.join(tmp, 'cmd')
-            env = dict(os.environ, ASOUND_DIR=asound, USB_WAIT='0', PIANO_SF2='/p', MECH_SF2='/m', FLUIDSYNTH=fake, CMD_FIFO=fifo)
+            env = dict(clean_environ(tmp), ASOUND_DIR=asound, USB_WAIT='0', PIANO_SF2='/p', MECH_SF2='/m', FLUIDSYNTH=fake, CMD_FIFO=fifo)
             proc = subprocess.Popen(['bash', RUN], env=env, stderr=subprocess.DEVNULL)
             try:
                 for _ in range(50):  # wait for the pipe to appear

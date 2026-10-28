@@ -21,7 +21,7 @@ The pictures of every section are in the README, under [What it looks like](../R
 - **Monitor section**: live, once a second. **Service messages**: warnings and errors the piano services logged since the boot (for example "no sound card found"), the notes of the piano's own scripts (grey: which audio output was chosen, that a service started; not the whole log), and the programs the kernel killed for lack of memory ("out of memory: the kernel killed fluidsynth ..."). Throttling and power (under-voltage, frequency cap, temperature limit, now and since the boot), CPU load in total and per core,
   temperature, frequency, memory, the share of a core used by the synthesizer, the mechanics bridge and the web interface, and charts of the last 2.5 minutes. Below it, the
   **real parameters of the audio interface** read from the driver while the synthesizer plays: format, channels, sample rate, the period and buffer the driver actually
-  chose (the onboard jack rounds 64 up to 444) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
+  chose (the onboard jack rounds 64 up to 444 at 44.1 kHz, 480 at 48 kHz) with the latency in milliseconds, how much is queued, and for a USB interface its clock mode and supported rates.
 - **Wi-Fi section**: the connection (network, address, signal), the saved networks (with *Forget*), and **Connect to a network**: pick one from the scan (or type a
   hidden network's name), type the password, press *Connect*. The Pi tries the network for up to a minute and keeps the previous settings if it does not work.
   See *Connecting to a new Wi-Fi* below.
@@ -128,16 +128,55 @@ At first boot every installation gets a persistent random ID such as `012ABC`. C
 ## Audio output and latency
 
 - **Onboard 3.5 mm:** the product image turns it on (`dtparam=audio=on` in `/boot/usercfg.txt`), device
-  `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
-  30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The default `PERIOD_SIZE=64` x `PERIODS=3` (the smallest value FluidSynth accepts, the driver rounds it up) played without clicks on a Pi 3; raise `PERIOD_SIZE` in the web interface if you hear any. The output is somewhat noisy.
+  `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself (480 at 48 kHz), so the latency is about
+  30 ms with `PERIODS=3`. The driver never takes a period under 10 ms and learns from the GPU only every ~10 ms how much it has played, so `444 x 2` (20 ms) clicks all the time, even with the CPU idle (100-160 xruns a minute on a Pi 3 B). The default is the smallest buffer that played clean there: `PERIOD_SIZE=600` x `PERIODS=2` (27 ms at 44.1 kHz; 5 minutes of a dense piece without a single xrun); with 2 periods `exxpiano-run` raises a smaller period to 600 by itself (654 at `SAMPLE_RATE=48000`, the same 27 ms). The GPU adds its own delay on top of the buffer. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
-  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (64 frames = 1.45 ms per period, ~4.4 ms of buffering; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
+  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=2` (at 44.1 kHz 64 frames = 1.45 ms per period, ~2.9 ms of buffering; at 48 kHz 1.33 ms and ~2.7 ms; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
   matters: many interfaces accept only 24/32-bit audio or 4 channels, and opening them directly (`hw:`) fails with
   `Failed to find an audio format supported by alsa`.
-  Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 with `64 x 3`: no clicks by ear, latency not
-  measured; on a Pi 5 the same interface was picked by itself and ran with `64 x 3` without underruns. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
+  Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 B with `64 x 2`: three 5-minute runs of
+  La Campanella without a single xrun (`64 x 3` is clean too; if another card clicks, set `USB_PERIODS=3`); on a Pi 5 the same interface was picked by itself and ran with `64 x 3` without underruns. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
   plug or unplug a card is done by an eudev rule that was written from the documentation and **not tested on hardware**;
   if it does not work, run `rc-service exxpiano restart` after changing the interface.
+
+### Which USB card to get
+
+If you want low latency, use an external card. The same goes for a Pi 4 or Pi 5: the Pi 4's 3.5 mm jack runs on the same bcm2835 driver as the Pi 3 (about 27 ms), and the Pi 5 has no jack at all. Any USB card that works without drivers (USB Audio Class) will do: exxpiano finds it by itself and switches to the `64 x 2` buffer (about 2.9 ms at 44.1 kHz, 2.7 ms at 48 kHz).
+
+| What | Rough price | Things to know |
+|---|---|---|
+| USB "dongle" with a C-Media chip (CM108, CM119 and the like) | a few euros | 16-bit / 48 kHz, noisier; 3.5 mm headphone out |
+| Branded USB adapter (UGREEN, for example) | 15-25 € | the same, better built |
+| Apple USB-C to 3.5 mm adapter | 10-20 € | 24-bit, good sound; needs a USB-A to USB-C adapter; fakes are common |
+| Behringer UCA202 / UCA222 | 30-40 € | RCA line out for speakers or a mixer |
+| Audio interface (Zoom U-24 and the like) | more | tested: `64 x 2` without a single xrun on a Pi 3 B |
+
+Only the Zoom U-24 has been tested on hardware; exxpiano has not been measured with dongles. If a card clicks, set `USB_PERIODS=3` (about 4.4 ms at 44.1 kHz, 4.0 ms at 48 kHz). Another option without USB: an I2S DAC on the GPIO header (below).
+
+### I2S DAC on the GPIO header
+
+A small DAC board on the GPIO header plays with the same small buffer as a USB card and costs a few euros. Supported (by the kernel
+overlays of the Raspberry Pi firmware):
+
+| Board | Line for `/boot/usercfg.txt` |
+|---|---|
+| PCM5102A board (the common purple "GY-PCM5102" and the like), HiFiBerry DAC / DAC+ Light | `dtoverlay=hifiberry-dac` |
+| HiFiBerry DAC+ / DAC+ Pro and its clones (InnoMaker HiFi DAC and others with a PCM5122) | `dtoverlay=hifiberry-dacplus` |
+| Raspberry Pi DAC+ (formerly IQaudio DAC+) | `dtoverlay=rpi-dacplus` (older firmware: `dtoverlay=iqaudio-dacplus`) |
+
+`/boot/usercfg.txt` is on the boot partition of the card (FAT, readable on any computer); add the line at the end, `config.txt`
+itself belongs to the boot loader package and is rewritten by its upgrades. `dtparam=audio=on` may stay: the jack is still there,
+the DAC is simply preferred. Then `reboot`; `aplay -l` should list the DAC (for example `sndrpihifiberry`).
+
+Wiring of a PCM5102A board (pins of the 40-pin header): VIN to 5 V (pin 2), GND to pin 6, BCK to GPIO18 (pin 12), LCK to GPIO19
+(pin 35), DIN to GPIO21 (pin 40), SCK to GND (the board makes its own clock). The solder jumpers on its back: H1L, H2L, H3H, H4L
+(normal filter, no de-emphasis, not muted, I2S format).
+
+The choice is automatic: with `ALSA_DEVICE=auto` a USB card wins, then an I2S DAC, then the jack. The DAC gets
+`USB_PERIOD_SIZE` x `USB_PERIODS` (64 x 2 by default; the `USB_` settings are the buffer of any external card, USB or I2S); the
+service log says `audio output plughw:CARD=sndrpihifiberry (i2s), period 64 x 2`. HDMI and virtual cards (snd-dummy, snd-aloop)
+are never taken for a DAC. A PCM5102A board has no volume control of its own: the master volume of the synthesizer is the one.
+**Not yet tried on hardware**: the choice is covered by tests with the card names these overlays give.
 
 ## Configuration
 
@@ -149,8 +188,9 @@ Everything is in `/etc/exxpiano.conf`. After editing: `rc-service exxpiano resta
 | `POLYPHONY` | number of voices (default 256, the most); stereo uses two voices per note, and the mechanics add more |
 | `METER` | 1 = the output goes through the level meter: the **Home** section shows the peak of the left and the right channel and counts the samples at full scale (clipping). It costs about 3% of one core; 0 plays to the card directly |
 | `CPU_CORES` | synthesis threads of FluidSynth (1-4, default 3; one core always stays free): the voices of a dense piece are shared between the cores of the board, so a higher `POLYPHONY` (192 or 256) becomes possible (also in the **Audio output** section) |
-| `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
-| `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
+| `ALSA_DEVICE` | `auto` (a USB card, then an I2S DAC, otherwise onboard) or an explicit device such as `plughw:U24` |
+| `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output (600 x 2 by default) / for an external card, USB or I2S DAC, chosen automatically or by name (64 x 2), and how long to wait for a USB card at boot |
+| `SAMPLE_RATE`, `CPU_GOVERNOR` | sample rate of the synthesizer (44100 by default, 48000 for a card that plays only 48 kHz) / CPU frequency governor while it plays (`performance` by default, so a small buffer does not click while a core speeds up; empty leaves the kernel's choice) |
 | `REVERB` | 1 enables FluidSynth's reverb (higher CPU load; also in the **Effects** section, applied without a restart) |
 | `REVERB_SEND` | how much of the piano and the mechanics goes into the reverb, 0-127 = 0-50 % for banks without their own `reverbEffectsSend`, including the project banks (default 64, about a quarter; set by the bridge through the SoundFont NRPN with CC91 = 0; CC91 alone reaches only 20 %). For imported banks with this generator, NRPN adds an offset to the bank’s send without compensation: the final send can differ, and 0 does not guarantee dry sound |
 | `REVERB_ROOM`, `REVERB_DAMP`, `REVERB_WIDTH`, `REVERB_LEVEL` | the room of the reverb, each 0-1: size (default 0.6), damping of the high frequencies (0.4), stereo width (0.8), output level (0.7) |

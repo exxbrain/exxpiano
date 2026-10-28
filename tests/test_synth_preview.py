@@ -19,6 +19,9 @@ sys.path.insert(0, os.path.join(ROOT, 'pi'))
 import banklib  # noqa: E402
 import oslib  # noqa: E402
 
+sys.path.insert(0, os.path.join(ROOT, 'tests'))
+from runfixture import clean_environ  # noqa: E402
+
 spec = importlib.util.spec_from_file_location('exxpiano_synth', os.path.join(ROOT, 'pi', 'exxpiano-synth.py'))
 synth = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(synth)
@@ -387,7 +390,7 @@ class LaunchTests(unittest.TestCase):
             with open(good, 'wb') as f:
                 f.write(b'x')
             env = dict(
-                os.environ,
+                clean_environ(tmp),
                 ASOUND_DIR=asound,
                 DRY_RUN='1',
                 USB_WAIT='0',
@@ -427,8 +430,8 @@ class LaunchTests(unittest.TestCase):
             "audio.alsa.device=plughw:CARD=Headphones",
             'audio.sample-format=16bits',
             'synth.sample-rate=44100',
-            'audio.period-size=64',
-            'audio.periods=3',
+            'audio.period-size=600',  # the jack's default, 600 x 2
+            'audio.periods=2',
             'synth.reverb.active=0',
             'synth.reverb.room-size=0.6',
             'synth.reverb.damp=0.4',

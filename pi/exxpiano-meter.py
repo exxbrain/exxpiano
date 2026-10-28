@@ -2,7 +2,7 @@
 """The level meter of the synthesizer's output: the peak of the left and the right channel and the samples that hit full scale (clipping).
 
 exxpiano-run lets FluidSynth play through the ALSA device `exxpiano_tap` (see 60-exxpiano-tap.conf): a copy of everything that goes to the sound card
-(16 bit, 2 channels, 44.1 kHz) is written into a pipe, and this program reads the pipe and publishes a small status file for the web interface.
+(16 bit, 2 channels, 44.1 kHz unless SAMPLE_RATE says otherwise) is written into a pipe, and this program reads the pipe and publishes a small status file for the web interface.
 
   exxpiano-meter.py PIPE STATUS_FILE [SYNTH_PID]
 
@@ -21,7 +21,17 @@ import sys
 import tempfile
 import time
 
-RATE = 44100
+
+def _rate():
+    """The sample rate of the stream: exxpiano-run passes the one FluidSynth plays at (SAMPLE_RATE)."""
+    try:
+        rate = int(os.environ.get('SAMPLE_RATE', '44100'))
+    except ValueError:
+        return 44100
+    return rate if rate in (44100, 48000, 88200, 96000) else 44100
+
+
+RATE = _rate()
 FULL_SCALE = 32768.0
 SILENCE_DB = -90.0
 PUBLISH = 0.1  # seconds between status files
