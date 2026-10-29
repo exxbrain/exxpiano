@@ -53,15 +53,15 @@
 
 **«Кампанелла» (с 1:48)**
 
-<a href="https://youtu.be/_oCsFN9PC_Q"><img src="docs/images/video-campanella-full-ru.jpg" width="320" alt="La Campanella, банк full"></a> <a href="https://youtu.be/WpUCxzW6b-o"><img src="docs/images/video-campanella-lite-ru.jpg" width="320" alt="La Campanella, банк lite"></a>
+<a href="https://vkvideo.ru/video-242580115_456239020"><img src="docs/images/video-campanella-full-ru.jpg" width="320" alt="La Campanella, банк full"></a> <a href="https://vkvideo.ru/video-242580115_456239019"><img src="docs/images/video-campanella-lite-ru.jpg" width="320" alt="La Campanella, банк lite"></a>
 
-▶ Смотреть на YouTube: [банк full](https://youtu.be/_oCsFN9PC_Q) · [банк lite](https://youtu.be/WpUCxzW6b-o)
+▶ Смотреть в VK Видео: [банк full](https://vkvideo.ru/video-242580115_456239020) · [банк lite](https://vkvideo.ru/video-242580115_456239019)
 
 **«Вздох»**
 
-<a href="https://youtu.be/nHJo8DUatrA"><img src="docs/images/video-sospiro-full-ru.jpg" width="320" alt="Un Sospiro, банк full"></a> <a href="https://youtu.be/ROzxRNCvmKA"><img src="docs/images/video-sospiro-lite-ru.jpg" width="320" alt="Un Sospiro, банк lite"></a>
+<a href="https://vkvideo.ru/video-242580115_456239021"><img src="docs/images/video-sospiro-full-ru.jpg" width="320" alt="Un Sospiro, банк full"></a> <a href="https://vkvideo.ru/video-242580115_456239018"><img src="docs/images/video-sospiro-lite-ru.jpg" width="320" alt="Un Sospiro, банк lite"></a>
 
-▶ Смотреть на YouTube: [банк full](https://youtu.be/nHJo8DUatrA) · [банк lite](https://youtu.be/ROzxRNCvmKA)
+▶ Смотреть в VK Видео: [банк full](https://vkvideo.ru/video-242580115_456239021) · [банк lite](https://vkvideo.ru/video-242580115_456239018)
 
 Слева (на телефоне сверху) банк `full`, справа (ниже) банк `lite`.
 
@@ -132,4 +132,4 @@ Pi 4 нужен блок 5.1 В / 3 А, а Pi 5 — 5.1 В / 5 А (официа�
 ([NOTICE.md](NOTICE.md)). Собранные из них файлы `.sf2` — производные работы, их распространение требует
 указания авторства.
 
-Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Демонстрационные видео ([YouTube](https://www.youtube.com/channel/UCaqFaRCMmHVezksqe_fxcJg)) сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. Alpine Linux и её пакеты в образе остаются под своими лицензиями.
+Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Демонстрационные видео ([VK Видео](https://vkvideo.ru/@club242580115)) сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. Alpine Linux и её пакеты в образе остаются под своими лицензиями.
