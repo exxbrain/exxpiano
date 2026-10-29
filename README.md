@@ -21,9 +21,9 @@ You need a Raspberry Pi 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microS
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline. While the full bank loads, a small **preview piano** plays: on a Pi 3 Model B the first note sounds within 15 s of power-on (14.5 s with a stopwatch), and the full bank follows about 32 s after the preview. The piano moves over to the full bank at a moment with no key and no pedal down, without a pause. The preview is plainer: 3 velocity layers, 22 kHz, and notes held longer than 3 s stop with the end of their sample.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. The setup network is on for **5 minutes** after the Pi is switched on while it has no saved network (as long as a phone is connected to it, it stays): if you missed it, unplug the power and plug it in again. With an Ethernet cable there is no setup network: open that address directly.
 
-<table><tr><td><video src="https://github.com/user-attachments/assets/b1c3d651-384a-4afa-83c2-de545a81e27e" controls width="100%"></video></td></tr></table>
+<table><tr><td><a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/maE7SnMffYA">Watch on YouTube</a></td></tr></table>
 
-*The four steps on a real Pi 3 Model B, from the download to the settings on a phone (2:53, the waiting sped up; [1080p](https://exxbrain.github.io/exxpiano/exxpiano-setup.mp4)).*
+*The four steps on a real Pi 3 Model B, from the download to the settings on a phone (2:53, the waiting sped up).*
 
 Then play. More about the setup network: [Connecting to a new Wi-Fi](docs/USING.md#connecting-to-a-new-wi-fi); and read "Power supply" below. Building the banks and the image yourself is only for developers: [docs/BUILDING.md](docs/BUILDING.md).
 
@@ -61,13 +61,13 @@ Not yet tried on real hardware: the import from a USB drive (see "Tested on" bel
 <tr><th width="50%">Full bank</th><th width="50%">Lite bank</th></tr>
 <tr><th colspan="2"><i>La Campanella</i> (from 1:48)</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/ed38b688-a0c3-4dd1-9f60-c69b75b97188" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/2143e2ff-5f1c-4d69-8303-2ad6272d8107" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
+<td><a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/_oCsFN9PC_Q">Watch on YouTube</a></td>
+<td><a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/WpUCxzW6b-o">Watch on YouTube</a></td>
 </tr>
 <tr><th colspan="2"><i>Un Sospiro</i></th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/f805db33-6a42-4462-bb08-bb2ccb2b3917" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/b120f9a7-37c8-40de-9d94-99739a298258" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
+<td><a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/nHJo8DUatrA">Watch on YouTube</a></td>
+<td><a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/ROzxRNCvmKA">Watch on YouTube</a></td>
 </tr>
 </table>
 
@@ -137,4 +137,4 @@ The repository's scripts are MIT ([LICENSE](LICENSE)). The [Salamander Grand Pia
 ([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
 attribution.
 
-The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The demonstration videos ([exxbrain.github.io/exxpiano](https://exxbrain.github.io/exxpiano/)) are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. Alpine Linux and its packages in the image keep their own licenses.
+The two demonstration recordings of real pianists (`assets/midi/`, Liszt's *Un Sospiro* and *La Campanella*) are taken unchanged from the [**MAESTRO dataset v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) and are licensed [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): non-commercial use only, with attribution, shared under the same license; this covers these files, not the MIT code ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). The demonstration videos ([YouTube](https://www.youtube.com/channel/UCaqFaRCMmHVezksqe_fxcJg)) are made from these recordings and are under the same license. Delete them if you use exxpiano commercially. Alpine Linux and its packages in the image keep their own licenses.

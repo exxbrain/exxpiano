@@ -21,9 +21,9 @@
 3. **Включите:** вставьте карту в Pi, подключите клавиатуру и наушники (разъём 3.5 мм или USB-звуковая карта) и подайте питание. Первый запуск идёт без сети. Пока грузится полный банк, играет небольшой **рояль-превью**: на Pi 3 Model B первая нота звучит не позже 15 с от включения (14,5 с по секундомеру), а полный банк — примерно через 32 с после превью. Пианино переходит на полный банк без паузы, в момент, когда отпущены все клавиши и педаль. Превью звучит проще: 3 слоя громкости, 22 кГц, а ноты дольше 3 с обрываются концом сэмпла.
 4. **Откройте с телефона:** подключитесь к Wi-Fi сети **`exxpiano-Setup-<ID>`** (пароль **`exxpianosetup`**); web-интерфейс откроется сам или по адресу `http://10.42.0.1:8080/`. В его разделе **Wi-Fi** подключите Pi к домашней сети, затем откройте `http://exxpiano-<id>.local:8080/`. Пока у Pi нет сохранённых сетей, сеть настройки работает **5 минут** после включения (пока к ней подключён телефон, она не выключается): если не успели, выньте и снова вставьте питание. С кабелем Ethernet сети настройки нет: сразу откройте этот адрес.
 
-<table><tr><td><video src="https://github.com/user-attachments/assets/b1c3d651-384a-4afa-83c2-de545a81e27e" controls width="100%"></video></td></tr></table>
+<table><tr><td><a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/maE7SnMffYA">Смотреть на YouTube</a></td></tr></table>
 
-*Те же четыре шага на настоящем Pi 3 Model B, от скачивания до настроек на телефоне (2:53, ожидание ускорено; [1080p](https://exxbrain.github.io/exxpiano/exxpiano-setup.mp4)).*
+*Те же четыре шага на настоящем Pi 3 Model B, от скачивания до настроек на телефоне (2:53, ожидание ускорено).*
 
 Можно играть. Подробнее о сети настройки: [«Подключение к новой Wi-Fi»](docs/USING.ru.md#подключение-к-новой-wi-fi); и прочитайте «Питание» ниже. Собирать банки и образ самому нужно только разработчикам: [docs/BUILDING.ru.md](docs/BUILDING.ru.md).
 
@@ -61,13 +61,13 @@
 <tr><th width="50%">Банк full</th><th width="50%">Банк lite</th></tr>
 <tr><th colspan="2">«Кампанелла» (с 1:48)</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/ed38b688-a0c3-4dd1-9f60-c69b75b97188" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/2143e2ff-5f1c-4d69-8303-2ad6272d8107" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-campanella-lite.mp4">1080p</a></td>
+<td><a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/_oCsFN9PC_Q">Смотреть на YouTube</a></td>
+<td><a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/WpUCxzW6b-o">Смотреть на YouTube</a></td>
 </tr>
 <tr><th colspan="2">«Вздох»</th></tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/f805db33-6a42-4462-bb08-bb2ccb2b3917" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-full.mp4">1080p</a></td>
-<td><video src="https://github.com/user-attachments/assets/b120f9a7-37c8-40de-9d94-99739a298258" controls width="100%"></video><br><a href="https://exxbrain.github.io/exxpiano/exxpiano-sospiro-lite.mp4">1080p</a></td>
+<td><a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/nHJo8DUatrA">Смотреть на YouTube</a></td>
+<td><a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/ROzxRNCvmKA">Смотреть на YouTube</a></td>
 </tr>
 </table>
 
@@ -138,4 +138,4 @@ Pi 4 нужен блок 5.1 В / 3 А, а Pi 5 — 5.1 В / 5 А (официа�
 ([NOTICE.md](NOTICE.md)). Собранные из них файлы `.sf2` — производные работы, их распространение требует
 указания авторства.
 
-Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Демонстрационные видео ([exxbrain.github.io/exxpiano](https://exxbrain.github.io/exxpiano/)) сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. Alpine Linux и её пакеты в образе остаются под своими лицензиями.
+Две демонстрационные записи настоящих пианистов (`assets/midi/`, «Вздох» и «Кампанелла» Листа) взяты без изменений из [**набора MAESTRO v3.0.0**](https://magenta.tensorflow.org/datasets/maestro) (Google LLC) и распространяются по лицензии [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/): только некоммерческое использование, с указанием авторства и под той же лицензией; это относится к этим файлам, а не к коду под MIT ([assets/midi/NOTICE.md](assets/midi/NOTICE.md)). Демонстрационные видео ([YouTube](https://www.youtube.com/channel/UCaqFaRCMmHVezksqe_fxcJg)) сделаны из этих записей и распространяются под той же лицензией. Для коммерческого использования удалите их. Alpine Linux и её пакеты в образе остаются под своими лицензиями.
