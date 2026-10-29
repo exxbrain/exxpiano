@@ -1,6 +1,6 @@
 [English](README.md) | Русский
 
-![exxpiano](docs/images/exxpiano.svg)
+<img src="docs/images/exxpiano.svg" width="600" alt="exxpiano">
 
 [![сборка](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml)
 [![сборка релиза](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml)
@@ -21,7 +21,7 @@
 3. **Включите:** вставьте карту в Pi, подключите клавиатуру и наушники (разъём 3.5 мм или USB-звуковая карта) и подайте питание. Первый запуск идёт без сети. Пока грузится полный банк, играет небольшой **рояль-превью**: на Pi 3 Model B первая нота звучит не позже 15 с от включения (14,5 с по секундомеру), а полный банк — примерно через 32 с после превью. Пианино переходит на полный банк без паузы, в момент, когда отпущены все клавиши и педаль. Превью звучит проще: 3 слоя громкости, 22 кГц, а ноты дольше 3 с обрываются концом сэмпла.
 4. **Откройте с телефона:** подключитесь к Wi-Fi сети **`exxpiano-Setup-<ID>`** (пароль **`exxpianosetup`**); web-интерфейс откроется сам или по адресу `http://10.42.0.1:8080/`. В его разделе **Wi-Fi** подключите Pi к домашней сети, затем откройте `http://exxpiano-<id>.local:8080/`. Пока у Pi нет сохранённых сетей, сеть настройки работает **5 минут** после включения (пока к ней подключён телефон, она не выключается): если не успели, выньте и снова вставьте питание. С кабелем Ethernet сети настройки нет: сразу откройте этот адрес.
 
-<table><tr><td><a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/maE7SnMffYA">Смотреть на YouTube</a></td></tr></table>
+<a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="480" alt="Установка exxpiano на YouTube"></a>
 
 *Те же четыре шага на настоящем Pi 3 Model B, от скачивания до настроек на телефоне (2:53, ожидание ускорено).*
 
@@ -41,35 +41,23 @@
 
 ## Как это выглядит
 
-| Главная | Банк рояля (и импорт с USB) | Туше и механика |
-|---|---|---|
-| ![Главная](docs/images/ui-home-ru.png) | ![Банк рояля](docs/images/ui-bank-ru.png) | ![Туше и механика](docs/images/ui-sound-ru.png) |
+<img src="docs/images/ui-home-ru.png" width="220" alt="Главная"> <img src="docs/images/ui-bank-ru.png" width="220" alt="Банк рояля"> <img src="docs/images/ui-sound-ru.png" width="220" alt="Туше и механика"> <img src="docs/images/ui-mon-ru.png" width="220" alt="Монитор"> <img src="docs/images/ui-wifi-ru.png" width="220" alt="Wi-Fi"> <img src="docs/images/ui-midi-ru.png" width="220" alt="MIDI-файлы"> <img src="docs/images/ui-fx-ru.png" width="220" alt="Эффекты">
 
-| Монитор | Wi-Fi | MIDI-плеер |
-|---|---|---|
-| ![Монитор](docs/images/ui-mon-ru.png) | ![Wi-Fi](docs/images/ui-wifi-ru.png) | ![MIDI-файлы](docs/images/ui-midi-ru.png) |
-
-| Эффекты (реверберация) |
-|---|
-| ![Эффекты](docs/images/ui-fx-ru.png) |
+По порядку: Главная · Банк рояля (и импорт с USB) · Туше и механика · Монитор · Wi-Fi · MIDI-плеер · Эффекты (реверберация).
 
 *Картинки делает `scripts/make-screenshots.py` из демо `scripts/demo-web.py` (имитация устройства: цифры, сети и банки выдуманы; пьесы настоящие, записи из `assets/midi/`), в ширину телефона.*
 
 ## Как это звучит
 
-<table>
-<tr><th width="50%">Банк full</th><th width="50%">Банк lite</th></tr>
-<tr><th colspan="2">«Кампанелла» (с 1:48)</th></tr>
-<tr>
-<td><a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/_oCsFN9PC_Q">Смотреть на YouTube</a></td>
-<td><a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/WpUCxzW6b-o">Смотреть на YouTube</a></td>
-</tr>
-<tr><th colspan="2">«Вздох»</th></tr>
-<tr>
-<td><a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/nHJo8DUatrA">Смотреть на YouTube</a></td>
-<td><a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/ROzxRNCvmKA">Смотреть на YouTube</a></td>
-</tr>
-</table>
+**«Кампанелла» (с 1:48)**
+
+<a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/mqdefault.jpg" width="320" alt="La Campanella, банк full"></a> <a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/mqdefault.jpg" width="320" alt="La Campanella, банк lite"></a>
+
+**«Вздох»**
+
+<a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/mqdefault.jpg" width="320" alt="Un Sospiro, банк full"></a> <a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/mqdefault.jpg" width="320" alt="Un Sospiro, банк lite"></a>
+
+Слева (на телефоне сверху) банк `full`, справа (ниже) банк `lite`. Нажмите на картинку, чтобы посмотреть на YouTube.
 
 *Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi 3 Model B с exxpiano 2.0.1, звук записан цифровой копией потока, который устройство отдаёт на звуковую карту: слева банк `full`, справа `lite`, оба с механикой и 256 голосами. К звуку ничего не добавлено, кроме одного усиления на запись, чтобы все записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
 

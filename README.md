@@ -1,6 +1,6 @@
 English | [Русский](README.ru.md)
 
-![exxpiano](docs/images/exxpiano.svg)
+<img src="docs/images/exxpiano.svg" width="600" alt="exxpiano">
 
 [![build](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/build.yml)
 [![release build](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml/badge.svg)](https://github.com/exxbrain/exxpiano/actions/workflows/release.yml)
@@ -21,7 +21,7 @@ You need a Raspberry Pi 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microS
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline. While the full bank loads, a small **preview piano** plays: on a Pi 3 Model B the first note sounds within 15 s of power-on (14.5 s with a stopwatch), and the full bank follows about 32 s after the preview. The piano moves over to the full bank at a moment with no key and no pedal down, without a pause. The preview is plainer: 3 velocity layers, 22 kHz, and notes held longer than 3 s stop with the end of their sample.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. The setup network is on for **5 minutes** after the Pi is switched on while it has no saved network (as long as a phone is connected to it, it stays): if you missed it, unplug the power and plug it in again. With an Ethernet cable there is no setup network: open that address directly.
 
-<table><tr><td><a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/maE7SnMffYA">Watch on YouTube</a></td></tr></table>
+<a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="480" alt="exxpiano setup on YouTube"></a>
 
 *The four steps on a real Pi 3 Model B, from the download to the settings on a phone (2:53, the waiting sped up).*
 
@@ -41,35 +41,23 @@ Not yet tried on real hardware: the import from a USB drive (see "Tested on" bel
 
 ## What it looks like
 
-| Home | Piano bank (and the USB import) | Touch and mechanics |
-|---|---|---|
-| ![Home](docs/images/ui-home.png) | ![Piano bank](docs/images/ui-bank.png) | ![Touch and mechanics](docs/images/ui-sound.png) |
+<img src="docs/images/ui-home.png" width="220" alt="Home"> <img src="docs/images/ui-bank.png" width="220" alt="Piano bank"> <img src="docs/images/ui-sound.png" width="220" alt="Touch and mechanics"> <img src="docs/images/ui-mon.png" width="220" alt="Monitor"> <img src="docs/images/ui-wifi.png" width="220" alt="Wi-Fi"> <img src="docs/images/ui-midi.png" width="220" alt="MIDI files"> <img src="docs/images/ui-fx.png" width="220" alt="Effects">
 
-| Monitor | Wi-Fi | MIDI player |
-|---|---|---|
-| ![Monitor](docs/images/ui-mon.png) | ![Wi-Fi](docs/images/ui-wifi.png) | ![MIDI files](docs/images/ui-midi.png) |
-
-| Effects (reverb) |
-|---|
-| ![Effects](docs/images/ui-fx.png) |
+In order: Home · Piano bank (and the USB import) · Touch and mechanics · Monitor · Wi-Fi · MIDI player · Effects (reverb).
 
 *The pictures are made by `scripts/make-screenshots.py` from the demo `scripts/demo-web.py` (a simulated device: the numbers, the networks and the banks are made up; the pieces are the real recordings of `assets/midi/`), at the width of a phone.*
 
 ## What it sounds like
 
-<table>
-<tr><th width="50%">Full bank</th><th width="50%">Lite bank</th></tr>
-<tr><th colspan="2"><i>La Campanella</i> (from 1:48)</th></tr>
-<tr>
-<td><a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/_oCsFN9PC_Q">Watch on YouTube</a></td>
-<td><a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/WpUCxzW6b-o">Watch on YouTube</a></td>
-</tr>
-<tr><th colspan="2"><i>Un Sospiro</i></th></tr>
-<tr>
-<td><a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/nHJo8DUatrA">Watch on YouTube</a></td>
-<td><a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/maxresdefault.jpg" width="100%" alt="YouTube"></a><br><a href="https://youtu.be/ROzxRNCvmKA">Watch on YouTube</a></td>
-</tr>
-</table>
+**<i>La Campanella</i> (from 1:48)**
+
+<a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/mqdefault.jpg" width="320" alt="La Campanella, full bank"></a> <a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/mqdefault.jpg" width="320" alt="La Campanella, lite bank"></a>
+
+**<i>Un Sospiro</i>**
+
+<a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/mqdefault.jpg" width="320" alt="Un Sospiro, full bank"></a> <a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/mqdefault.jpg" width="320" alt="Un Sospiro, lite bank"></a>
+
+Left (or top on a phone): the `full` bank; right (or below): the `lite` bank. Click a picture to watch on YouTube.
 
 *The two pieces that come with the device, played by its MIDI player on a Raspberry Pi 3 Model B running exxpiano 2.0.1 and recorded digitally from the stream the device sends to its sound card: the `full` bank on the left, the `lite` bank on the right, both with the mechanics and 256 voices. Nothing was added to the sound but one gain per recording to bring them all to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 
