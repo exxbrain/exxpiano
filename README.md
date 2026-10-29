@@ -21,7 +21,9 @@ You need a Raspberry Pi 3, 4 or 5 (a Pi 5 also needs a USB sound card), a microS
 3. **Switch it on:** put the card into the Pi, plug in the keyboard and the headphones (3.5 mm jack or a USB sound card) and power it on. The first start is offline. While the full bank loads, a small **preview piano** plays: on a Pi 3 Model B the first note sounds within 15 s of power-on (14.5 s with a stopwatch), and the full bank follows about 32 s after the preview. The piano moves over to the full bank at a moment with no key and no pedal down, without a pause. The preview is plainer: 3 velocity layers, 22 kHz, and notes held longer than 3 s stop with the end of their sample.
 4. **Open it from your phone:** join the Wi-Fi network **`exxpiano-Setup-<ID>`** (password **`exxpianosetup`**); the web interface opens by itself or at `http://10.42.0.1:8080/`. In its **Wi-Fi** section connect the Pi to your home network, then open `http://exxpiano-<id>.local:8080/`. The setup network is on for **5 minutes** after the Pi is switched on while it has no saved network (as long as a phone is connected to it, it stays): if you missed it, unplug the power and plug it in again. With an Ethernet cable there is no setup network: open that address directly.
 
-<a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="480" alt="exxpiano setup on YouTube"></a>
+<a href="https://youtu.be/maE7SnMffYA"><img src="docs/images/video-setup-en.jpg" width="480" alt="exxpiano setup on YouTube"></a>
+
+[▶ Watch on YouTube](https://youtu.be/maE7SnMffYA)
 
 *The four steps on a real Pi 3 Model B, from the download to the settings on a phone (2:53, the waiting sped up).*
 
@@ -51,13 +53,17 @@ In order: Home · Piano bank (and the USB import) · Touch and mechanics · Moni
 
 **<i>La Campanella</i> (from 1:48)**
 
-<a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/mqdefault.jpg" width="320" alt="La Campanella, full bank"></a> <a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/mqdefault.jpg" width="320" alt="La Campanella, lite bank"></a>
+<a href="https://youtu.be/_oCsFN9PC_Q"><img src="docs/images/video-campanella-full-en.jpg" width="320" alt="La Campanella, full bank"></a> <a href="https://youtu.be/WpUCxzW6b-o"><img src="docs/images/video-campanella-lite-en.jpg" width="320" alt="La Campanella, lite bank"></a>
+
+▶ Watch on YouTube: [full bank](https://youtu.be/_oCsFN9PC_Q) · [lite bank](https://youtu.be/WpUCxzW6b-o)
 
 **<i>Un Sospiro</i>**
 
-<a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/mqdefault.jpg" width="320" alt="Un Sospiro, full bank"></a> <a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/mqdefault.jpg" width="320" alt="Un Sospiro, lite bank"></a>
+<a href="https://youtu.be/nHJo8DUatrA"><img src="docs/images/video-sospiro-full-en.jpg" width="320" alt="Un Sospiro, full bank"></a> <a href="https://youtu.be/ROzxRNCvmKA"><img src="docs/images/video-sospiro-lite-en.jpg" width="320" alt="Un Sospiro, lite bank"></a>
 
-Left (or top on a phone): the `full` bank; right (or below): the `lite` bank. Click a picture to watch on YouTube.
+▶ Watch on YouTube: [full bank](https://youtu.be/nHJo8DUatrA) · [lite bank](https://youtu.be/ROzxRNCvmKA)
+
+Left (or top on a phone): the `full` bank; right (or below): the `lite` bank.
 
 *The two pieces that come with the device, played by its MIDI player on a Raspberry Pi 3 Model B running exxpiano 2.0.1 and recorded digitally from the stream the device sends to its sound card: the `full` bank on the left, the `lite` bank on the right, both with the mechanics and 256 voices. Nothing was added to the sound but one gain per recording to bring them all to the same level. The falling notes are drawn from the same MIDI files. The performances are from the MAESTRO dataset and, like these videos, are **CC BY-NC-SA 4.0** (see "Licenses").*
 

@@ -21,7 +21,9 @@
 3. **Включите:** вставьте карту в Pi, подключите клавиатуру и наушники (разъём 3.5 мм или USB-звуковая карта) и подайте питание. Первый запуск идёт без сети. Пока грузится полный банк, играет небольшой **рояль-превью**: на Pi 3 Model B первая нота звучит не позже 15 с от включения (14,5 с по секундомеру), а полный банк — примерно через 32 с после превью. Пианино переходит на полный банк без паузы, в момент, когда отпущены все клавиши и педаль. Превью звучит проще: 3 слоя громкости, 22 кГц, а ноты дольше 3 с обрываются концом сэмпла.
 4. **Откройте с телефона:** подключитесь к Wi-Fi сети **`exxpiano-Setup-<ID>`** (пароль **`exxpianosetup`**); web-интерфейс откроется сам или по адресу `http://10.42.0.1:8080/`. В его разделе **Wi-Fi** подключите Pi к домашней сети, затем откройте `http://exxpiano-<id>.local:8080/`. Пока у Pi нет сохранённых сетей, сеть настройки работает **5 минут** после включения (пока к ней подключён телефон, она не выключается): если не успели, выньте и снова вставьте питание. С кабелем Ethernet сети настройки нет: сразу откройте этот адрес.
 
-<a href="https://youtu.be/maE7SnMffYA"><img src="https://img.youtube.com/vi/maE7SnMffYA/maxresdefault.jpg" width="480" alt="Установка exxpiano на YouTube"></a>
+<a href="https://youtu.be/maE7SnMffYA"><img src="docs/images/video-setup-ru.jpg" width="480" alt="Установка exxpiano на YouTube"></a>
+
+[▶ Смотреть на YouTube](https://youtu.be/maE7SnMffYA)
 
 *Те же четыре шага на настоящем Pi 3 Model B, от скачивания до настроек на телефоне (2:53, ожидание ускорено).*
 
@@ -51,13 +53,17 @@
 
 **«Кампанелла» (с 1:48)**
 
-<a href="https://youtu.be/_oCsFN9PC_Q"><img src="https://img.youtube.com/vi/_oCsFN9PC_Q/mqdefault.jpg" width="320" alt="La Campanella, банк full"></a> <a href="https://youtu.be/WpUCxzW6b-o"><img src="https://img.youtube.com/vi/WpUCxzW6b-o/mqdefault.jpg" width="320" alt="La Campanella, банк lite"></a>
+<a href="https://youtu.be/_oCsFN9PC_Q"><img src="docs/images/video-campanella-full-ru.jpg" width="320" alt="La Campanella, банк full"></a> <a href="https://youtu.be/WpUCxzW6b-o"><img src="docs/images/video-campanella-lite-ru.jpg" width="320" alt="La Campanella, банк lite"></a>
+
+▶ Смотреть на YouTube: [банк full](https://youtu.be/_oCsFN9PC_Q) · [банк lite](https://youtu.be/WpUCxzW6b-o)
 
 **«Вздох»**
 
-<a href="https://youtu.be/nHJo8DUatrA"><img src="https://img.youtube.com/vi/nHJo8DUatrA/mqdefault.jpg" width="320" alt="Un Sospiro, банк full"></a> <a href="https://youtu.be/ROzxRNCvmKA"><img src="https://img.youtube.com/vi/ROzxRNCvmKA/mqdefault.jpg" width="320" alt="Un Sospiro, банк lite"></a>
+<a href="https://youtu.be/nHJo8DUatrA"><img src="docs/images/video-sospiro-full-ru.jpg" width="320" alt="Un Sospiro, банк full"></a> <a href="https://youtu.be/ROzxRNCvmKA"><img src="docs/images/video-sospiro-lite-ru.jpg" width="320" alt="Un Sospiro, банк lite"></a>
 
-Слева (на телефоне сверху) банк `full`, справа (ниже) банк `lite`. Нажмите на картинку, чтобы посмотреть на YouTube.
+▶ Смотреть на YouTube: [банк full](https://youtu.be/nHJo8DUatrA) · [банк lite](https://youtu.be/ROzxRNCvmKA)
+
+Слева (на телефоне сверху) банк `full`, справа (ниже) банк `lite`.
 
 *Две пьесы, которые идут с устройством: их сыграл MIDI-плеер на Raspberry Pi 3 Model B с exxpiano 2.0.1, звук записан цифровой копией потока, который устройство отдаёт на звуковую карту: слева банк `full`, справа `lite`, оба с механикой и 256 голосами. К звуку ничего не добавлено, кроме одного усиления на запись, чтобы все записи были одной громкости. Падающие ноты нарисованы по тем же MIDI-файлам. Исполнения взяты из набора MAESTRO и, как и эти видео, распространяются по **CC BY-NC-SA 4.0** (см. «Лицензии»).*
 
