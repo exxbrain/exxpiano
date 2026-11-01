@@ -44,6 +44,7 @@ VARIABLES = (
     'SYNTH_PROGRAM',
     'USB_PERIOD_SIZE',
     'USB_PERIODS',
+    'USB_READ_RATE',
     'USB_SETTLE',
     'USB_SYSFS',
     'USB_WAIT',

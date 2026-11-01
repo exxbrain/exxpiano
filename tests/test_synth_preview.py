@@ -6,6 +6,7 @@ preview-bank-while-loading). Run from the repository root:   python3 -m unittest
 """
 
 import importlib.util
+import ctypes
 import json
 import os
 import subprocess
@@ -43,7 +44,8 @@ class FakeFS:
         self.next_id += 1
         return self.next_id - 1
 
-    def load_aside(self, path):
+    def load_aside(self, path, read_rate=None):
+        self.read_rates = getattr(self, 'read_rates', []) + [(path, read_rate)]
         if 'preview' not in path:
             self.release.wait(5)
         self.loaded_aside.append(path)
@@ -154,6 +156,34 @@ class EngineTests(unittest.TestCase):
         st = self.state()
         self.assertEqual((st['state'], st['playing'], st['loading'], st['error']), ('ready', '/p/full.sf2', None, None))
         self.assertEqual(st['pid'], os.getpid())
+
+    def test_only_the_big_bank_is_read_slowly(self):
+        fs = FakeFS()
+        e = synth.Engine(fs, state_file=self.state_file, clock=self.clock, sleep=self.clock.sleep, read_rate=20)
+        e.start('/p/preview.sf2', '/p/mech.sf2', '/p/full.sf2', 0, 0)
+        self.finish(e)
+        self.assertEqual(fs.read_rates, [('/p/preview.sf2', None), ('/p/mech.sf2', None), ('/p/full.sf2', 20)])
+
+    def test_slow_files_read_everything_at_the_rate(self):
+        clock = Clock()
+        files = synth.SlowFiles(2, clock=clock, sleep=clock.sleep)  # 2 MB/s
+        with tempfile.NamedTemporaryFile() as f:
+            data = bytes(range(256)) * (5 * 4096)  # 5 MiB
+            f.write(data)
+            f.flush()
+            h = files.open(f.name.encode())
+            self.assertEqual((files.seek(h, 3, 0), files.tell(h)), (0, 3))
+            buf = ctypes.create_string_buffer(len(data) - 3)
+            self.assertEqual(files.read(ctypes.addressof(buf), len(data) - 3, h), 0)
+            self.assertEqual(buf.raw, data[3:])
+            self.assertAlmostEqual(clock.t, (len(data) - 3) / 2e6, places=3)  # the pauses add up to the rate
+            self.assertEqual(files.read(ctypes.addressof(buf), 10, h), -1)  # past the end: a failure, as FluidSynth expects
+            self.assertEqual(files.close(h), 0)
+        self.assertIsNone(files.open(b'/no/such/file'))
+
+    def test_the_read_rate_argument(self):
+        args = synth.parse_args(['--preview', 'p.sf2', '--mech', 'm.sf2', '--read-rate', '20', 'full.sf2'])
+        self.assertEqual(args.read_rate, 20)
 
     def test_while_the_bank_loads_the_state_says_the_preview_plays(self):
         fs = FakeFS()
@@ -380,12 +410,18 @@ class ArgsTests(unittest.TestCase):
 class LaunchTests(unittest.TestCase):
     """exxpiano-run picks exxpiano-synth only for a usable preview bank."""
 
-    def run_dry(self, preview, failed=False, newer_preview=False):
+    def run_dry(self, preview, failed=False, newer_preview=False, usb_card=False, **extra):
         with tempfile.TemporaryDirectory() as tmp:
             asound = os.path.join(tmp, 'asound')
             os.makedirs(os.path.join(asound, 'card0', 'pcm0p'))
             with open(os.path.join(asound, 'cards'), 'w') as f:
                 f.write(' 0 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n')
+                if usb_card:
+                    f.write(' 1 [U24            ]: USB-Audio - U-24\n')
+            if usb_card:
+                os.makedirs(os.path.join(asound, 'card1', 'pcm0p'))
+                with open(os.path.join(asound, 'card1', 'usbid'), 'w') as f:
+                    f.write('1686:0090\n')
             good = os.path.join(tmp, 'good.sf2')
             with open(good, 'wb') as f:
                 f.write(b'x')
@@ -403,6 +439,7 @@ class LaunchTests(unittest.TestCase):
                 CPU_COUNT='4',
                 FX_ARGS='--velocity-curve 1 --piano-bank 2 --piano-prog 5',
                 PIANO_SF2_LAST_GOOD='/last.sf2',
+                **extra,
             )
             with open(env['SF2INFO'], 'w') as f:  # a stand-in: a bank is good when its name has "good" in it
                 f.write("import sys\nsys.exit(0 if 'good' in sys.argv[-1] else 1)\n")
@@ -446,6 +483,16 @@ class LaunchTests(unittest.TestCase):
             'TMP/good.sf2',
         ):
             self.assertIn(part, out)
+
+    def test_with_a_usb_card_the_piano_bank_is_read_slowly(self):
+        out, err = self.run_dry('preview-good.sf2', usb_card=True)
+        self.assertIn('audio.alsa.device=plughw:CARD=U24', out)
+        self.assertIn('--read-rate 20 TMP/good.sf2', out)
+        self.assertIn('read at 20 MB/s', err)
+        out, _ = self.run_dry('preview-good.sf2', usb_card=True, USB_READ_RATE='0')
+        self.assertNotIn('--read-rate', out)
+        out, _ = self.run_dry('preview-good.sf2')
+        self.assertNotIn('--read-rate', out)  # the jack: as fast as the card goes
 
     def test_without_a_usable_preview_fluidsynth_starts_as_before(self):
         out, _ = self.run_dry(None)  # PREVIEW_SF2 empty: turned off

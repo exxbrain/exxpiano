@@ -42,6 +42,12 @@ The `exxpiano-fx` log should contain lines like `synth: FLUID Synth ...` and `in
 - First check `vcgencmd get_throttled`. If it is not `0x0`, it is the power supply, not the settings (see [Power supply](../README.md#power-supply-read-this) in the README).
 - Clicks: raise `PERIODS` to 3-4 (or `PERIOD_SIZE`).
 - Latency: `PERIODS=2` on the onboard output, or better a USB sound card.
+- **A USB card clicks in the first half minute, while the piano bank loads, and then stops.** On a Pi 3 reading the SD card disturbs the USB
+  card (a Zoom U-24 on a Pi 3 B: about 30 clicks while the full bank was read at full speed). That is why the bank is read at most
+  `USB_READ_RATE` MB/s with an external card: 20 by default (the full bank in about 35 s, a few clicks can be left), 8 is clean (about
+  90 s), 0 reads at full speed. The preview piano plays meanwhile. The buffer is not the cause: a larger one did not help.
+- Headphones in the Pi's own 3.5 mm jack while a USB card is plugged in: the sound goes to the USB card, the jack carries only the noise of
+  the board (clicks of the SD card, the processor, the network). Unplug the USB card or listen through it.
 - Load: `htop` (if the `fluidsynth` thread sits at 100%, use `lite`, lower `POLYPHONY`, keep `REVERB=0`; on a Pi with 4 cores `CPU_CORES=3` shares the voices between the cores).
 
 ## A USB drive is not offered for the bank import

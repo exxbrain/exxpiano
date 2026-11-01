@@ -7,12 +7,14 @@ waits for that lock (31.7 s for the full bank on a Pi 3 B). So the big bank is r
 no MIDI, and the loaded SoundFont is then moved over (remove_sfont + add_sfont, 0.1 ms): notes wait at most 0.5 ms meanwhile.
 
 When the bank is loaded and no key of the piano channel and no sustain pedal is down, the piano channel moves to it and the preview is
-unloaded; its sounding notes ring on until their voices end. A new bank is loaded the same way when the web interface writes
+unloaded; its sounding notes ring on until their voices end. With --read-rate the big bank is read from the card at most that fast:
+reading it at full speed made a USB sound card click while the preview played (a Zoom U-24 on a Pi 3 B; 8 MB/s was clean). A new bank is loaded the same way when the web interface writes
 `exxpiano-load BANK PROG PATH` into the command pipe (the path last: a file name may hold spaces); every other line goes to FluidSynth's own commands (`set synth.gain 0.8`).
 
 The state is written to /run/exxpiano-bank.json for the web interface: state (preview, ready, failed), playing, loading, error.
 
-  exxpiano-synth.py [-o NAME=VALUE ...] --preview PREVIEW.sf2 --mech MECH.sf2 [--bank B --prog P] [--fallback LAST_GOOD.sf2] PIANO.sf2
+  exxpiano-synth.py [-o NAME=VALUE ...] --preview PREVIEW.sf2 --mech MECH.sf2 [--bank B --prog P] [--fallback LAST_GOOD.sf2]
+                    [--read-rate MB_PER_S] PIANO.sf2
 """
 
 import argparse
@@ -51,8 +53,9 @@ def write_state(path, **state):
 class Engine:
     """What to load and when to move over. `fs` does the work (FluidSynth below, a fake in the tests)."""
 
-    def __init__(self, fs, state_file=STATE_FILE, clock=time.monotonic, sleep=time.sleep, choose=None, remember=None):
+    def __init__(self, fs, state_file=STATE_FILE, clock=time.monotonic, sleep=time.sleep, choose=None, remember=None, read_rate=None):
         self.fs, self.state_file, self.clock, self.sleep = fs, state_file, clock, sleep
+        self.read_rate = read_rate  # MB/s for reading a big piano bank (None: as fast as the card goes); the preview and the mechanics are small
         self.choose = choose or (lambda piano, mech, preview: piano)  # the bank that fits the memory (see fitting_bank)
         self.remember = remember or (lambda path: None)  # the bank that really plays goes into the settings (see store_piano)
         self.lock = threading.Lock()
@@ -119,7 +122,7 @@ class Engine:
     # ---- loading a big bank and moving over to it
     def _bring_in(self, piano, bank, prog, fallback=None):
         t0 = self.clock()
-        handle = self.fs.load_aside(piano)
+        handle = self.fs.load_aside(piano, self.read_rate) if self.read_rate else self.fs.load_aside(piano)
         if handle is None:
             log('%s did not load' % piano)
             if fallback and fallback != piano:
@@ -232,6 +235,72 @@ class Engine:
         return True
 
 
+class SlowFiles:
+    """File callbacks of a FluidSynth SoundFont loader that read at most `rate` MB/s, in chunks of 1 MB with pauses between them."""
+
+    CHUNK = 1 << 20
+
+    def __init__(self, rate, clock=time.monotonic, sleep=time.sleep):
+        self.rate, self.clock, self.sleep = rate * 1e6, clock, sleep
+        self.files, self.next = {}, 1
+        L64 = ctypes.c_longlong
+        self._cb = (
+            ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_char_p)(self.open),
+            ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, L64, ctypes.c_void_p)(self.read),
+            ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, L64, ctypes.c_int)(self.seek),
+            ctypes.CFUNCTYPE(L64, ctypes.c_void_p)(self.tell),
+            ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p)(self.close),
+        )
+
+    def callbacks(self):
+        return [ctypes.cast(cb, ctypes.c_void_p) for cb in self._cb]
+
+    def open(self, name):
+        try:
+            f = open(name.decode(), 'rb', buffering=0)
+        except OSError:
+            return None
+        handle, self.next = self.next, self.next + 1
+        self.files[handle] = [f, self.clock(), 0]  # the file, when reading began, bytes read since
+        return handle
+
+    def read(self, buf, count, handle):
+        """FluidSynth wants all `count` bytes or a failure (0 / -1)."""
+        entry = self.files.get(handle)
+        if entry is None:
+            return -1
+        f, done = entry[0], 0
+        while done < count:
+            n = f.readinto((ctypes.c_char * min(self.CHUNK, count - done)).from_address(buf + done))
+            if not n:
+                return -1
+            done += n
+            entry[2] += n
+            ahead = entry[1] + entry[2] / self.rate - self.clock()
+            if ahead > 0:
+                self.sleep(ahead)
+        return 0
+
+    def seek(self, handle, offset, origin):
+        try:
+            self.files[handle][0].seek(offset, origin)
+            return 0
+        except (KeyError, OSError, ValueError):
+            return -1
+
+    def tell(self, handle):
+        try:
+            return self.files[handle][0].tell()
+        except (KeyError, OSError, ValueError):
+            return -1
+
+    def close(self, handle):
+        entry = self.files.pop(handle, None)
+        if entry:
+            entry[0].close()
+        return 0
+
+
 class FluidSynth:
     """The calls Engine needs, on libfluidsynth through ctypes."""
 
@@ -270,6 +339,9 @@ class FluidSynth:
             ('fluid_preset_get_banknum', I, [P]),
             ('fluid_preset_get_num', I, [P]),
             ('fluid_set_log_function', P, [I, P, P]),
+            ('new_fluid_defsfloader', P, [P]),
+            ('fluid_sfloader_set_callbacks', I, [P, P, P, P, P, P]),
+            ('fluid_synth_add_sfloader', None, [P, P]),
         ]:
             f = getattr(L, name)
             f.restype, f.argtypes = res, args
@@ -314,12 +386,17 @@ class FluidSynth:
         sfid = self.L.fluid_synth_sfload(self.synth, path.encode(), 0)
         return None if sfid < 0 else sfid
 
-    def load_aside(self, path):
-        """Read the bank in a synthesizer of its own (its lock, not the playing one's) and take the SoundFont out of it."""
+    def load_aside(self, path, read_rate=None):
+        """Read the bank in a synthesizer of its own (its lock, not the playing one's) and take the SoundFont out of it; read_rate: MB/s."""
         helper = self.L.new_fluid_synth(self.aside)
         if not helper:
             return None
         try:
+            if read_rate:
+                files = SlowFiles(read_rate)
+                loader = self.L.new_fluid_defsfloader(self.aside)
+                self.L.fluid_sfloader_set_callbacks(loader, *files.callbacks())
+                self.L.fluid_synth_add_sfloader(helper, loader)  # tried before the default one; freed with the helper
             sfid = self.L.fluid_synth_sfload(helper, path.encode(), 0)
             if sfid < 0:
                 return None
@@ -452,6 +529,7 @@ def parse_args(argv):
     ap.add_argument('--bank', type=int, default=0)
     ap.add_argument('--prog', type=int, default=0)
     ap.add_argument('--fallback', default='')
+    ap.add_argument('--read-rate', type=float, default=0, metavar='MB_PER_S', help='read the big bank at most this fast (0: no limit)')
     ap.add_argument('piano')
     args = ap.parse_args(argv)
     try:
@@ -476,7 +554,7 @@ def main(argv=None):
     args = parse_args(sys.argv[1:] if argv is None else argv)
     set_process_name('exxpiano-synth')
     fs = FluidSynth(args.options)
-    engine = Engine(fs, choose=fitting_bank, remember=store_piano)
+    engine = Engine(fs, choose=fitting_bank, remember=store_piano, read_rate=args.read_rate or None)
     if not engine.start(args.preview, args.mech, args.piano, args.bank, args.prog, args.fallback or None):
         try:  # exxpiano-run then starts fluidsynth without the preview, until the preview file changes
             open(os.environ.get('EXXPIANO_PREVIEW_FAILED', '/run/exxpiano-preview.failed'), 'w').close()

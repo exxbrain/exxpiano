@@ -19,6 +19,7 @@ PERIOD_SIZE="${PERIOD_SIZE:-444}"   # the onboard jack: 444 x 3 (30 ms); 600 x 2
 PERIODS="${PERIODS:-3}"
 USB_PERIOD_SIZE="${USB_PERIOD_SIZE:-64}"   # USB_*: the buffer of any external card, USB or I2S, chosen automatically or by name (the names are kept for old configs)
 USB_PERIODS="${USB_PERIODS:-2}"
+USB_READ_RATE="${USB_READ_RATE:-20}"   # MB/s for reading a big piano bank with an external card (0: no limit): read at full speed it made a USB card click
 USB_WAIT="${USB_WAIT:-8}"          # the most seconds to wait for a USB card to appear at boot
 USB_SETTLE="${USB_SETTLE:-6}"       # seconds after the boot that USB devices need to show up (a Pi 3 B: all of them by 3.5 s, the USB audio driver by 4.7 s); later nothing is waited for without a reason
 USB_SYSFS="${USB_SYSFS:-/sys/bus/usb/devices}"
@@ -256,6 +257,14 @@ if [ "$METER" = 1 ] && [ -f "$ALSA_TAP_CONF" ] && [ -f "$METER_PROGRAM" ]; then
 fi
 
 if [ -n "$PREVIEW" ]; then
+  # an external card clicked while the piano bank was read from the card at full speed (a Zoom U-24 on a Pi 3 B: about 30 clicks; 20 MB/s about 3, 8 MB/s none)
+  read_rate=()
+  case "$kind" in usb|i2s)
+    if [ "${USB_READ_RATE%.*}" -gt 0 ] 2>/dev/null; then
+      read_rate=(--read-rate "$USB_READ_RATE")
+      echo "exxpiano: the piano bank is read at $USB_READ_RATE MB/s" >&2
+    fi ;;
+  esac
   # the preset of the piano is set for the bridge (FX_ARGS): the synthesizer moves the piano channel to the same one
   read -r -a fx_words <<< "${FX_ARGS:-}"
   PIANO_BANK=0; PIANO_PROG=0
@@ -271,7 +280,7 @@ if [ -n "$PREVIEW" ]; then
        -o "synth.reverb.room-size=$REVERB_ROOM" -o "synth.reverb.damp=$REVERB_DAMP" -o "synth.reverb.width=$REVERB_WIDTH" -o "synth.reverb.level=$REVERB_LEVEL"
        -o "synth.polyphony=$POLYPHONY" -o "synth.cpu-cores=$CPU_CORES" -o "synth.gain=$GAIN"
        --preview "$PREVIEW" --mech "${MECH_SF2:?MECH_SF2 is not set}" --bank "$PIANO_BANK" --prog "$PIANO_PROG"
-       --fallback "${PIANO_SF2_LAST_GOOD:-}" "${PIANO_SF2:?PIANO_SF2 is not set}")
+       --fallback "${PIANO_SF2_LAST_GOOD:-}" ${read_rate[@]+"${read_rate[@]}"} "${PIANO_SF2:?PIANO_SF2 is not set}")
 else
   cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
        -o "audio.alsa.device=$OUT_DEVICE" -o audio.sample-format=16bits -r "$SAMPLE_RATE"
