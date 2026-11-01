@@ -15,8 +15,8 @@ set -euo pipefail
 
 ASOUND="${ASOUND_DIR:-/proc/asound}"
 ALSA_DEVICE="${ALSA_DEVICE:-auto}"
-PERIOD_SIZE="${PERIOD_SIZE:-600}"   # the onboard jack: 600 x 2 is its smallest clean buffer (see below)
-PERIODS="${PERIODS:-2}"
+PERIOD_SIZE="${PERIOD_SIZE:-444}"   # the onboard jack: 444 x 3 (30 ms); 600 x 2 clicked all the time on a Pi 3 B (2.1.0-rc1, see below)
+PERIODS="${PERIODS:-3}"
 USB_PERIOD_SIZE="${USB_PERIOD_SIZE:-64}"   # USB_*: the buffer of any external card, USB or I2S, chosen automatically or by name (the names are kept for old configs)
 USB_PERIODS="${USB_PERIODS:-2}"
 USB_WAIT="${USB_WAIT:-8}"          # the most seconds to wait for a USB card to appear at boot
@@ -232,7 +232,8 @@ fi
 # The onboard jack (bcm2835) never takes a period under 10 ms (444 frames at 44.1 kHz), learns from the GPU only every ~10 ms how much it
 # has played, and stops the stream itself when one such report covers the whole buffer. With 2 periods a buffer under ~27 ms therefore
 # runs dry again and again, whatever the load (a Pi 3 B: 444 x 2 gave 100-160 xruns a minute even in silence, 560 x 2 about one,
-# 600 x 2 none in 5 minutes of a dense piece). 3 periods of 444 (30 ms) are fine; 2 periods get at least 600 frames (27 ms at 44.1 kHz).
+# 600 x 2 none in 5 minutes of a dense piece, yet by ear it clicked all the time on another Pi 3 B with 2.1.0-rc1). 3 periods of 444 (30 ms)
+# are fine and the default; 2 periods get at least 600 frames (27 ms at 44.1 kHz).
 # The card is the one the choice or the explicit device resolved to (plughw:0 and hw:0,0 are the jack too); only a device that names no
 # card of /proc/asound is taken for the jack by its name.
 onboard=0

@@ -133,7 +133,7 @@ class AudioSelectTests(unittest.TestCase):
         r = self.run_script([HEADPHONES])
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('audio.alsa.device=plughw:CARD=Headphones', r.stdout)
-        self.assertIn('-z 600 -c 2', r.stdout)  # the jack's smallest clean buffer
+        self.assertIn('-z 444 -c 3', r.stdout)  # 600 x 2 clicked all the time by ear (2.1.0-rc1)
 
     def test_usb_card_is_preferred_and_uses_small_buffer(self):
         # 64 x 2 (2.9 ms): a Zoom U-24 on a Pi 3 B played 3 x 5 minutes of La Campanella with it without an xrun
@@ -302,7 +302,7 @@ class AudioSelectTests(unittest.TestCase):
         r = self.run_script([HEADPHONES, keyboard(1)])
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('plughw:CARD=Headphones', r.stdout)
-        self.assertIn('-z 600 -c 2', r.stdout)
+        self.assertIn('-z 444 -c 3', r.stdout)
 
     def test_interface_wins_over_keyboard_audio(self):
         r = self.run_script([HEADPHONES, keyboard(1), usb(2, 'U24')])

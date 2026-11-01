@@ -430,8 +430,8 @@ class LaunchTests(unittest.TestCase):
             "audio.alsa.device=plughw:CARD=Headphones",
             'audio.sample-format=16bits',
             'synth.sample-rate=44100',
-            'audio.period-size=600',  # the jack's default, 600 x 2
-            'audio.periods=2',
+            'audio.period-size=444',  # the jack's default, 444 x 3
+            'audio.periods=3',
             'synth.reverb.active=0',
             'synth.reverb.room-size=0.6',
             'synth.reverb.damp=0.4',
