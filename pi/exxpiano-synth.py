@@ -8,7 +8,7 @@ no MIDI, and the loaded SoundFont is then moved over (remove_sfont + add_sfont, 
 
 When the bank is loaded and no key of the piano channel and no sustain pedal is down, the piano channel moves to it and the preview is
 unloaded; its sounding notes ring on until their voices end. With --read-rate the big bank is read from the card at most that fast:
-reading it at full speed made a USB sound card click while the preview played (a Zoom U-24 on a Pi 3 B; 8 MB/s was clean). A new bank is loaded the same way when the web interface writes
+reading it at full speed made a USB sound card click while the preview played (a Zoom U-24 on a Pi 3 B; a slower read only thins the clicks out). A new bank is loaded the same way when the web interface writes
 `exxpiano-load BANK PROG PATH` into the command pipe (the path last: a file name may hold spaces); every other line goes to FluidSynth's own commands (`set synth.gain 0.8`).
 
 The state is written to /run/exxpiano-bank.json for the web interface: state (preview, ready, failed), playing, loading, error.
